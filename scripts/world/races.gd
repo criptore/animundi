@@ -1,4 +1,4 @@
-## The fixed pool of 13 races (docs/GAME_DESIGN.md § 8): base colours and visual traits.
+## The fixed pool of 12 races (docs/GAME_DESIGN.md § 8): base colours and visual traits.
 ## Same data as the 2D sprites in art/sprites.py; each world varies them later.
 extends RefCounted
 
@@ -28,8 +28,6 @@ const RACES := {
 			"banner": "#f49ac1", "magic": "#fff0a0", "traits": ["short", "wings"]},
 	"Bullfolk": {"skin": "#b07a50", "hair": "#5a3a1e", "clothes": "#a03a32", "legs": "#5a3a1e",
 			"banner": "#f08a2a", "magic": "#d83a3a", "traits": ["horns"]},
-	"Ratfolk": {"skin": "#9a9aa6", "hair": "#8a8a96", "clothes": "#4a4a58", "legs": "#5e5e6a",
-			"banner": "#55663a", "magic": "#9ad65a", "traits": ["round_ears", "tail"]},
 	"Undead": {"skin": "#e8e0c8", "hair": "#3d3d4a", "clothes": "#5e3a7a", "legs": "#3d3d4a",
 			"banner": "#4f2470", "magic": "#b07ad0", "traits": ["sockets"]},
 }

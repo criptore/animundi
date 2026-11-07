@@ -10,9 +10,9 @@ The twist: every people, monster species and force of nature (forest, volcano, o
 
 ![A generated world](docs/images/world_0.1.png)
 
-The world is a 3D scene (relief, shadows, water) rendered at low resolution and scaled up with sharp pixels, seen through a fixed tilted orthographic camera. Trees, plants, peoples, animals and monsters are **2D pixel-art sprites standing in that 3D world** ("HD-2D"), cut from the reference sheets in `art/reference/`. Water is coloured by its real depth with glints and shore foam.
+The world is a 3D scene of flat terraces on five levels (deep sea, shallow water, plain, hill, mountain) with shadows and water, rendered at low resolution and scaled up with sharp pixels, seen through a fixed tilted orthographic camera. Trees, plants, peoples, animals and monsters are **2D pixel-art sprites standing in that 3D world** ("HD-2D"), cut from the reference sheets in `art/reference/`. Water is coloured by its real depth with glints and shore foam.
 
-Every world is generated from a seed: continents, mountains, climate (latitude, altitude, winds and rain shadows), rivers and lakes, and 21 biomes, including volcanoes, mushroom lands and cursed lands.
+Every world is generated from a seed: continents, five terrain levels, climate (latitude, altitude, winds and rain shadows), rivers and lakes, and 21 biomes, including volcanoes, mushroom lands and cursed lands.
 
 ## Asset sheets
 

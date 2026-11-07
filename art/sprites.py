@@ -45,7 +45,6 @@ RACES = {
     'Treefolk':        dict(F='t', H='G', C='D', L='T', ban='l', mag='l', traits=['foliage']),
     'Fairies':            dict(F='p', H='u', C='c', L='p', ban='p', mag='f', traits=['short', 'wings']),
     'Bullfolk':         dict(F='S', H='T', C='R', L='T', ban='o', mag='r', traits=['horns']),
-    'Ratfolk':     dict(F='n', H='n', C='K', L='N', ban='M', mag='l', traits=['round_ears', 'tail:p']),
     'Undead':   dict(F='x', H='K', C='U', L='K', ban='U', mag='u', traits=['sockets']),
 }
 ROLES = ['Villager', 'Warrior', 'Chief', 'Shaman']

@@ -2,6 +2,9 @@
 extends RefCounted
 
 enum Water { LAND, OCEAN, LAKE, RIVER }
+## The five terrain levels (docs/GAME_DESIGN.md § 3.2): every tile sits on one of them, and two
+## neighbouring tiles never differ by more than one level.
+enum Level { DEEP_SEA, SHALLOW, PLAIN, HILL, MOUNTAIN }
 
 var width: int
 var height: int
@@ -14,8 +17,6 @@ var sea_level := 0.5
 var temperature := PackedFloat32Array()
 ## 0 = bone dry, 1 = soaked.
 var humidity := PackedFloat32Array()
-## Height of the water surface on lake and river tiles (lakes are flat), same scale as elevation.
-var water_surface := PackedFloat32Array()
 ## Water collected from all the tiles upstream (rivers are where it gets large).
 var flow := PackedFloat32Array()
 ## Tile that water flows to from each tile, -1 for sea tiles.
@@ -24,6 +25,8 @@ var downstream := PackedInt32Array()
 var water := PackedByteArray()
 ## One of the ids in biomes.gd.
 var biome := PackedByteArray()
+## One of Level.
+var level := PackedByteArray()
 ## Volcano centre tiles.
 var volcanoes := PackedInt32Array()
 ## Milliseconds spent in each generation stage, for the HUD and tuning.
@@ -35,12 +38,13 @@ func _init(w: int, h: int, seed_v: int) -> void:
 	height = h
 	seed_value = seed_v
 	var n := w * h
-	for arr in [elevation, temperature, humidity, flow, water_surface]:
+	for arr in [elevation, temperature, humidity, flow]:
 		arr.resize(n)
 	downstream.resize(n)
 	downstream.fill(-1)
 	water.resize(n)
 	biome.resize(n)
+	level.resize(n)
 
 
 func size() -> int:
@@ -63,11 +67,6 @@ func land_height(i: int) -> float:
 ## Depth below the sea, 0 at the shore and 1 at the deepest point. Negative on land.
 func sea_depth(i: int) -> float:
 	return (sea_level - elevation[i]) / sea_level
-
-
-## Like land_height, for the water surface of a lake or river tile.
-func surface_height(i: int) -> float:
-	return (water_surface[i] - sea_level) / (1.0 - sea_level)
 
 
 func is_water(i: int) -> bool:

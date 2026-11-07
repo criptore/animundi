@@ -3,8 +3,8 @@
 For each sheet: the light-blue background and the drop shadows are removed by flood-filling from
 the image border (black outlines stop the fill, so blue inside a sprite stays), plus enclosed
 pockets of the exact background blue. Each sprite is cut from a hand-placed cell (SHEETS), brought
-back to its true pixel-art grid (the sheets use ~5-10 sheet pixels per art pixel) and saved as a
-transparent PNG.
+back to its true pixel-art grid (the sheets use ~5-10 sheet pixels per art pixel), enlarged and
+detailed when its sheet is coarser than the characters (UPSCALE), and saved as a transparent PNG.
 
     pip install pillow numpy scipy
     python3 art/extract_sprites.py            # writes assets/sprites/<group>/<Name>.png
@@ -62,7 +62,7 @@ SHEETS = {
         ('Humans', (50, 85, 210, 325)), ('Elves', (245, 80, 430, 325)), ('Dwarves', (435, 125, 650, 325)),
         ('Orcs', (650, 80, 835, 325)), ('Goblins', (845, 160, 1010, 325)), ('Lizardfolk', (10, 380, 262, 650)),
         ('Felines', (262, 400, 435, 650)), ('Merfolk', (435, 375, 665, 650)), ('Treefolk', (665, 375, 855, 650)),
-        ('Fairies', (855, 435, 1010, 620)), ('Bullfolk', (70, 685, 385, 970)), ('Ratfolk', (405, 730, 655, 970)),
+        ('Fairies', (855, 435, 1010, 620)), ('Bullfolk', (70, 685, 385, 970)),
         ('Undead', (755, 725, 930, 970))]),
     'roles_humans_elves_dwarves_orcs': ('peoples', roles(['Humans', 'Elves', 'Dwarves', 'Orcs'])),
     'roles_goblins_lizardfolk_felines_merfolk': ('peoples', roles(['Goblins', 'Lizardfolk', 'Felines', 'Merfolk'])),
@@ -122,6 +122,80 @@ def to_pixel_grid(rgba, p):
     return out
 
 
+# Groups drawn at a coarser pixel size than the characters: enlarged with Scale2x (as many times
+# as needed) and given extra painted detail, so every sprite has the same pixel density in game.
+UPSCALE = {'trees': 4, 'plants': 2}
+
+
+def scale2x(rgba):
+    """EPX / Scale2x: doubles a pixel-art image, rounding diagonal edges without blurring."""
+    h, w = rgba.shape[:2]
+    pad = np.pad(rgba, ((1, 1), (1, 1), (0, 0)), mode='edge')
+    P = pad[1:-1, 1:-1]
+    A, B, C, D = pad[:-2, 1:-1], pad[1:-1, 2:], pad[1:-1, :-2], pad[2:, 1:-1]  # up, right, left, down
+    eq = lambda x, y: np.all(x == y, axis=2)
+    out = np.zeros((h * 2, w * 2, 4), dtype=rgba.dtype)
+    c1 = np.where((eq(C, A) & ~eq(C, D) & ~eq(A, B))[..., None], A, P)
+    c2 = np.where((eq(A, B) & ~eq(A, C) & ~eq(B, D))[..., None], B, P)
+    c3 = np.where((eq(D, C) & ~eq(D, B) & ~eq(C, A))[..., None], C, P)
+    c4 = np.where((eq(B, D) & ~eq(B, A) & ~eq(D, C))[..., None], D, P)
+    out[0::2, 0::2], out[0::2, 1::2], out[1::2, 0::2], out[1::2, 1::2] = c1, c2, c3, c4
+    return out
+
+
+def thin_outline(rgba):
+    """After enlarging, outlines are several pixels thick: keep only their outer pixel (the one
+    touching transparency) and fill the inner ones with the colour of the body next to them,
+    slightly darkened, so outlines match the 1-pixel outlines of the characters."""
+    out = rgba.copy()
+    for _ in range(4):
+        rgb = out[..., :3].astype(int)
+        opaque = out[..., 3] > 0
+        outline = opaque & (rgb.max(axis=2) < 60)
+        body = opaque & ~outline
+        tp = np.pad(~opaque, 1, constant_values=True)
+        touches_air = tp[:-2, 1:-1] | tp[2:, 1:-1] | tp[1:-1, :-2] | tp[1:-1, 2:]
+        inner = outline & ~touches_air
+        bp = np.pad(body, 1)
+        cp = np.pad(out[..., :3], ((1, 1), (1, 1), (0, 0)))
+        filled = False
+        for dy, dx in ((0, 1), (2, 1), (1, 0), (1, 2)):
+            src = bp[dy:dy + body.shape[0], dx:dx + body.shape[1]] & inner
+            if src.any():
+                colour = cp[dy:dy + body.shape[0], dx:dx + body.shape[1]][src]
+                out[..., :3][src] = (colour * 0.88).astype(np.uint8)
+                inner &= ~src
+                filled = True
+        if not filled:
+            break
+    return out
+
+
+def add_detail(rgba, seed):
+    """Paints detail on an enlarged sprite: soft light on edges facing the upper left, shade on
+    edges facing the lower right, and a fine leaf / stone texture in 2x2 clusters. Outlines stay."""
+    rgba = thin_outline(rgba)
+    rgb = rgba[..., :3].astype(float)
+    opaque = rgba[..., 3] > 0
+    outline = opaque & (rgb.max(axis=2) < 60)
+    body = opaque & ~outline
+    edge = ~body
+    pad = np.pad(edge, 1, constant_values=True)
+    lit = body & (pad[:-2, 1:-1] | pad[1:-1, :-2])        # something empty above or to the left
+    shaded = body & (pad[2:, 1:-1] | pad[1:-1, 2:])        # ... below or to the right
+    h, w = edge.shape
+    rng = np.random.default_rng(seed)
+    cells = rng.random(((h + 1) // 2, (w + 1) // 2))
+    noise = np.kron(cells, np.ones((2, 2)))[:h, :w]
+    factor = np.ones((h, w))
+    factor[body] *= 0.94 + 0.12 * noise[body]
+    factor[lit & ~shaded] *= 1.14
+    factor[shaded & ~lit] *= 0.84
+    out = rgba.copy()
+    out[..., :3] = np.clip(rgb * factor[..., None], 0, 255).astype(np.uint8)
+    return out
+
+
 def trim(rgba):
     ys, xs = np.nonzero(rgba[..., 3])
     if len(ys) == 0:
@@ -150,6 +224,10 @@ def main():
             mask &= sizes[labels] >= max(40, 0.03 * sizes[1:].max(initial=0))
             rgba = np.dstack([rgb[y0:y1, x0:x1], np.where(mask, 255, 0)]).astype(np.uint8)
             sprite = trim(to_pixel_grid(rgba, p))
+            for _ in range(UPSCALE.get(group, 1).bit_length() - 1):
+                sprite = scale2x(sprite)
+            if group in UPSCALE:
+                sprite = add_detail(sprite, seed=sum(map(ord, name)))
             Image.fromarray(sprite).save(os.path.join(OUT, group, name.replace(' ', '_') + '.png'))
             if debug:
                 d.rectangle((x0, y0, x1, y1), outline=(255, 0, 0))

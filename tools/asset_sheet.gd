@@ -56,7 +56,7 @@ func _initialize() -> void:
 
 	match _sheet:
 		"peoples":
-			_title = "Animundi · Peoples (13 races × 4 roles)"
+			_title = "Animundi · Peoples (12 races × 4 roles)"
 			_build_peoples()
 		"creatures":
 			_title = "Animundi · Animals and monsters"
@@ -104,9 +104,9 @@ func _build_nature() -> void:
 		if col == 11:
 			col = 0
 			row += 1
-	_water(Vector3(col * 2.1 + 1.0, 0, 7.0 + row * 2.4), Vector2(3.6, 1.6), -0.4)
+	_water(Vector3(col * 2.1 + 1.0, 0, 7.0 + row * 2.4), Vector2(3.6, 1.6), -0.45)
 	_label("Shallow water", Vector3(col * 2.1 + 1.0, 0, 7.0 + row * 2.4 + 1.15), 12)
-	_water(Vector3((col + 2) * 2.1 + 1.0, 0, 7.0 + row * 2.4), Vector2(3.6, 1.6), -6.0)
+	_water(Vector3((col + 2) * 2.1 + 1.0, 0, 7.0 + row * 2.4), Vector2(3.6, 1.6), -1.4)
 	_label("Deep water", Vector3((col + 2) * 2.1 + 1.0, 0, 7.0 + row * 2.4 + 1.15), 12)
 
 

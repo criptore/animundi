@@ -24,7 +24,7 @@ Known limit noted by the author: a perfect outline shader for every model and ca
 
 The camera never rotates, so characters, animals, monsters, trees and plants are **2D pixel-art sprites** standing upright in the 3D world, facing the camera (stretched by 1 / cos(pitch) so they keep their drawn proportions), casting shadows of their own shape on the relief. Their art comes from the reference sheets in `art/reference/` (trees, small plants, biomes, water, races, roles × races, animals, monsters), cut into `assets/sprites/` by `art/extract_sprites.py`. Biome ground and water colours are taken from the biome and water sheets.
 
-Known gaps: the role sheets have no Ratfolk row (the Ratfolk race sprite stands in for all four roles); trees and small plants are drawn at about half the pixel density of the characters, so their pixels look bigger in game.
+Trees and small plants are drawn at a coarser pixel size than the characters in their sheets; the extraction script enlarges them (Scale2x) and paints extra detail (leaf texture, rim light, shading) so every sprite shares the same pixel density in game.
 
 ## Secondary references
 

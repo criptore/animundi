@@ -36,7 +36,6 @@ const COLORS := [
 const PEAK_HEIGHT := 0.94
 const MOUNTAIN_HEIGHT := 0.8
 const HILLS_HEIGHT := 0.6
-const BEACH_HEIGHT := 0.05
 # Sea depth below which water turns deep (0 = shore, 1 = deepest point).
 const DEEP_WATER_DEPTH := 0.14
 # Temperature under which water freezes.

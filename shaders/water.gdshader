@@ -11,7 +11,7 @@ uniform vec4 shallow_color : source_color = vec4(0.36, 0.78, 0.95, 1.0);
 uniform vec4 deep_color : source_color = vec4(0.08, 0.27, 0.6, 1.0);
 uniform vec4 foam_color : source_color = vec4(0.93, 0.98, 1.0, 1.0);
 // Depth (in tiles) at which water reaches its deepest colour.
-uniform float full_depth = 6.0;
+uniform float full_depth = 1.5;
 
 varying vec3 world_pos;
 
@@ -37,7 +37,7 @@ void fragment() {
 	c = mix(c, foam_color.rgb, glint * 0.55 * (1.0 - band * 0.5));
 
 	// Foam: a band along the shore that swells and shrinks.
-	float swell = 0.18 + 0.12 * sin(TIME * 1.8 + (world_pos.x + world_pos.z) * 0.6);
+	float swell = 0.1 + 0.08 * sin(TIME * 1.8 + (world_pos.x + world_pos.z) * 0.6);
 	float foam = step(depth, swell);
 	c = mix(c, foam_color.rgb, foam * 0.85);
 

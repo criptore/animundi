@@ -59,7 +59,7 @@ seed
 
 - Heightmap = continent mask (number of continents, falloff to the edges) + multi-octave noise + ridge noise for mountain chains.
 - Sea level cuts the heightmap into **deep water / shallow water / land**.
-- Height bands: beach, lowland, hills, mountains, peaks.
+- **Five terrain levels**: deep sea, shallow water (coasts, rivers, lakes), plain (and beach), hill, mountain. The heightmap is quantised into these levels, smoothed with a cellular automaton (each land tile takes the majority level of its 3×3 neighbourhood) and constrained so that two neighbouring tiles never differ by more than one level: mountains are ringed by hills, coasts and river banks are plains, deep sea is ringed by shallow water. In 3D every tile is a flat terrace with small cliffs, about one tile high per level, so the relief stays at the scale of the people on it.
 - Volcanoes: placed on high ridges or hotspots; they create volcanic rock and lava around them.
 
 ### 3.3 Climate
@@ -170,7 +170,7 @@ Monsters are species with a **threat** role. They are generated the same way as 
 
 ## 8. Peoples (procedural races)
 
-**Decision: a fixed pool of 13 races**, the ones in `assets/`: Humans, Elves, Dwarves, Orcs, Goblins, Lizardfolk, Felines, Merfolk, Treefolk, Fairies, Bullfolk, Ratfolk, Undead. Each world picks some of them and **varies** them (palette shifts, stat spread, traits, temperament), so the Elves of one world are not the Elves of the next. Everything built on top of a race (language, culture, religion, buildings, history) stays fully generated.
+**Decision: a fixed pool of 12 races**, the ones in `assets/`: Humans, Elves, Dwarves, Orcs, Goblins, Lizardfolk, Felines, Merfolk, Treefolk, Fairies, Bullfolk, Undead. Each world picks some of them and **varies** them (palette shifts, stat spread, traits, temperament), so the Elves of one world are not the Elves of the next. Everything built on top of a race (language, culture, religion, buildings, history) stays fully generated.
 
 ### 8.1 Race definition and per-world variation
 
@@ -485,7 +485,7 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 
 ## 24. Open questions
 
-Decided: **Godot 4** desktop game; **fixed pool of 13 races**, varied per world.
+Decided: **Godot 4** desktop game; **fixed pool of 12 races**, varied per world.
 
 1. **Map size target** and number of units we want to support.
 2. **Violence level:** blood, slavery, sacrifices, genocide in the chronicle — what is in and what is out?

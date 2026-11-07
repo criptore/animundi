@@ -24,7 +24,6 @@ var _heights := PackedFloat32Array()
 var _container := SubViewportContainer.new()
 var _viewport := SubViewport.new()
 var _terrain := MeshInstance3D.new()
-var _inland_water := MeshInstance3D.new()
 var _ocean := MeshInstance3D.new()
 var _vegetation := Node3D.new()
 var _camera := PixelCamera.new()
@@ -50,11 +49,9 @@ func _ready() -> void:
 
 	_style.add_lighting(_viewport)
 	_terrain.material_override = _style.terrain
-	_inland_water.material_override = _style.water
 	_ocean.material_override = _style.water
-	_inland_water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ocean.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for node in [_terrain, _inland_water, _ocean, _vegetation, _camera]:
+	for node in [_terrain, _ocean, _vegetation, _camera]:
 		_viewport.add_child(node)
 	_camera.current = true
 
@@ -69,7 +66,6 @@ func _ready() -> void:
 func generate() -> void:
 	world = WorldGenerator.generate(settings)
 	_heights = TerrainBuilder.heights(world)
-	_inland_water.mesh = TerrainBuilder.build_inland_water(world)
 	_style.water.set_shader_parameter("heightmap", TerrainBuilder.heightmap_texture(world, _heights))
 	_style.water.set_shader_parameter("map_size", Vector2(world.width, world.height))
 
@@ -143,13 +139,12 @@ func pick_tile(screen_pos: Vector2) -> Vector2i:
 	var dir := _camera.project_ray_normal(p)
 	if dir.y >= -0.01:
 		return Vector2i(-1, -1)
-	var top := TerrainBuilder.HEIGHT_SCALE + 2.0
-	var t := (origin.y - top) / -dir.y
-	var t_end := (origin.y + TerrainBuilder.SEA_FLOOR + 2.0) / -dir.y
+	var t := (origin.y - TerrainBuilder.TOP - 0.5) / -dir.y
+	var t_end := (origin.y - TerrainBuilder.BOTTOM + 0.5) / -dir.y
 	while t < t_end:
 		var q := origin + dir * t
 		var inside := q.x >= 0.0 and q.z >= 0.0 and q.x <= world.width - 1 and q.z <= world.height - 1
 		if inside and q.y <= maxf(TerrainBuilder.sample(world, _heights, q.x, q.z), 0.0):
 			return Vector2i(roundi(q.x), roundi(q.z))
-		t += 0.25
+		t += 0.1
 	return Vector2i(-1, -1)

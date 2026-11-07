@@ -18,6 +18,7 @@ static func generate(settings) -> WorldData:
 	_timed(world, "shape", func(): _shape(world, settings, rng))
 	_timed(world, "climate", func(): _climate(world, settings, rng))
 	_timed(world, "hydrology", func(): _hydrology(world, settings))
+	_timed(world, "levels", func(): _levels(world))
 	_timed(world, "biomes", func(): _biomes(world, settings, rng))
 	return world
 
@@ -310,10 +311,6 @@ static func _hydrology(world: WorldData, s) -> void:
 		if world.water[i] == WorldData.Water.LAND and world.flow[i] > threshold:
 			world.water[i] = WorldData.Water.RIVER
 
-	for i in order:
-		if world.water[i] == WorldData.Water.LAKE or world.water[i] == WorldData.Water.RIVER:
-			world.water_surface[i] = filled[i]
-
 	# Fresh water makes the land around it greener.
 	var wet := world.humidity.duplicate()
 	for i in order:
@@ -356,7 +353,75 @@ static func _remove_small_lakes(world: WorldData, min_tiles: int) -> void:
 				world.water[i] = WorldData.Water.LAND
 
 
-# ------------------------------------------------------------------------------ 4. biomes
+# ------------------------------------------------------------------------------ 4. levels
+
+## Terraced terrain with five levels: deep sea, shallow water (coasts, rivers, lakes), plain,
+## hill, mountain.
+##  1. Quantise: sea tiles by depth, land tiles by height band.
+##  2. Smooth with a cellular automaton: each land tile takes the majority level of its 3x3
+##     neighbourhood (removes lone bumps and pits, gives clean plateaus).
+##  3. Stair constraint: neighbours differ by at most one level. Land is lowered towards lower
+##     neighbours (mountains get a ring of hills, coasts and river banks are plains), and deep sea
+##     next to land becomes shallow. Water tiles (sea, rivers, lakes) keep their water level.
+static func _levels(world: WorldData) -> void:
+	var w := world.width
+	var h := world.height
+	var L := WorldData.Level
+	for i in world.size():
+		match world.water[i]:
+			WorldData.Water.OCEAN:
+				world.level[i] = L.DEEP_SEA if world.sea_depth(i) > Biomes.DEEP_WATER_DEPTH else L.SHALLOW
+			WorldData.Water.LAKE, WorldData.Water.RIVER:
+				world.level[i] = L.SHALLOW
+			_:
+				var e := world.land_height(i)
+				world.level[i] = L.MOUNTAIN if e > Biomes.MOUNTAIN_HEIGHT else (L.HILL if e > Biomes.HILLS_HEIGHT else L.PLAIN)
+
+	for _pass in 2:
+		var next := world.level.duplicate()
+		for y in h:
+			for x in w:
+				var i := world.index(x, y)
+				if world.is_water(i):
+					continue
+				var votes := [0, 0, 0, 0, 0]
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						if world.in_bounds(x + dx, y + dy):
+							var j := world.index(x + dx, y + dy)
+							if not world.is_water(j):
+								votes[world.level[j]] += 1
+				var best: int = world.level[i]
+				for lv in range(L.PLAIN, L.MOUNTAIN + 1):
+					if votes[lv] > votes[best]:
+						best = lv
+				next[i] = best
+		world.level = next
+
+	var changed := true
+	while changed:
+		changed = false
+		for y in h:
+			for x in w:
+				var i := world.index(x, y)
+				var lo := 99
+				var hi := -1
+				for d in NEIGHBOURS_4:
+					var nx: int = x + d.x
+					var ny: int = y + d.y
+					if world.in_bounds(nx, ny):
+						var lv: int = world.level[world.index(nx, ny)]
+						lo = mini(lo, lv)
+						hi = maxi(hi, lv)
+				if not world.is_water(i) and world.level[i] > maxi(lo + 1, L.PLAIN):
+					world.level[i] = maxi(lo + 1, L.PLAIN)
+					changed = true
+				elif world.water[i] == WorldData.Water.OCEAN and world.level[i] < hi - 1:
+					world.level[i] = mini(hi - 1, L.SHALLOW)
+					changed = true
+
+
+# ------------------------------------------------------------------------------ 5. biomes
 
 static func _biomes(world: WorldData, s, rng: SeededRng) -> void:
 	var w := world.width
@@ -375,7 +440,7 @@ static func _biomes(world: WorldData, s, rng: SeededRng) -> void:
 			var b: int
 			match world.water[i]:
 				WorldData.Water.OCEAN:
-					b = Biomes.DEEP_WATER if world.sea_depth(i) > Biomes.DEEP_WATER_DEPTH else Biomes.WATER
+					b = Biomes.DEEP_WATER if world.level[i] == WorldData.Level.DEEP_SEA else Biomes.WATER
 					if t < Biomes.ICE_TEMPERATURE:
 						b = Biomes.ICE
 				WorldData.Water.LAKE, WorldData.Water.RIVER:
@@ -397,14 +462,13 @@ static func _biomes(world: WorldData, s, rng: SeededRng) -> void:
 static func _land_biome(world: WorldData, i: int, x: int, y: int) -> int:
 	var e := world.land_height(i)
 	var t := world.temperature[i]
-	if e > Biomes.PEAK_HEIGHT:
-		return Biomes.PEAK
-	if e > Biomes.MOUNTAIN_HEIGHT:
-		return Biomes.MOUNTAIN if t > 0.12 else Biomes.PEAK
-	if e < Biomes.BEACH_HEIGHT and t > 0.25 and _touches_ocean(world, x, y):
+	var lv := world.level[i]
+	if lv == WorldData.Level.MOUNTAIN:
+		return Biomes.PEAK if e > Biomes.PEAK_HEIGHT or t <= 0.12 else Biomes.MOUNTAIN
+	if lv == WorldData.Level.PLAIN and t > 0.25 and _touches_ocean(world, x, y):
 		return Biomes.BEACH
 	var b := Biomes.classify_climate(t, world.humidity[i], e < 0.12)
-	if e > Biomes.HILLS_HEIGHT and (b == Biomes.GRASSLAND or b == Biomes.FOREST or b == Biomes.SAVANNA):
+	if lv == WorldData.Level.HILL and (b == Biomes.GRASSLAND or b == Biomes.FOREST or b == Biomes.SAVANNA):
 		return Biomes.HILLS
 	return b
 

@@ -27,6 +27,7 @@ func _initialize() -> void:
 	test_renderer()
 	test_terrain_mesh()
 	test_vegetation()
+	test_levels()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -134,13 +135,31 @@ func test_terrain_mesh() -> void:
 	var h := TerrainBuilder.heights(w)
 	var mesh := TerrainBuilder.build_terrain(w, h)
 	var arrays := mesh.surface_get_arrays(0)
-	check((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 64 * 64, "terrain has one vertex per tile")
+	check((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() >= 64 * 64 * 6, "terrain has a flat top for every tile")
 	var ok := true
 	for i in w.size():
 		var land := w.water[i] == WorldData.Water.LAND
-		if land and h[i] <= 0.0 or w.water[i] == WorldData.Water.OCEAN and h[i] >= 0.0:
+		var sea_floor := w.water[i] == WorldData.Water.OCEAN and w.biome[i] != Biomes.ICE
+		if land and h[i] <= 0.0 or sea_floor and h[i] >= 0.0:
 			ok = false
-	check(ok, "land is above the sea plane and sea floor below it")
+	check(ok, "land is above the sea plane and sea floor below it (sea ice floats on it)")
+
+
+func test_levels() -> void:
+	var w := make("levels", 128)
+	var ok := true
+	var used := {}
+	for y in w.height:
+		for x in w.width:
+			var i := w.index(x, y)
+			used[w.level[i]] = true
+			for d in [Vector2i(1, 0), Vector2i(0, 1)]:
+				if w.in_bounds(x + d.x, y + d.y) and absi(int(w.level[i]) - int(w.level[w.index(x + d.x, y + d.y)])) > 1:
+					ok = false
+			if w.is_water(i) != (w.level[i] <= WorldData.Level.SHALLOW):
+				ok = false
+	check(ok, "neighbouring tiles differ by at most one level, water sits on the two water levels")
+	check(used.size() == 5, "all five levels are used (%d)" % used.size())
 
 
 func test_vegetation() -> void:

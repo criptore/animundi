@@ -8,8 +8,8 @@ const ROOT := "res://assets/sprites"
 
 ## World units (tiles) per sprite pixel, by group: sets how big each kind of sprite stands.
 const SCALE := {
-	"trees": 0.12,
-	"plants": 0.055,
+	"trees": 0.03,
+	"plants": 0.0275,
 	"peoples": 0.028,
 	"races": 0.028,
 	"animals": 0.022,

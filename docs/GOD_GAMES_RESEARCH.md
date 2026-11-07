@@ -30,7 +30,7 @@ Research notes for Animundi: what the player can do in god games and world sandb
 
 | Feature | Games | Animundi |
 |---|---|---|
-| Spawn peoples (humans, elves, orcs, dwarves…) | WorldBox | ✅ 13 fixed races |
+| Spawn peoples (humans, elves, orcs, dwarves…) | WorldBox | ✅ 12 fixed races |
 | Spawn animals and monsters | WorldBox | ✅ |
 | Spawn legendary / huge creatures (dragons, giants) | WorldBox | ✅ |
 | Creature editor (build a body from parts) | Spore | ❌ |
