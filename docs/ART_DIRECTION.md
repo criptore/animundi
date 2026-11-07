@@ -22,15 +22,20 @@ Known limit noted by the author: a perfect outline shader for every model and ca
 
 ## Shaders in the game
 
-The game renders with Godot's **Forward+** renderer (needed for the normal buffer of the stylizer).
+The game renders with Godot's **Forward+** renderer. Its shaders follow the techniques of the t3ssel8r / David Holland style, taken from open-source Godot implementations (credits and licenses in `shaders/vendor/README.md`):
 
-| Effect | Where |
-|---|---|
-| Pixel-art outlines (depth edges) and highlights (normal edges), toggle with E | `shaders/vendor/pixelart_stylizer.gdshader`, by Leo Peltola (MIT), unmodified |
-| Banded toon light with dithered edges, shared by ground, sprites and water | `shaders/toon.gdshaderinc` |
-| Sprites lit like the ground, darkened in tree shadows | `shaders/sprite.gdshader` |
-| Tile-top patterns, cliff strata, glowing lava | `shaders/terrain.gdshader` |
-| Water depth colours, mirrored-camera reflections with pixel ripple, glints, shore foam | `shaders/water.gdshader` |
+| Technique | Where | From |
+|---|---|---|
+| Pixel-art outlines (depth edges) and highlights (normal edges), toggle with E | `shaders/vendor/pixelart_stylizer.gdshader` | Leo Peltola (MIT), unmodified |
+| Stepped cel lighting shared by ground, sprites and grass | `shaders/cel.gdshaderinc` | Robert-K/godot-3d-pixel-art (MIT) |
+| Cloud shadows: the sun ray is followed up to a cloud layer that reads a scrolling noise texture | `shaders/cel.gdshaderinc` | Robert-K/godot-3d-pixel-art (MIT) |
+| Sprites and grass lit as one point at their base (`LIGHT_VERTEX`), so each is wholly in sun or shade | `shaders/sprite.gdshader`, `shaders/grass.gdshader` | Robert-K/godot-3d-pixel-art (MIT) |
+| Dense billboard grass: 3×3 tuft atlas, ground colour, wind animated at a low frame rate in groups | `shaders/grass.gdshader`, `assets/vendor/grass_atlas.png` | Robert-K/godot-3d-pixel-art (MIT) |
+| Texel-snapped camera with sub-pixel display offset (smooth panning, no shimmering) | `scripts/ui/pixel_camera.gd`, `scripts/main.gd` | Robert-K/godot-3d-pixel-art (MIT) |
+| Water: depth colours, mirrored-camera reflections with pixel ripple, glints, shore foam | `shaders/water.gdshader` | after David Holland's article |
+| Tile-top patterns, cliff strata, glowing lava | `shaders/terrain.gdshader` | Animundi |
+
+Tried and dropped: volumetric godray planes (they washed a beige veil over large parts of a world-sized map; the technique suits close-up scenes).
 
 ## Sprites in the 3D world
 

@@ -5,7 +5,7 @@
 shader_type spatial;
 render_mode cull_back;
 
-#include "res://shaders/toon.gdshaderinc"
+#include "res://shaders/cel.gdshaderinc"
 
 // Pattern pixels per tile.
 uniform float pixels = 8.0;
@@ -66,6 +66,6 @@ void fragment() {
 }
 
 void light() {
-	float d = hash12(floor(world_pos.xz * pixels) + 17.0);
-	DIFFUSE_LIGHT += toon_light(NORMAL, LIGHT, ATTENUATION, LIGHT_COLOR, d);
+	float amount = dot(NORMAL, LIGHT) + (ATTENUATION - 1.0) - cloud_shadow(world_pos, TIME);
+	DIFFUSE_LIGHT += cel_light(amount, LIGHT_COLOR);
 }

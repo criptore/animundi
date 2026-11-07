@@ -36,6 +36,7 @@ var _reflection := SubViewport.new()
 var _reflection_camera := Camera3D.new()
 ## Leo Peltola's pixel-art outline & highlight pass, on a quad in front of the camera.
 var _stylizer: MeshInstance3D
+var _grass := MultiMeshInstance3D.new()
 var _hud := Hud.new()
 var _style := SceneStyle.new()
 var _dragging := false
@@ -64,6 +65,9 @@ func _ready() -> void:
 		_viewport.add_child(node)
 	_camera.current = true
 	_stylizer = _style.add_stylizer(_camera, STYLIZER_LAYER)
+	_grass.material_override = _style.grass
+	_grass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_vegetation.add_child(_grass)
 
 	# Reflections: a camera mirrored under the water plane renders the same world (water itself
 	# excluded through its render layer) into a transparent texture the water shader reads.
@@ -100,7 +104,9 @@ func generate() -> void:
 	_ocean.position = Vector3(world.width / 2.0, 0.0, world.height / 2.0)
 
 	for child in _vegetation.get_children():
-		child.queue_free()
+		if child != _grass:
+			child.queue_free()
+	_grass.multimesh = VegetationBuilder.build_grass(world, _heights)
 	var plants := VegetationBuilder.build(world, _heights)
 	_ground_cover.clear()
 	for id in plants:
@@ -148,6 +154,8 @@ func _process(_delta: float) -> void:
 	var close := _camera.world_per_pixel() < GROUND_COVER_MAX_PIXEL
 	for node in _ground_cover:
 		node.visible = close
+	_grass.visible = close
+	_update_display()
 	var tile := pick_tile(get_viewport().get_mouse_position())
 	if tile.x < 0:
 		_hud.set_hover_text("")
@@ -160,6 +168,17 @@ func _process(_delta: float) -> void:
 		roundi(lerpf(-30.0, 45.0, world.temperature[i])), roundi(world.humidity[i] * 100.0)])
 
 
+## Shows the upscaled render one render pixel larger than the window on every side, shifted by the
+## camera's sub-pixel error, so the snapped render pans smoothly.
+func _update_display() -> void:
+	var pad := float(pixel_scale)
+	var shift := _camera.texel_error * pixel_scale
+	_container.offset_left = -pad + shift.x
+	_container.offset_top = -pad + shift.y
+	_container.offset_right = pad + shift.x
+	_container.offset_bottom = pad + shift.y
+
+
 ## Keeps the reflection camera the mirror image of the game camera across the water plane (y = 0).
 func _update_reflection() -> void:
 	if _reflection.size != _viewport.size:
@@ -169,13 +188,15 @@ func _update_reflection() -> void:
 			Basis.from_euler(Vector3(deg_to_rad(-PixelCamera.PITCH), deg_to_rad(PixelCamera.YAW), 0.0)),
 			Vector3(p.x, -p.y, p.z))
 	_reflection_camera.size = _camera.size
+	_reflection_camera.h_offset = _camera.h_offset
+	_reflection_camera.v_offset = -_camera.v_offset
 	_reflection_camera.near = _camera.near
 	_reflection_camera.far = _camera.far
 
 
 ## Tile under a screen position, or (-1, -1): walks the camera ray until it goes under the ground.
 func pick_tile(screen_pos: Vector2) -> Vector2i:
-	var p := screen_pos / float(pixel_scale)
+	var p := (screen_pos - _container.position) / float(pixel_scale)
 	var origin := _camera.project_ray_origin(p)
 	var dir := _camera.project_ray_normal(p)
 	if dir.y >= -0.01:

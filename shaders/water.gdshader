@@ -4,7 +4,7 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled;
 
-#include "res://shaders/toon.gdshaderinc"
+#include "res://shaders/cel.gdshaderinc"
 
 uniform sampler2D heightmap : filter_linear, repeat_disable;
 uniform vec2 map_size = vec2(256.0, 256.0);

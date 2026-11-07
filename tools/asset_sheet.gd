@@ -95,23 +95,23 @@ func _process(_delta: float) -> bool:
 func _build_nature() -> void:
 	_row("Trees", SpriteLibrary.list("trees"), 0.0, 3.0)
 	_row("Bushes, rocks, mushrooms, cacti, grass, flowers", SpriteLibrary.list("plants"), 3.6, 3.0)
-	_section("Terrain (biome ground) and water", 6.4)
+	_section("Terrain (biome ground) and water", 7.4)
 	var col := 0
 	var row := 0
 	for b in Biomes.COUNT:
 		if b == Biomes.WATER or b == Biomes.DEEP_WATER:
 			continue
-		var p := Vector3(col * 2.1, 0, 7.0 + row * 2.4)
+		var p := Vector3(col * 2.1, 0, 8.0 + row * 2.4)
 		_swatch(Biomes.COLORS[b], p)
 		_label(Biomes.NAMES[b], p + Vector3(0, 0, 1.15), 12)
 		col += 1
 		if col == 11:
 			col = 0
 			row += 1
-	_water(Vector3(col * 2.1 + 1.0, 0, 7.0 + row * 2.4), Vector2(3.6, 1.6), -0.45)
-	_label("Shallow water", Vector3(col * 2.1 + 1.0, 0, 7.0 + row * 2.4 + 1.15), 12)
-	_water(Vector3((col + 2) * 2.1 + 1.0, 0, 7.0 + row * 2.4), Vector2(3.6, 1.6), -1.4)
-	_label("Deep water", Vector3((col + 2) * 2.1 + 1.0, 0, 7.0 + row * 2.4 + 1.15), 12)
+	_water(Vector3(col * 2.1 + 1.0, 0, 8.0 + row * 2.4), Vector2(3.6, 1.6), -0.45)
+	_label("Shallow water", Vector3(col * 2.1 + 1.0, 0, 8.0 + row * 2.4 + 1.15), 12)
+	_water(Vector3((col + 2) * 2.1 + 1.0, 0, 8.0 + row * 2.4), Vector2(3.6, 1.6), -1.4)
+	_label("Deep water", Vector3((col + 2) * 2.1 + 1.0, 0, 8.0 + row * 2.4 + 1.15), 12)
 
 
 func _build_peoples() -> void:

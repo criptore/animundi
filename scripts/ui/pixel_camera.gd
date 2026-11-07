@@ -1,6 +1,9 @@
 ## Orthographic camera looking north over the world at a fixed angle, for the low-resolution pixel
 ## render. It pans and zooms but never rotates: a fixed angle keeps pixel outlines clean
-## (docs/ART_DIRECTION.md). Its position snaps to the render's pixel grid, so nothing shimmers.
+## (docs/ART_DIRECTION.md). The render is snapped to whole pixels (through h_offset / v_offset, so
+## nothing shimmers) and the leftover fraction of a pixel is reported in `texel_error`, for the
+## display to shift the upscaled image by it: panning stays smooth. Technique from
+## Robert-K/godot-3d-pixel-art (MIT, see shaders/vendor/README.md).
 extends Camera3D
 
 const DISTANCE := 300.0
@@ -15,6 +18,8 @@ const PITCH := -42.0
 var target := Vector3.ZERO
 ## Height of the view in world units (tiles).
 var ortho_size := 120.0
+## How far the snapped render is from the true camera position, in render pixels.
+var texel_error := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -71,11 +76,12 @@ func apply() -> void:
 	size = ortho_size
 	var b := Basis.from_euler(Vector3(deg_to_rad(PITCH), deg_to_rad(YAW), 0.0))
 	var pos := target + b.z * DISTANCE
+	global_transform = Transform3D(b, pos)
 	if is_inside_tree():
-		# Snap to whole render pixels in the camera's own plane.
+		# Snap the render to whole pixels in the camera's own plane, keeping the true position.
 		var texel := world_per_pixel()
 		var local := b.inverse() * pos
-		local.x = roundf(local.x / texel) * texel
-		local.y = roundf(local.y / texel) * texel
-		pos = b * local
-	global_transform = Transform3D(b, pos)
+		var error := Vector2(roundf(local.x / texel) * texel - local.x, roundf(local.y / texel) * texel - local.y)
+		h_offset = error.x
+		v_offset = error.y
+		texel_error = Vector2(error.x, -error.y) / texel
