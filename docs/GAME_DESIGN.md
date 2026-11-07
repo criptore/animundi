@@ -10,6 +10,8 @@ Animundi is a top-down, pixel-art god sandbox. The player shapes a world and wat
 
 **Everything is procedural.** A world is born from a single seed: its land, its climate, its species, its peoples, their languages, gods, buildings, banners and history. Two seeds never give the same world. Nothing in the content is hand-authored except the *rules* and the *building blocks* the generators combine.
 
+**Progress never stops.** Peoples go from stone tools to bronze, iron, gunpowder, steam, planes, rockets and space travel, and keep going: there is no final age.
+
 **The twist:** on top of the procedural generators, small local AI models give each people, monster species and nature force a mind of its own. They invent culture and write the code of their own inventions in a small in-game language. The game must stay fully playable **without** AI: generators produce everything by default, and the AI only replaces some of their choices.
 
 ### Design pillars
@@ -193,7 +195,7 @@ A race is a small data record; the sprite, stats and behaviour all derive from i
 
 - Spawned at world creation (number set in world settings), placed in their preferred biomes.
 - Spawned by the player.
-- **Transformations inside the pool:** a curse or a plague can turn a people Undead, magic can awaken trees into Treefolk. A group isolated for a long time drifts into a distinct **culture** (and slight visual variation), not a new race.
+- **Transformations inside the pool:** a curse or a plague can turn a people Undead, an enchanted forest can give birth to Treefolk. Animals are never awakened into peoples. A group isolated for a long time drifts into a distinct **culture** (and slight visual variation), not a new race.
 
 ---
 
@@ -268,11 +270,30 @@ Cultures **drift** over time (events, contact with neighbours, leaders) and can 
 
 ## 13. Technology, magic and the invention language
 
-### 13.1 Progress
+### 13.1 Progress: it never stops
 
-- Ages: Stone → Bronze → Iron → Medieval → (Renaissance, optional). Magic grows on its own track depending on magic level and culture.
-- Progress comes from knowledge points (scholars, libraries, contact, discoveries).
-- There is **no fixed tech tree**. Inventions are generated items, buildings, techniques and spells, written in the invention language.
+Peoples keep advancing as long as they survive. There is **no last age**.
+
+| Age | Examples of what appears |
+|---|---|
+| Stone | tools, fire, huts, spears, first farms |
+| Bronze | metalwork, wheels, writing, temples, boats |
+| Iron | iron weapons, roads, fortresses, coins |
+| Medieval | castles, mills, crossbows, guilds, universities |
+| Renaissance | gunpowder, cannons, printing, ocean ships, banks |
+| Industrial | steam engines, trains, factories, rifles, cities of brick |
+| Modern | electricity, cars, **planes**, radio, tanks, skyscrapers |
+| Atomic | nuclear power and **nuclear weapons**, computers, jets |
+| Space | **rockets**, satellites, moon landings, space stations |
+| Future | robots, AI, lasers, fusion, orbital cities, starships |
+| Beyond | generated without end: each new age is named and filled by the generators (and the AI), e.g. colonising other worlds, terraforming, post-physical civilisations |
+
+- Progress comes from knowledge points (scholars, libraries, universities, contact, discoveries, war).
+- There is **no fixed tech tree**. Inventions are generated items, buildings, vehicles, techniques and spells, written in the invention language. Each age only unlocks new **building blocks** (materials, energy sources, effect types) that inventions can combine.
+- Magic grows on its own track depending on magic level and culture, and can merge with technology (magitech) instead of disappearing.
+- Peoples can also **regress**: wars, plagues, disasters or a nuclear winter can throw a civilisation back several ages, and knowledge can be lost and rediscovered.
+- **Consequences of progress:** pollution, deforestation, climate change, extinctions, nuclear wars. Nature spirits react to them (§ 15).
+- **Space:** rockets launch from the map; later ages unlock satellites, the moon and other worlds (a separate small map per celestial body, generated from the same seed).
 
 ### 13.2 Invention language (Animundi Script)
 
@@ -292,8 +313,8 @@ A small, safe, data-only language. Generators (and later the AI) combine **build
 }
 ```
 
-- **Kinds:** weapon, armour, tool, building, technique (farming, mining…), spell, ritual, law, unit ability, monster ability.
-- **Blocks:** triggers (`on`), conditions (`if`), actions (`do`: damage, heal, spawn, transform tile, buff, debuff, move, build, produce…), costs and requirements.
+- **Kinds:** weapon, armour, tool, vehicle (cart, ship, train, car, plane, rocket…), building, energy source, technique (farming, mining…), spell, ritual, law, unit ability, monster ability.
+- **Blocks:** triggers (`on`), conditions (`if`), actions (`do`: damage, heal, spawn, transform tile, buff, debuff, move, fly, launch, build, produce, pollute…), costs and requirements. New blocks unlock with each age.
 - **Rules:** every effect has a cost; power is capped by age and resources; invalid scripts are rejected; nothing outside the sandbox can be touched.
 - **Selection:** inventions are tested in the world. Useful ones spread to other settlements and get copied by neighbours; useless ones are forgotten.
 
@@ -325,6 +346,7 @@ A small, safe, data-only language. Generators (and later the AI) combine **build
 
 - Causes: territory, resources, religion, revenge, a leader's ambition, monsters.
 - Armies gather, march, siege, fight in the open (simple unit-vs-unit combat with stats, equipment and terrain).
+- Warfare follows the age: spears and bows, then cannons and muskets, then tanks, planes, missiles and nuclear weapons, then robots and orbital weapons.
 - Results: conquest, razing, refugees, tribute, peace treaties. All recorded in the chronicle.
 
 ---
@@ -333,7 +355,7 @@ A small, safe, data-only language. Generators (and later the AI) combine **build
 
 Nature has its own **spirits**: one per large biome region or special site (Forest of X, Volcano Y, the Northern Sea). They are agents like peoples (with an optional AI mind).
 
-- A spirit has a mood (calm ↔ angry) driven by what happens in its domain: deforestation, mining, pollution, worship, offerings.
+- A spirit has a mood (calm ↔ angry) driven by what happens in its domain: deforestation, mining, pollution, industry, nuclear tests, worship, offerings. The more industrial the world, the angrier nature can get.
 - When angry or rewarded, it acts through **natural events:** storms, floods, droughts, earthquakes, eruptions, wildfires, plagues of beasts, blooming, bountiful harvests.
 - Spirits can be worshipped, bargained with or fought.
 
@@ -363,12 +385,17 @@ Generated diseases: name, carrier (people, animals, water, rats), symptoms (stat
 | Category | Powers |
 |---|---|
 | Terrain | raise / lower land, water, sand, mountains, biome brushes, rivers, volcano |
-| Life | spawn any generated species, people or monster; create a new people with the race generator |
+| Life | spawn any species, people or monster (including legendary ones), give or remove traits, spread infections (zombie, spores) |
 | Nature | rain, drought, snow, storms, lightning, tornado, earthquake, meteor, fire, flood |
-| Magic | bless, curse, corrupt, purify, awaken (animal or tree → people), resurrect, plague, cure |
-| Civilisation | inspire (invention), madness, rebellion, peace, war, gift of resources |
+| Destruction | bombs, napalm, nukes, UFO attack, Armageddon (every kingdom at war), destroy buildings |
+| Magic | bless, curse, corrupt, purify, heal, resurrect, madness, plague, cure, epic miracles, powers from sacred sites |
+| Gestures | miracles cast by drawing a gesture with the mouse |
+| Civilisation | inspire (invention or research direction), rebellion, peace, war, alliance, friendship / spite, world laws, gift of resources |
+| Faith | belief of followers gives mana (optional Faith mode), good ↔ evil alignment that changes how the world looks, rival gods (nature spirits) |
+| Avatar | a creature the player trains by rewards and punishments, which then acts on its own |
 | Tools | inspect anything, follow a unit, favourite units, name things, time controls, divine hand (pick up, drop, throw), poke |
-| World | world settings, regenerate with a seed, save/load, share a seed |
+| World | world settings, regenerate with a seed, save/load, share a seed, rename anything, scenarios with goals, achievements, storyteller that paces events (optional) |
+| Mods | races, species, inventions and powers as data files |
 
 Peoples **react** to the player's acts (§ 12).
 
@@ -391,11 +418,11 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 ## 19. Graphics
 
 - 8×8 tiles, 16×16 for large creatures, one shared palette (~40 colours), "micro roguelike" style.
-- **All sprites are generated** from templates + traits + palette:
+- **All sprites are generated** from templates + traits + palette, and **change with the age**: a village of huts becomes a brick city, then a city of skyscrapers; clothes, weapons and vehicles follow:
   - peoples (body + race traits + role + culture colours),
   - animals and monsters (body plan + traits + element colours),
   - buildings (function template + culture style + age),
-  - items (template + materials),
+  - items and vehicles (template + materials + age),
   - banners (shape + pattern + symbol + colours).
 - Terrain tiles with procedural variations and transitions between biomes.
 - Simple animations: walk (2 frames), attack, work, idle; fire, water and lava animated.
@@ -446,7 +473,8 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 | **0.4 Civilisation** | settlements growth, generated buildings, kingdoms, borders, diplomacy, war |
 | **0.5 Culture** | cultures, religions, gods, laws, rituals, chronicle |
 | **0.6 Monsters & nature** | monster generator, lairs, legendary creatures, spirits, disasters, diseases |
-| **0.7 Inventions** | the invention language, procedural inventions, technology ages, magic |
+| **0.7 Inventions** | the invention language, procedural inventions, ages from Stone to Medieval, magic |
+| **0.75 Industry & beyond** | Renaissance → Space ages, vehicles, planes, rockets, pollution, nuclear war, endless generated ages |
 | **0.8 God powers & UI** | full power set, inspector, chronicle views, save/load |
 | **0.9 AI minds** | local model integration for cultures, monsters and spirits |
 | **1.0** | balancing, performance, audio, polish |
