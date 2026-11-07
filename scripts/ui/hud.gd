@@ -3,6 +3,7 @@ extends CanvasLayer
 
 signal generate_requested
 signal layer_selected(layer: String)
+signal effects_toggled(on: bool)
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
@@ -17,6 +18,7 @@ var _climate: SpinBox
 var _hover_label: Label
 var _stats_label: Label
 var _layer_buttons := {}
+var _effects: CheckButton
 
 
 func _ready() -> void:
@@ -89,6 +91,11 @@ func _ready() -> void:
 		b.pressed.connect(func(): layer_selected.emit(layer))
 		layers.add_child(b)
 		_layer_buttons[layer] = b
+	_effects = CheckButton.new()
+	_effects.text = "Effects (E)"
+	_effects.button_pressed = true
+	_effects.toggled.connect(func(on): effects_toggled.emit(on))
+	layers.add_child(_effects)
 	var help := _label("\nWheel: zoom\nRight drag / WASD: pan\nR: random seed")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
@@ -113,6 +120,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if key.keycode == KEY_R:
 		randomize_seed()
+	elif key.keycode == KEY_E:
+		_effects.button_pressed = not _effects.button_pressed
 	elif key.keycode >= KEY_1 and key.keycode < KEY_1 + MapRenderer.LAYERS.size():
 		var layer: String = MapRenderer.LAYERS[key.keycode - KEY_1]
 		_layer_buttons[layer].button_pressed = true

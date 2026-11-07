@@ -42,6 +42,26 @@ func render_biomes(world: WorldData) -> Image:
 	return img
 
 
+## Data texture for the map shader, one pixel per tile:
+## R = land height (0 on water), G = sea depth (0 on land, shallow for lakes and rivers),
+## B = 1 where the shader draws open water (sea, lakes, rivers; not ice), A = 1.
+func render_shader_data(world: WorldData) -> Image:
+	var img := Image.create(world.width, world.height, false, Image.FORMAT_RGBA8)
+	for y in world.height:
+		for x in world.width:
+			var i := world.index(x, y)
+			var b := world.biome[i]
+			var open_water := b == Biomes.WATER or b == Biomes.DEEP_WATER
+			var land := clampf(world.land_height(i), 0.0, 1.0) if not world.is_water(i) else 0.0
+			var depth := 0.0
+			if world.water[i] == WorldData.Water.OCEAN:
+				depth = clampf(world.sea_depth(i), 0.0, 1.0)
+			elif open_water:
+				depth = 0.05
+			img.set_pixel(x, y, Color(land, depth, 1.0 if open_water else 0.0, 1.0))
+	return img
+
+
 ## A data layer, one pixel per tile (display it scaled by TILE).
 func render_layer(world: WorldData, layer: String) -> Image:
 	var img := Image.create(world.width, world.height, false, Image.FORMAT_RGBA8)

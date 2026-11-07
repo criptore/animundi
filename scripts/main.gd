@@ -10,6 +10,7 @@ const CameraController = preload("res://scripts/ui/camera_controller.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 
 const TILE := MapRenderer.TILE
+const MapShader = preload("res://shaders/map.gdshader")
 
 var settings := WorldSettings.new()
 var world: WorldData
@@ -20,6 +21,7 @@ var _map := Sprite2D.new()
 var _layer := Sprite2D.new()
 var _camera := CameraController.new()
 var _hud := Hud.new()
+var _material := ShaderMaterial.new()
 
 
 func _ready() -> void:
@@ -28,10 +30,14 @@ func _ready() -> void:
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(sprite)
 	_layer.scale = Vector2(TILE, TILE)
+	_material.shader = MapShader
+	_material.set_shader_parameter("cloud_noise", _make_cloud_noise())
+	_map.material = _material
 	add_child(_camera)
 	_hud.settings = settings
 	_hud.generate_requested.connect(generate)
 	_hud.layer_selected.connect(show_layer)
+	_hud.effects_toggled.connect(func(on): _material.set_shader_parameter("effects", on))
 	add_child(_hud)
 	generate()
 
@@ -39,9 +45,26 @@ func _ready() -> void:
 func generate() -> void:
 	world = WorldGenerator.generate(settings)
 	_map.texture = ImageTexture.create_from_image(renderer.render_biomes(world))
+	_material.set_shader_parameter("data_tex", ImageTexture.create_from_image(renderer.render_shader_data(world)))
+	_material.set_shader_parameter("world_tiles", Vector2(world.width, world.height))
+	_material.set_shader_parameter("tile_pixels", float(TILE))
 	show_layer(current_layer)
 	_camera.fit(Rect2(Vector2.ZERO, Vector2(world.width, world.height) * TILE))
 	_hud.set_stats(world)
+
+
+## Soft, tileable noise for the drifting cloud shadows.
+func _make_cloud_noise() -> NoiseTexture2D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.012
+	noise.fractal_octaves = 3
+	var tex := NoiseTexture2D.new()
+	tex.width = 256
+	tex.height = 256
+	tex.seamless = true
+	tex.noise = noise
+	return tex
 
 
 func show_layer(layer: String) -> void:

@@ -49,6 +49,8 @@ static func _shape(world: WorldData, s, rng: SeededRng) -> void:
 	var shape_rng := rng.stream("shape")
 	var base := _noise(rng, "shape:base", 3.0 / w, 5)
 	var warp := _noise(rng, "shape:warp", 2.0 / w, 3)
+	var fine_warp := _noise(rng, "shape:fine_warp", 9.0 / w, 3)
+	var detail := _noise(rng, "shape:detail", 14.0 / w, 3)
 	var ridges := _noise(rng, "shape:ridges", 3.5 / w, 4, FastNoiseLite.FRACTAL_RIDGED)
 
 	# Continent centres, kept apart from each other so they don't merge into one blob.
@@ -72,9 +74,9 @@ static func _shape(world: WorldData, s, rng: SeededRng) -> void:
 	raw.resize(w * h)
 	for y in h:
 		for x in w:
-			# Warp the sampling point so coasts are ragged instead of round.
-			var wx := x + warp.get_noise_2d(x, y) * 0.12 * w
-			var wy := y + warp.get_noise_2d(x + 999.0, y) * 0.12 * h
+			# Warp the sampling point at two scales so coasts are ragged (bays, capes, fjords).
+			var wx := x + warp.get_noise_2d(x, y) * 0.12 * w + fine_warp.get_noise_2d(x, y) * 0.05 * w
+			var wy := y + warp.get_noise_2d(x + 999.0, y) * 0.12 * h + fine_warp.get_noise_2d(x, y + 999.0) * 0.05 * h
 			var mask := -1.0
 			for c in centres:
 				var d := Vector2(wx, wy).distance_to(c) / radius
@@ -82,6 +84,8 @@ static func _shape(world: WorldData, s, rng: SeededRng) -> void:
 			var n := base.get_noise_2d(x, y)
 			var r := ridges.get_noise_2d(x, y)
 			var v := mask * 0.85 + n * 0.4 + maxf(r, 0.0) * 0.45 * clampf(mask + 0.4, 0.0, 1.0)
+			# Small-scale detail: jagged shorelines, rocky points and offshore islets.
+			v += detail.get_noise_2d(wx, wy) * 0.3
 			var edge := clampf(minf(minf(x, w - 1 - x), minf(y, h - 1 - y)) / edge_band, 0.0, 1.0)
 			raw[world.index(x, y)] = lerpf(-1.0, v, edge)
 
