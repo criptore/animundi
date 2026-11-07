@@ -28,7 +28,7 @@ godot --path . --script res://tools/asset_sheet.gd -- <nature|peoples|creatures>
 
 ## Running the game
 
-Requires [Godot 4.3](https://godotengine.org/download) (standard version, not .NET).
+Requires [Godot 4.3](https://godotengine.org/download) (standard version, not .NET) and a GPU with Vulkan (the game uses the Forward+ renderer).
 
 1. Open Godot, click **Import**, and pick `project.godot` in this folder.
 2. Press **F5** to run.
@@ -42,7 +42,7 @@ Controls:
 | New random world | R or the **Random** button |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Pixel size | **Pixel size** box (1 = full resolution, 3 = default) |
-| Effects on / off (wind, clouds, outlines, light shafts) | E |
+| Pixel-art outlines and highlights on / off | E |
 | Tile info | hover the map (bottom bar) |
 
 Type any word or number as the seed: the same seed and settings always give the same world.

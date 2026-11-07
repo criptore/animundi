@@ -100,7 +100,7 @@ func _ready() -> void:
 	_effects = CheckButton.new()
 	_effects.text = "Effects (E)"
 	_effects.button_pressed = true
-	_effects.tooltip_text = "Wind, clouds, outlines, light shafts"
+	_effects.tooltip_text = "Pixel-art outlines and highlights"
 	_effects.toggled.connect(func(on): effects_toggled.emit(on))
 	layers.add_child(_effects)
 	var help := _label("\nWheel: zoom\nRight drag / WASD: pan\nR: random seed")

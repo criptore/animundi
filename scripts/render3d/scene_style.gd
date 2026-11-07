@@ -1,24 +1,20 @@
 ## The shared look of every 3D view (game and asset sheets): environment, sun and materials,
 ## following docs/ART_DIRECTION.md. Change the look here and it changes everywhere.
-## Palette colours are given to the shaders as they are (no linear conversion): sun and ambient are
-## tuned so a lit flat surface shows its palette colour and a shaded one about 60% of it.
+## Rendered with Forward+: palette colours are sRGB, vertex colours are converted to linear; sun and
+## ambient are tuned (measured) so a lit flat surface shows its palette colour.
 extends RefCounted
 
 const TerrainShader = preload("res://shaders/terrain.gdshader")
 const WaterShader = preload("res://shaders/water.gdshader")
 const SpriteShader = preload("res://shaders/sprite.gdshader")
-const PostShader = preload("res://shaders/post.gdshader")
+const StylizerShader = preload("res://shaders/vendor/pixelart_stylizer.gdshader")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
-
-## Wind sway (world units at the top of the sprite) by sprite group; others stand still.
-const SWAY := {"trees": 0.05, "plants": 0.03}
-const STILL := ["plants/Rock", "plants/Boulder", "plants/Grassy_rock", "plants/Cactus"]
 
 var terrain := ShaderMaterial.new()
 var water := ShaderMaterial.new()
-## Final pass on the low-resolution render (light shafts, warm grade, vignette).
-var post := ShaderMaterial.new()
-var effects := true
+## Leo Peltola's 3D pixel-art outline & highlight pass (shaders/vendor), drawn on a quad just in
+## front of the camera: dark outlines where depth jumps, light highlights where surfaces turn.
+var stylizer := ShaderMaterial.new()
 var _sprites := {}
 
 
@@ -27,7 +23,7 @@ func _init() -> void:
 	water.shader = WaterShader
 	water.set_shader_parameter("shallow_color", Color("#49ccdf"))
 	water.set_shader_parameter("deep_color", Color("#1b4479"))
-	post.shader = PostShader
+	stylizer.shader = StylizerShader
 
 
 ## Material drawing one sprite (shared by every instance of it).
@@ -36,17 +32,28 @@ func sprite(id: String) -> ShaderMaterial:
 		var m := ShaderMaterial.new()
 		m.shader = SpriteShader
 		m.set_shader_parameter("sprite", SpriteLibrary.texture(id))
-		m.set_shader_parameter("sway", 0.0 if id in STILL else SWAY.get(id.get_slice("/", 0), 0.0))
-		m.set_shader_parameter("effects", effects)
 		_sprites[id] = m
 	return _sprites[id]
 
 
-## Turns the shader effects (wind, clouds, outlines, light shafts, grade) on or off everywhere.
-func set_effects(on: bool) -> void:
-	effects = on
-	for m in [terrain, water, post] + _sprites.values():
-		m.set_shader_parameter("effects", on)
+## Adds the stylizer pass in front of `camera` (it must be kept sized with update_stylizer).
+## It sits on its own render layer so other cameras (reflections) can leave it out.
+func add_stylizer(camera: Camera3D, layer: int) -> MeshInstance3D:
+	var quad := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	quad.mesh = plane
+	quad.material_override = stylizer
+	quad.layers = layer
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# A plane facing the camera, just past its near plane.
+	quad.transform = Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, 0, -camera.near - 0.5))
+	camera.add_child(quad)
+	return quad
+
+
+## Keeps the stylizer quad covering the whole view of an orthographic camera.
+func update_stylizer(quad: MeshInstance3D, camera: Camera3D, aspect: float) -> void:
+	(quad.mesh as PlaneMesh).size = Vector2(camera.size * aspect, camera.size) * 1.2
 
 
 ## Adds the environment (sky colour, soft bluish ambient) and the warm sun to `parent`.
@@ -57,7 +64,7 @@ func add_lighting(parent: Node, background := Color("#1b4479")) -> DirectionalLi
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	# Bluish ambient: shadows turn cool and soft instead of black (cosy look).
 	env.ambient_light_color = Color(0.62, 0.72, 0.95)
-	env.ambient_light_energy = 0.21
+	env.ambient_light_energy = 0.47
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	parent.add_child(world_env)
@@ -66,7 +73,7 @@ func add_lighting(parent: Node, background := Color("#1b4479")) -> DirectionalLi
 	# fall to the right of every tree and rock.
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-42.0, -65.0, 0.0)
-	sun.light_energy = 0.47
+	sun.light_energy = 1.05
 	sun.light_color = Color(1.0, 0.93, 0.8)
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL

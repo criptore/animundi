@@ -1,8 +1,7 @@
 // Terrain: biome colour (vertex colour) with a pixel pattern painted in world space, lit in soft
 // bands with shadows. Tile tops carry their pattern in UV.x (TerrainBuilder.Pattern): grass tufts,
 // forest-floor litter, sand ripples, snow sparkles, rock cracks, moving lava. Cliff faces (UV.y = 1)
-// get rock strata. With `effects`: a dark pixel outline along tile tops where the ground drops
-// (read from the heightmap), and drifting cloud shadows.
+// get rock strata. Outlines and highlights come from the pixel-art stylizer post pass.
 shader_type spatial;
 render_mode cull_back;
 
@@ -11,30 +10,11 @@ render_mode cull_back;
 // Pattern pixels per tile.
 uniform float pixels = 8.0;
 uniform float grain = 0.06;
-uniform bool effects = true;
-// Ground height per tile (TerrainBuilder.heightmap_texture), for the cliff-edge outlines.
-uniform sampler2D heightmap : filter_nearest, repeat_disable;
-uniform bool has_heightmap = false;
 
 varying vec3 world_pos;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-}
-
-// True on the outermost pattern pixel of a tile top whose neighbour on that side is lower.
-bool cliff_edge(vec3 p) {
-	vec2 tile = round(p.xz);
-	vec2 f = p.xz - tile;
-	float edge = 0.5 - 1.0 / pixels;
-	ivec2 t = ivec2(tile);
-	ivec2 size = textureSize(heightmap, 0);
-	float here = p.y - 0.05;
-	if (f.x > edge && t.x + 1 < size.x && texelFetch(heightmap, t + ivec2(1, 0), 0).r < here) return true;
-	if (f.x < -edge && t.x > 0 && texelFetch(heightmap, t - ivec2(1, 0), 0).r < here) return true;
-	if (f.y > edge && t.y + 1 < size.y && texelFetch(heightmap, t + ivec2(0, 1), 0).r < here) return true;
-	if (f.y < -edge && t.y > 0 && texelFetch(heightmap, t - ivec2(0, 1), 0).r < here) return true;
-	return false;
 }
 
 void fragment() {
@@ -79,12 +59,6 @@ void fragment() {
 			c = v > 1.0 ? vec3(1.0, 0.82, 0.3) : (v < -1.0 ? vec3(0.35, 0.1, 0.06) : c);
 			EMISSION = c * 0.8;
 		}
-	}
-	if (effects) {
-		if (has_heightmap && UV.y < 0.5) {
-			c *= cliff_edge(world_pos) ? 0.42 : 1.0;
-		}
-		c *= cloud_shade(world_pos.xz, TIME, pixels);
 	}
 	ALBEDO = c;
 	ROUGHNESS = 1.0;

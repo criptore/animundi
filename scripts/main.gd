@@ -13,8 +13,9 @@ const PixelCamera = preload("res://scripts/ui/pixel_camera.gd")
 const SceneStyle = preload("res://scripts/render3d/scene_style.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 
-## Render layer of the water surfaces, hidden from the reflection camera.
+## Render layers hidden from the reflection camera: water surfaces and the stylizer pass.
 const WATER_LAYER := 2
+const STYLIZER_LAYER := 4
 
 var settings := WorldSettings.new()
 var world: WorldData
@@ -33,6 +34,8 @@ var _camera := PixelCamera.new()
 ## Renders the scene mirrored under the water plane, for water reflections.
 var _reflection := SubViewport.new()
 var _reflection_camera := Camera3D.new()
+## Leo Peltola's pixel-art outline & highlight pass, on a quad in front of the camera.
+var _stylizer: MeshInstance3D
 var _hud := Hud.new()
 var _style := SceneStyle.new()
 var _dragging := false
@@ -49,7 +52,6 @@ func _ready() -> void:
 	_container.stretch_shrink = pixel_scale
 	_container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_container.material = _style.post
 	add_child(_container)
 	_viewport.msaa_3d = Viewport.MSAA_DISABLED
 	_container.add_child(_viewport)
@@ -61,6 +63,7 @@ func _ready() -> void:
 	for node in [_terrain, _ocean, _vegetation, _camera]:
 		_viewport.add_child(node)
 	_camera.current = true
+	_stylizer = _style.add_stylizer(_camera, STYLIZER_LAYER)
 
 	# Reflections: a camera mirrored under the water plane renders the same world (water itself
 	# excluded through its render layer) into a transparent texture the water shader reads.
@@ -70,7 +73,7 @@ func _ready() -> void:
 	_reflection.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_viewport.add_child(_reflection)
 	_reflection_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	_reflection_camera.cull_mask = 0xFFFFF & ~WATER_LAYER
+	_reflection_camera.cull_mask = 0xFFFFF & ~WATER_LAYER & ~STYLIZER_LAYER
 	_reflection_camera.current = true
 	_reflection.add_child(_reflection_camera)
 	_style.water.set_shader_parameter("reflection", _reflection.get_texture())
@@ -80,7 +83,7 @@ func _ready() -> void:
 	_hud.generate_requested.connect(generate)
 	_hud.layer_selected.connect(show_layer)
 	_hud.pixel_scale_changed.connect(set_pixel_scale)
-	_hud.effects_toggled.connect(_style.set_effects)
+	_hud.effects_toggled.connect(func(on): _stylizer.visible = on)
 	add_child(_hud)
 	generate()
 
@@ -88,10 +91,7 @@ func _ready() -> void:
 func generate() -> void:
 	world = WorldGenerator.generate(settings)
 	_heights = TerrainBuilder.heights(world)
-	var heightmap := TerrainBuilder.heightmap_texture(world, _heights)
-	_style.water.set_shader_parameter("heightmap", heightmap)
-	_style.terrain.set_shader_parameter("heightmap", heightmap)
-	_style.terrain.set_shader_parameter("has_heightmap", true)
+	_style.water.set_shader_parameter("heightmap", TerrainBuilder.heightmap_texture(world, _heights))
 	_style.water.set_shader_parameter("map_size", Vector2(world.width, world.height))
 
 	var ocean := PlaneMesh.new()
@@ -143,6 +143,8 @@ func _process(_delta: float) -> void:
 	if world == null:
 		return
 	_update_reflection()
+	var view := _viewport.size
+	_style.update_stylizer(_stylizer, _camera, float(view.x) / maxf(view.y, 1.0))
 	var close := _camera.world_per_pixel() < GROUND_COVER_MAX_PIXEL
 	for node in _ground_cover:
 		node.visible = close

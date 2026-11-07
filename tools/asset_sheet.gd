@@ -28,6 +28,7 @@ var _labels: Array = []  # [text, world position, font size, colour, left-aligne
 var _min := Vector3(INF, 0, INF)
 var _max := Vector3(-INF, 0, -INF)
 var _title := ""
+var _stylizer: MeshInstance3D
 
 
 func _initialize() -> void:
@@ -46,13 +47,13 @@ func _initialize() -> void:
 	container.stretch = true
 	container.stretch_shrink = PIXEL
 	container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	container.material = _style.post
 	root.add_child(container)
 	_viewport.msaa_3d = Viewport.MSAA_DISABLED
 	container.add_child(_viewport)
 	_style.add_lighting(_viewport, MEADOW)
 	_viewport.add_child(_camera)
 	_camera.current = true
+	_stylizer = _style.add_stylizer(_camera, 4)
 	_add_ground()
 
 	match _sheet:
@@ -78,6 +79,8 @@ func _process(_delta: float) -> bool:
 			# One sprite pixel per render pixel.
 			view_h = SpriteLibrary.SCALE["peoples"] * WINDOW.y / PIXEL
 		_camera.frame(ORIGIN + centre + Vector3(0, 0, -0.6), view_h)
+	if _frames >= 2:
+		_style.update_stylizer(_stylizer, _camera, float(WINDOW.x) / WINDOW.y)
 	if _frames == 4:
 		_add_labels()
 	if _frames == 14:
@@ -155,7 +158,7 @@ func _add_ground() -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var s := 400.0
 	for v in [Vector3(-s, 0, -s), Vector3(s, 0, -s), Vector3(-s, 0, s), Vector3(s, 0, -s), Vector3(s, 0, s), Vector3(-s, 0, s)]:
-		st.set_color(MEADOW)
+		st.set_color(MEADOW.srgb_to_linear())
 		st.set_normal(Vector3.UP)
 		st.add_vertex(v)
 	var ground := MeshInstance3D.new()
@@ -175,7 +178,7 @@ func _swatch(color: Color, at: Vector3) -> void:
 	var h := Vector3(0.85, 0, 0.8)
 	var y := Vector3(0, 0.08, 0)
 	for v in [Vector3(-h.x, 0, -h.z), Vector3(h.x, 0, -h.z), Vector3(-h.x, 0, h.z), Vector3(h.x, 0, -h.z), Vector3(h.x, 0, h.z), Vector3(-h.x, 0, h.z)]:
-		st.set_color(color)
+		st.set_color(color.srgb_to_linear())
 		st.set_normal(Vector3.UP)
 		st.add_vertex(v + y)
 	var mi := MeshInstance3D.new()

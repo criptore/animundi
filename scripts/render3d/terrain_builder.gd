@@ -104,7 +104,7 @@ static func side_color(b: int) -> Color:
 
 
 ## Terrain mesh. `layer` is "Biomes" or one of the data layers of MapRenderer.
-## Colours are used as they are: the renderer (GL Compatibility) lights them directly.
+## Palette colours are sRGB; vertex colours are stored linear, as the Forward+ renderer expects.
 static func build_terrain(world: WorldData, h: PackedFloat32Array, layer := "Biomes",
 		renderer: MapRenderer = null) -> ArrayMesh:
 	var verts := PackedVector3Array()
@@ -128,9 +128,10 @@ static func build_terrain(world: WorldData, h: PackedFloat32Array, layer := "Bio
 				c = Color(base.r + v, base.g + v, base.b + v * 0.5)
 			else:
 				c = renderer.layer_color(world, i, layer)
+			c = c.srgb_to_linear()
 			var top_uv := Vector2(pattern(world.biome[i]) if layer == "Biomes" else Pattern.PLAIN, 0.0)
 			_quad(verts, normals, colors, uvs, Vector3(x - 0.5, top, z - 0.5), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3.UP, c, top_uv)
-			var wall: Color = side_color(world.biome[i]) if layer == "Biomes" or renderer == null else c.darkened(0.3)
+			var wall: Color = side_color(world.biome[i]).srgb_to_linear() if layer == "Biomes" or renderer == null else c.darkened(0.3)
 			for s in sides:
 				var d: Vector2i = s[0]
 				var n: Vector3 = s[1]

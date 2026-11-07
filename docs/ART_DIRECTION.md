@@ -20,16 +20,17 @@ Techniques described in the article, all to be reproduced:
 
 Known limit noted by the author: a perfect outline shader for every model and camera angle is not possible at this resolution, so some edge compromises are expected.
 
-## Shader effects in the game (toggle with E)
+## Shaders in the game
+
+The game renders with Godot's **Forward+** renderer (needed for the normal buffer of the stylizer).
 
 | Effect | Where |
 |---|---|
+| Pixel-art outlines (depth edges) and highlights (normal edges), toggle with E | `shaders/vendor/pixelart_stylizer.gdshader`, by Leo Peltola (MIT), unmodified |
 | Banded toon light with dithered edges, shared by ground, sprites and water | `shaders/toon.gdshaderinc` |
-| Sprites lit like the ground, darkened in tree and cloud shadows, swaying in the wind | `shaders/sprite.gdshader` |
-| Tile-top patterns, cliff strata, 1-pixel dark outline where the ground drops, glowing lava | `shaders/terrain.gdshader` |
+| Sprites lit like the ground, darkened in tree shadows | `shaders/sprite.gdshader` |
+| Tile-top patterns, cliff strata, glowing lava | `shaders/terrain.gdshader` |
 | Water depth colours, mirrored-camera reflections with pixel ripple, glints, shore foam | `shaders/water.gdshader` |
-| Drifting cloud shadows over land and sea | `cloud_shade` in `shaders/toon.gdshaderinc` |
-| Diagonal light shafts, warm afternoon grade, vignette, per render pixel | `shaders/post.gdshader` |
 
 ## Sprites in the 3D world
 
