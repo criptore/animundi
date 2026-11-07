@@ -26,7 +26,10 @@ Each sprite is a grid of 8 rows of 8 characters; each character is a palette col
 
 ## Design
 
-The full game design, everything the game must contain and how it is generated, is in [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
+- [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md): everything the game must contain and how it is generated.
+- [docs/GOD_GAMES_RESEARCH.md](docs/GOD_GAMES_RESEARCH.md): what other god games let you do, and what Animundi takes.
+
+Engine: Godot 4.
 
 ## Next steps
 

@@ -105,7 +105,8 @@ Biomes are **not fixed**: they change with climate, fire, flooding, farming, def
 
 ## 4. Time and simulation
 
-- Fixed-step simulation, independent from rendering. Speeds: pause, ×1, ×2, ×5, ×20, and "skip years".
+- Engine: **Godot 4** (GDScript for gameplay; C# or a GDExtension in C++ for the hot loops if needed).
+- Fixed-step simulation (`_physics_process` or a custom fixed tick), independent from rendering. Speeds: pause, ×1, ×2, ×5, ×20, and "skip years".
 - Time units: tick → day → season → year → age. Default: 1 year ≈ 1 minute at ×1.
 - Scheduling: things update at different rates (movement every tick, needs every few ticks, settlements daily, kingdoms seasonally, AI minds yearly).
 - **Determinism:** seed + recorded player actions replay the exact same world.
@@ -167,9 +168,11 @@ Monsters are species with a **threat** role. They are generated the same way as 
 
 ## 8. Peoples (procedural races)
 
-Each world generates its own set of peoples. The 13 races in `assets/` (Humans, Elves, Dwarves, Orcs, Goblins, Lizardfolk, Felines, Merfolk, Treefolk, Fairies, Bullfolk, Ratfolk, Undead) are **archetypes**: the generator can produce them, but also mixes and new ones.
+**Decision: a fixed pool of 13 races**, the ones in `assets/`: Humans, Elves, Dwarves, Orcs, Goblins, Lizardfolk, Felines, Merfolk, Treefolk, Fairies, Bullfolk, Ratfolk, Undead. Each world picks some of them and **varies** them (palette shifts, stat spread, traits, temperament), so the Elves of one world are not the Elves of the next. Everything built on top of a race (language, culture, religion, buildings, history) stays fully generated.
 
-### 8.1 Race generator
+### 8.1 Race definition and per-world variation
+
+Each race is a data record with the parameters below. The base values are fixed per race; world generation applies a seeded variation on top.
 
 | Parameter | Examples |
 |---|---|
@@ -184,13 +187,13 @@ Each world generates its own set of peoples. The 13 races in `assets/` (Humans, 
 | Special abilities | swim, fly, night vision, regrow, photosynthesis, undeath |
 | Language | generated phonology (§ 9) |
 
-A race is a small data record; the sprite, stats and behaviour all derive from it. This is also the format the AI fills in to invent peoples.
+A race is a small data record; the sprite, stats and behaviour all derive from it. The AI can tune a race's variation (within limits) but does not create new races.
 
 ### 8.2 Origins of peoples
 
-- Spawned at world creation (number set in world settings).
+- Spawned at world creation (number set in world settings), placed in their preferred biomes.
 - Spawned by the player.
-- **Born in-world:** a group isolated long enough can drift into a new race (traits mutate), a curse can turn a people undead, magic can awaken animals or trees into a people.
+- **Transformations inside the pool:** a curse or a plague can turn a people Undead, magic can awaken trees into Treefolk. A group isolated for a long time drifts into a distinct **culture** (and slight visual variation), not a new race.
 
 ---
 
@@ -364,10 +367,12 @@ Generated diseases: name, carrier (people, animals, water, rats), symptoms (stat
 | Nature | rain, drought, snow, storms, lightning, tornado, earthquake, meteor, fire, flood |
 | Magic | bless, curse, corrupt, purify, awaken (animal or tree → people), resurrect, plague, cure |
 | Civilisation | inspire (invention), madness, rebellion, peace, war, gift of resources |
-| Tools | inspect anything, follow a unit, favourite units, name things, time controls |
+| Tools | inspect anything, follow a unit, favourite units, name things, time controls, divine hand (pick up, drop, throw), poke |
 | World | world settings, regenerate with a seed, save/load, share a seed |
 
 Peoples **react** to the player's acts (§ 12).
+
+The full survey of what other god games offer, and what Animundi takes from it, is in [GOD_GAMES_RESEARCH.md](GOD_GAMES_RESEARCH.md).
 
 ---
 
@@ -415,7 +420,7 @@ Peoples **react** to the player's acts (§ 12).
 | Nature spirit | on events | mood, natural events, demands to peoples |
 
 - **Models:** small local models (1–3B parameters, quantised), one base model with per-domain LoRA adapters (culture, monsters, nature).
-- **Runtime:** llama.cpp / Ollama next to the game, or WebLLM in the browser.
+- **Runtime:** llama.cpp linked through a Godot GDExtension, or a local Ollama server called over HTTP from Godot.
 - **Input:** a compact summary of the agent's situation and memory (its chronicle).
 - **Output:** JSON forced by grammar (JSON schema / GBNF), validated by the engine like any other script.
 - **Fallback:** if no model is available, the procedural generators make the same decisions.
@@ -450,10 +455,10 @@ Peoples **react** to the player's acts (§ 12).
 
 ## 24. Open questions
 
-1. **Platform:** web (HTML canvas / WebGL, nothing to install, like Celeste HQ) or a game engine (Godot)? The local AI is easier from a desktop app, but WebLLM makes the browser possible.
-2. **Map size target** and number of units we want to support.
-3. **Are races fully generated** (new races every world) or **a fixed pool of archetypes** mixed and varied per world?
-4. **Violence level:** blood, slavery, sacrifices, genocide in the chronicle — what is in and what is out?
-5. **Is the player visible** in the world as a god the peoples know, or an invisible force?
-6. **Multiplayer / shared worlds** — ever, or never?
-7. **Steam release** target, or a free open-source project?
+Decided: **Godot 4** desktop game; **fixed pool of 13 races**, varied per world.
+
+1. **Map size target** and number of units we want to support.
+2. **Violence level:** blood, slavery, sacrifices, genocide in the chronicle — what is in and what is out?
+3. **Is the player visible** in the world as a god the peoples know, or an invisible force?
+4. **Multiplayer / shared worlds** — ever, or never?
+5. **Steam release** target, or a free open-source project?
