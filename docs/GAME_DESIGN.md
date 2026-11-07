@@ -417,6 +417,8 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 
 ## 19. Graphics
 
+**Art direction:** 3D pixel art in the style of David Holland's *3D pixel art rendering* (https://davidholland.netlify.app/articles/3d-pixel-art-rendering), the main visual reference. Details and rules in [ART_DIRECTION.md](ART_DIRECTION.md).
+
 - 8×8 tiles, 16×16 for large creatures, one shared palette (~40 colours), "micro roguelike" style.
 - **All sprites are generated** from templates + traits + palette, and **change with the age**: a village of huts becomes a brick city, then a city of skyscrapers; clothes, weapons and vehicles follow:
   - peoples (body + race traits + role + culture colours),

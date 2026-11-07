@@ -76,6 +76,7 @@ python3 art/sprites.py
 
 - [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md): everything the game must contain and how it is generated.
 - [docs/GOD_GAMES_RESEARCH.md](docs/GOD_GAMES_RESEARCH.md): what other god games let you do, and what Animundi takes.
+- [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md): the look of the game. Main inspiration: [David Holland, 3D pixel art rendering](https://davidholland.netlify.app/articles/3d-pixel-art-rendering).
 
 Engine: Godot 4.3.
 
