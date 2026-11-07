@@ -21,13 +21,13 @@ const TILES := [
 	"Volcanic rock", "Lava", "Mushroom land", "Cursed soil",
 ]
 
-## Ground colour of each biome in the 3D view (from the sprite palette).
+## Ground colour of each biome in the 3D view: soft, warm "cosy" tones (docs/ART_DIRECTION.md).
 const COLORS := [
-	Color("#1d4a94"), Color("#3b8fe0"), Color("#cfe4f5"), Color("#ecd895"), Color("#e2c27a"),
-	Color("#c9b458"), Color("#6aae4a"), Color("#77b852"), Color("#3f8f3a"), Color("#2f8a3c"),
-	Color("#6b7a44"), Color("#4c7a5a"), Color("#8aa38c"), Color("#f1f6fc"), Color("#82b24a"),
-	Color("#8a8a96"), Color("#e9eef5"), Color("#3d3d4a"), Color("#ff5a1a"), Color("#c95f8c"),
-	Color("#6e3f8c"),
+	Color("#2f6fa8"), Color("#5fb0d8"), Color("#d8eaf4"), Color("#f0ddb0"), Color("#e8cf96"),
+	Color("#c8bb6c"), Color("#8fbf58"), Color("#9cc65e"), Color("#5e9a4a"), Color("#4f964c"),
+	Color("#728455"), Color("#5f846a"), Color("#a3b59c"), Color("#f2f5f7"), Color("#86b25a"),
+	Color("#9c958e"), Color("#eef1f4"), Color("#4c4450"), Color("#ff7a30"), Color("#d892b4"),
+	Color("#80629a"),
 ]
 
 # Land height bands (0 = shore, 1 = highest point). Land height is rank-based and squared, so

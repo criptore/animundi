@@ -57,7 +57,7 @@ static func sample(world: WorldData, h: PackedFloat32Array, x: float, z: float) 
 
 
 ## Terrain mesh. `layer` is "Biomes" or one of the data layers of MapRenderer.
-## Vertex colours are stored linear (shaders read them as linear), palette colours are sRGB.
+## Colours are used as they are: the renderer (GL Compatibility) lights them directly.
 static func build_terrain(world: WorldData, h: PackedFloat32Array, layer := "Biomes",
 		renderer: MapRenderer = null) -> ArrayMesh:
 	var w := world.width
@@ -84,9 +84,9 @@ static func build_terrain(world: WorldData, h: PackedFloat32Array, layer := "Bio
 				var c: Color = Biomes.COLORS[world.biome[i]]
 				# Gentle patchiness so big biomes are not flat colour.
 				var v := jitter.get_noise_2d(x, z) * 0.07
-				colors[i] = Color(c.r + v, c.g + v, c.b + v * 0.5).srgb_to_linear()
+				colors[i] = Color(c.r + v, c.g + v, c.b + v * 0.5)
 			else:
-				colors[i] = renderer.layer_color(world, i, layer).srgb_to_linear()
+				colors[i] = renderer.layer_color(world, i, layer)
 	var indices := PackedInt32Array()
 	indices.resize((w - 1) * (d - 1) * 6)
 	var k := 0

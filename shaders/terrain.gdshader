@@ -1,11 +1,11 @@
-// Terrain: biome colour (vertex colour) with a fine world-space pixel grain, lit in a few hard
-// bands with shadows, so the low-resolution render reads as pixel art.
+// Terrain: biome colour (vertex colour) with a fine world-space pixel grain, lit in soft bands
+// with shadows, so the low-resolution render reads as pixel art.
 shader_type spatial;
 render_mode cull_back;
 
 #include "res://shaders/toon.gdshaderinc"
 
-uniform float grain = 0.12;
+uniform float grain = 0.08;
 // Grain cells per tile: the "pixels" painted on the ground.
 uniform float grain_scale = 3.0;
 
@@ -23,5 +23,6 @@ void fragment() {
 }
 
 void light() {
-	DIFFUSE_LIGHT += toon_light(NORMAL, LIGHT, ATTENUATION, LIGHT_COLOR);
+	float d = hash12(floor(world_pos.xz * grain_scale) + 17.0);
+	DIFFUSE_LIGHT += toon_light(NORMAL, LIGHT, ATTENUATION, LIGHT_COLOR, d);
 }

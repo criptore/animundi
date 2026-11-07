@@ -10,11 +10,8 @@ const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
 const VegetationBuilder = preload("res://scripts/render3d/vegetation_builder.gd")
 const PixelCamera = preload("res://scripts/ui/pixel_camera.gd")
+const SceneStyle = preload("res://scripts/render3d/scene_style.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
-
-const TerrainShader = preload("res://shaders/terrain.gdshader")
-const WaterShader = preload("res://shaders/water.gdshader")
-const FoliageShader = preload("res://shaders/foliage.gdshader")
 
 var settings := WorldSettings.new()
 var world: WorldData
@@ -30,12 +27,9 @@ var _terrain := MeshInstance3D.new()
 var _inland_water := MeshInstance3D.new()
 var _ocean := MeshInstance3D.new()
 var _vegetation := Node3D.new()
-var _sun := DirectionalLight3D.new()
 var _camera := PixelCamera.new()
 var _hud := Hud.new()
-var _terrain_material := ShaderMaterial.new()
-var _water_material := ShaderMaterial.new()
-var _foliage_material := ShaderMaterial.new()
+var _style := SceneStyle.new()
 var _dragging := false
 
 
@@ -49,30 +43,10 @@ func _ready() -> void:
 	_viewport.msaa_3d = Viewport.MSAA_DISABLED
 	_container.add_child(_viewport)
 
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#123a78")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.72, 0.8, 0.95)
-	env.ambient_light_energy = 0.45
-	var world_env := WorldEnvironment.new()
-	world_env.environment = env
-	_viewport.add_child(world_env)
-
-	_sun.rotation_degrees = Vector3(-36.0, -130.0, 0.0)
-	_sun.light_energy = 1.5
-	_sun.light_color = Color(1.0, 0.96, 0.86)
-	_sun.shadow_enabled = true
-	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	_sun.directional_shadow_max_distance = 700.0
-	_viewport.add_child(_sun)
-
-	_terrain_material.shader = TerrainShader
-	_water_material.shader = WaterShader
-	_foliage_material.shader = FoliageShader
-	_terrain.material_override = _terrain_material
-	_inland_water.material_override = _water_material
-	_ocean.material_override = _water_material
+	_style.add_lighting(_viewport)
+	_terrain.material_override = _style.terrain
+	_inland_water.material_override = _style.water
+	_ocean.material_override = _style.water
 	_inland_water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ocean.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for node in [_terrain, _inland_water, _ocean, _vegetation, _camera]:
@@ -91,8 +65,8 @@ func generate() -> void:
 	world = WorldGenerator.generate(settings)
 	_heights = TerrainBuilder.heights(world)
 	_inland_water.mesh = TerrainBuilder.build_inland_water(world)
-	_water_material.set_shader_parameter("heightmap", TerrainBuilder.heightmap_texture(world, _heights))
-	_water_material.set_shader_parameter("map_size", Vector2(world.width, world.height))
+	_style.water.set_shader_parameter("heightmap", TerrainBuilder.heightmap_texture(world, _heights))
+	_style.water.set_shader_parameter("map_size", Vector2(world.width, world.height))
 
 	var ocean := PlaneMesh.new()
 	ocean.size = Vector2(world.width, world.height) * 4.0
@@ -101,15 +75,30 @@ func generate() -> void:
 
 	for child in _vegetation.get_children():
 		child.queue_free()
-	for kind in VegetationBuilder.build(world, _heights).values():
+	var plants := VegetationBuilder.build(world, _heights)
+	for kind in plants:
 		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = kind
-		mmi.material_override = _foliage_material
+		mmi.multimesh = plants[kind]
+		mmi.material_override = material_for(_style, kind)
+		if VegetationBuilder.is_ground_cover(kind):
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_vegetation.add_child(mmi)
 
 	show_layer(current_layer)
-	_camera.frame(Vector3(world.width / 2.0, 0.0, world.height / 2.0), world.height * 1.15)
+	_camera.frame(Vector3(world.width / 2.0, 0.0, world.height / 2.0), world.height * 0.8)
 	_hud.set_stats(world)
+
+
+static func material_for(style: SceneStyle, kind: int) -> ShaderMaterial:
+	match kind:
+		VegetationBuilder.Kind.GRASS:
+			return style.grass
+		VegetationBuilder.Kind.FLOWER:
+			return style.flower
+		VegetationBuilder.Kind.ROCK, VegetationBuilder.Kind.CACTUS, VegetationBuilder.Kind.MUSHROOM, \
+				VegetationBuilder.Kind.DEAD:
+			return style.solid
+	return style.leafy
 
 
 func show_layer(layer: String) -> void:
@@ -135,16 +124,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dragging = mb.pressed
 	elif event is InputEventMouseMotion and _dragging:
 		_camera.pan_screen((event as InputEventMouseMotion).relative, get_viewport().get_visible_rect().size.y)
-	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_Q:
-			_camera.rotate_view(-45.0)
-		elif event.keycode == KEY_E:
-			_camera.rotate_view(45.0)
 
 
 func _process(_delta: float) -> void:
 	if world == null:
 		return
+	# Outlines one render pixel wide, hidden when zoomed far out.
+	_style.update_outline(_camera.world_per_pixel())
 	var tile := pick_tile(get_viewport().get_mouse_position())
 	if tile.x < 0:
 		_hud.set_hover_text("")

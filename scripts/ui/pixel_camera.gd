@@ -1,5 +1,6 @@
-## Orthographic camera looking down at the world at an angle, for the low-resolution pixel render.
-## Its position is snapped to the render's pixel grid, so the picture doesn't shimmer when it moves.
+## Orthographic camera looking north over the world at a fixed angle, for the low-resolution pixel
+## render. It pans and zooms but never rotates: a fixed angle keeps pixel outlines clean
+## (docs/ART_DIRECTION.md). Its position snaps to the render's pixel grid, so nothing shimmers.
 extends Camera3D
 
 const DISTANCE := 300.0
@@ -7,11 +8,11 @@ const MIN_SIZE := 10.0
 const MAX_SIZE := 700.0
 const PAN_SPEED := 500.0  # screen pixels per second
 const ZOOM_STEP := 1.15
+const YAW := 0.0
+const PITCH := -42.0
 
 ## Ground point at the centre of the view.
 var target := Vector3.ZERO
-var yaw := 45.0
-var pitch := -48.0
 ## Height of the view in world units (tiles).
 var ortho_size := 120.0
 
@@ -45,17 +46,12 @@ func zoom_by(factor: float) -> void:
 ## Moves the view as if the ground were dragged by `delta` pixels on a screen `screen_height` tall.
 func pan_screen(delta: Vector2, screen_height: float) -> void:
 	var units := ortho_size / screen_height
-	var b := Basis.from_euler(Vector3(deg_to_rad(pitch), deg_to_rad(yaw), 0.0))
+	var b := Basis.from_euler(Vector3(deg_to_rad(PITCH), deg_to_rad(YAW), 0.0))
 	var right := Vector3(b.x.x, 0.0, b.x.z).normalized()
 	var forward := Vector3(-b.z.x, 0.0, -b.z.z).normalized()
 	# Screen height maps to more ground than its length because the view is tilted.
 	target -= right * delta.x * units
-	target += forward * delta.y * units / sin(absf(deg_to_rad(pitch)))
-	apply()
-
-
-func rotate_view(degrees: float) -> void:
-	yaw = wrapf(yaw + degrees, 0.0, 360.0)
+	target += forward * delta.y * units / sin(absf(deg_to_rad(PITCH)))
 	apply()
 
 
@@ -66,13 +62,18 @@ func frame(centre: Vector3, view_size: float) -> void:
 	apply()
 
 
+## World units covered by one render pixel (for pixel-sized effects such as outlines).
+func world_per_pixel() -> float:
+	return ortho_size / maxf(get_viewport().get_visible_rect().size.y, 1.0)
+
+
 func apply() -> void:
 	size = ortho_size
-	var b := Basis.from_euler(Vector3(deg_to_rad(pitch), deg_to_rad(yaw), 0.0))
+	var b := Basis.from_euler(Vector3(deg_to_rad(PITCH), deg_to_rad(YAW), 0.0))
 	var pos := target + b.z * DISTANCE
 	if is_inside_tree():
 		# Snap to whole render pixels in the camera's own plane.
-		var texel := ortho_size / maxf(get_viewport().get_visible_rect().size.y, 1.0)
+		var texel := world_per_pixel()
 		var local := b.inverse() * pos
 		local.x = roundf(local.x / texel) * texel
 		local.y = roundf(local.y / texel) * texel

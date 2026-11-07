@@ -95,7 +95,7 @@ func _ready() -> void:
 	_pixels = _spin(1, 6, 1, 3)
 	_pixels.value_changed.connect(func(v): pixel_scale_changed.emit(int(v)))
 	layers.add_child(_pixels)
-	var help := _label("\nWheel: zoom\nRight drag / WASD: pan\nQ / E: rotate\nR: random seed")
+	var help := _label("\nWheel: zoom\nRight drag / WASD: pan\nR: random seed")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 

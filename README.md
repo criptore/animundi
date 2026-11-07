@@ -14,6 +14,18 @@ The world is shown in **3D pixel art**: a real 3D scene (relief, low-poly trees,
 
 Every world is generated from a seed: continents, mountains, climate (latitude, altitude, winds and rain shadows), rivers and lakes, and 21 biomes, including volcanoes, mushroom lands and cursed lands.
 
+## Asset sheets
+
+Every 3D model, drawn with the game's own look (regenerate with `tools/asset_sheet.gd`):
+
+| Nature, terrain, water | Peoples | Animals and monsters |
+|---|---|---|
+| ![](docs/images/assets_nature.png) | ![](docs/images/assets_peoples.png) | ![](docs/images/assets_creatures.png) |
+
+```bash
+godot --path . --script res://tools/asset_sheet.gd -- <nature|peoples|creatures> <out.png>
+```
+
 ## Running the game
 
 Requires [Godot 4.3](https://godotengine.org/download) (standard version, not .NET).
@@ -27,7 +39,6 @@ Controls:
 |---|---|
 | Zoom | mouse wheel |
 | Pan | right or middle drag, WASD, arrow keys |
-| Rotate the view | Q / E |
 | New random world | R or the **Random** button |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Pixel size | **Pixel size** box (1 = full resolution, 3 = default) |
@@ -40,10 +51,10 @@ Type any word or number as the seed: the same seed and settings always give the 
 | Path | Content |
 |---|---|
 | `scripts/world/` | world settings, data and the generator (shape → climate → hydrology → biomes) |
-| `scripts/render3d/` | 3D terrain, water and vegetation builders |
+| `scripts/render3d/` | 3D terrain, water, vegetation and creature builders, shared scene style |
 | `scripts/render/` | 2D map renderer (preview tool) and data layer colours |
 | `scripts/ui/` | pixel camera and HUD |
-| `shaders/` | terrain, water and foliage shaders (banded light, depth, foam) |
+| `shaders/` | terrain, water, foliage, grass and outline shaders (banded dithered light, depth, foam) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
 | `assets/tiles/` | terrain atlas used by the game |
