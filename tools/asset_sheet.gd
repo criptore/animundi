@@ -46,6 +46,7 @@ func _initialize() -> void:
 	container.stretch = true
 	container.stretch_shrink = PIXEL
 	container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	container.material = _style.post
 	root.add_child(container)
 	_viewport.msaa_3d = Viewport.MSAA_DISABLED
 	container.add_child(_viewport)

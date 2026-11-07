@@ -7,10 +7,18 @@ extends RefCounted
 const TerrainShader = preload("res://shaders/terrain.gdshader")
 const WaterShader = preload("res://shaders/water.gdshader")
 const SpriteShader = preload("res://shaders/sprite.gdshader")
+const PostShader = preload("res://shaders/post.gdshader")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
+
+## Wind sway (world units at the top of the sprite) by sprite group; others stand still.
+const SWAY := {"trees": 0.05, "plants": 0.03}
+const STILL := ["plants/Rock", "plants/Boulder", "plants/Grassy_rock", "plants/Cactus"]
 
 var terrain := ShaderMaterial.new()
 var water := ShaderMaterial.new()
+## Final pass on the low-resolution render (light shafts, warm grade, vignette).
+var post := ShaderMaterial.new()
+var effects := true
 var _sprites := {}
 
 
@@ -19,6 +27,7 @@ func _init() -> void:
 	water.shader = WaterShader
 	water.set_shader_parameter("shallow_color", Color("#49ccdf"))
 	water.set_shader_parameter("deep_color", Color("#1b4479"))
+	post.shader = PostShader
 
 
 ## Material drawing one sprite (shared by every instance of it).
@@ -27,8 +36,17 @@ func sprite(id: String) -> ShaderMaterial:
 		var m := ShaderMaterial.new()
 		m.shader = SpriteShader
 		m.set_shader_parameter("sprite", SpriteLibrary.texture(id))
+		m.set_shader_parameter("sway", 0.0 if id in STILL else SWAY.get(id.get_slice("/", 0), 0.0))
+		m.set_shader_parameter("effects", effects)
 		_sprites[id] = m
 	return _sprites[id]
+
+
+## Turns the shader effects (wind, clouds, outlines, light shafts, grade) on or off everywhere.
+func set_effects(on: bool) -> void:
+	effects = on
+	for m in [terrain, water, post] + _sprites.values():
+		m.set_shader_parameter("effects", on)
 
 
 ## Adds the environment (sky colour, soft bluish ambient) and the warm sun to `parent`.

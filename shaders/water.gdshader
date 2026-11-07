@@ -13,6 +13,7 @@ uniform vec4 deep_color : source_color = vec4(0.08, 0.27, 0.6, 1.0);
 uniform vec4 foam_color : source_color = vec4(0.93, 0.98, 1.0, 1.0);
 // Depth (in tiles) at which water reaches its deepest colour.
 uniform float full_depth = 1.5;
+uniform bool effects = true;
 uniform bool has_reflection = false;
 uniform sampler2D reflection : filter_nearest, repeat_disable;
 uniform float reflection_strength = 0.45;
@@ -54,5 +55,8 @@ void fragment() {
 	float foam = step(depth, swell);
 	c = mix(c, foam_color.rgb, foam * 0.85);
 
+	if (effects) {
+		c *= cloud_shade(world_pos.xz, TIME, 8.0);
+	}
 	ALBEDO = c;
 }

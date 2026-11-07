@@ -42,6 +42,7 @@ Controls:
 | New random world | R or the **Random** button |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Pixel size | **Pixel size** box (1 = full resolution, 3 = default) |
+| Effects on / off (wind, clouds, outlines, light shafts) | E |
 | Tile info | hover the map (bottom bar) |
 
 Type any word or number as the seed: the same seed and settings always give the same world.

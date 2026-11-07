@@ -49,6 +49,7 @@ func _ready() -> void:
 	_container.stretch_shrink = pixel_scale
 	_container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_container.material = _style.post
 	add_child(_container)
 	_viewport.msaa_3d = Viewport.MSAA_DISABLED
 	_container.add_child(_viewport)
@@ -79,6 +80,7 @@ func _ready() -> void:
 	_hud.generate_requested.connect(generate)
 	_hud.layer_selected.connect(show_layer)
 	_hud.pixel_scale_changed.connect(set_pixel_scale)
+	_hud.effects_toggled.connect(_style.set_effects)
 	add_child(_hud)
 	generate()
 
@@ -86,7 +88,10 @@ func _ready() -> void:
 func generate() -> void:
 	world = WorldGenerator.generate(settings)
 	_heights = TerrainBuilder.heights(world)
-	_style.water.set_shader_parameter("heightmap", TerrainBuilder.heightmap_texture(world, _heights))
+	var heightmap := TerrainBuilder.heightmap_texture(world, _heights)
+	_style.water.set_shader_parameter("heightmap", heightmap)
+	_style.terrain.set_shader_parameter("heightmap", heightmap)
+	_style.terrain.set_shader_parameter("has_heightmap", true)
 	_style.water.set_shader_parameter("map_size", Vector2(world.width, world.height))
 
 	var ocean := PlaneMesh.new()
