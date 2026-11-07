@@ -24,6 +24,10 @@ python3 assets/sprites.py
 
 Each sprite is a grid of 8 rows of 8 characters; each character is a palette colour. Peoples are generated from a base body, race traits (ears, tusks, tail, wings…) and a role. A race fits on one line, which is what will let the AIs invent peoples of their own.
 
+## Design
+
+The full game design, everything the game must contain and how it is generated, is in [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
+
 ## Next steps
 
 1. Playable 2D map with these tiles and a few living villages.
