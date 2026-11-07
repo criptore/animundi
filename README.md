@@ -10,7 +10,7 @@ The twist: every people, monster species and force of nature (forest, volcano, o
 
 ![A generated world](docs/images/world_0.1.png)
 
-The world is a 3D scene of flat terraces on five levels (deep sea, shallow water, plain, hill, mountain) with shadows and water, rendered at low resolution and scaled up with sharp pixels, seen through a fixed tilted orthographic camera. Trees, plants, peoples, animals and monsters are **2D pixel-art sprites standing in that 3D world** ("HD-2D"), cut from the reference sheets in `art/reference/`. Water is coloured by its real depth with glints and shore foam.
+The world is a 3D scene of flat terraces on five levels (deep sea, shallow water, plain, hill, mountain) with shadows and water, rendered at low resolution and scaled up with sharp pixels, seen through a fixed tilted orthographic camera. Trees, plants, peoples, animals and monsters are **2D pixel-art sprites standing in that 3D world** ("HD-2D"), cut from the reference sheets in `art/reference/`. Tile tops carry pixel patterns (grass tufts, sand ripples, snow sparkles, rock cracks, moving lava), volcanoes rise as cones with a lava crater, and water is coloured by its real depth, reflects shores, trees and people (mirrored camera), with glints and shore foam.
 
 Every world is generated from a seed: continents, five terrain levels, climate (latitude, altitude, winds and rain shadows), rivers and lakes, and 21 biomes, including volcanoes, mushroom lands and cursed lands.
 
@@ -94,6 +94,7 @@ python3 art/sprites.py
 
 - [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md): everything the game must contain and how it is generated.
 - [docs/GOD_GAMES_RESEARCH.md](docs/GOD_GAMES_RESEARCH.md): what other god games let you do, and what Animundi takes.
+- [docs/ROADMAP.md](docs/ROADMAP.md): the steps to 1.0, ticked as they land.
 - [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md): the look of the game. Main inspiration: [David Holland, 3D pixel art rendering](https://davidholland.netlify.app/articles/3d-pixel-art-rendering).
 
 Engine: Godot 4.3.

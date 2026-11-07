@@ -13,6 +13,9 @@ const PixelCamera = preload("res://scripts/ui/pixel_camera.gd")
 const SceneStyle = preload("res://scripts/render3d/scene_style.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 
+## Render layer of the water surfaces, hidden from the reflection camera.
+const WATER_LAYER := 2
+
 var settings := WorldSettings.new()
 var world: WorldData
 var renderer := MapRenderer.new()
@@ -27,6 +30,9 @@ var _terrain := MeshInstance3D.new()
 var _ocean := MeshInstance3D.new()
 var _vegetation := Node3D.new()
 var _camera := PixelCamera.new()
+## Renders the scene mirrored under the water plane, for water reflections.
+var _reflection := SubViewport.new()
+var _reflection_camera := Camera3D.new()
 var _hud := Hud.new()
 var _style := SceneStyle.new()
 var _dragging := false
@@ -54,6 +60,20 @@ func _ready() -> void:
 	for node in [_terrain, _ocean, _vegetation, _camera]:
 		_viewport.add_child(node)
 	_camera.current = true
+
+	# Reflections: a camera mirrored under the water plane renders the same world (water itself
+	# excluded through its render layer) into a transparent texture the water shader reads.
+	_ocean.layers = WATER_LAYER
+	_reflection.transparent_bg = true
+	_reflection.msaa_3d = Viewport.MSAA_DISABLED
+	_reflection.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_viewport.add_child(_reflection)
+	_reflection_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_reflection_camera.cull_mask = 0xFFFFF & ~WATER_LAYER
+	_reflection_camera.current = true
+	_reflection.add_child(_reflection_camera)
+	_style.water.set_shader_parameter("reflection", _reflection.get_texture())
+	_style.water.set_shader_parameter("has_reflection", true)
 
 	_hud.settings = settings
 	_hud.generate_requested.connect(generate)
@@ -117,6 +137,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
 	if world == null:
 		return
+	_update_reflection()
 	var close := _camera.world_per_pixel() < GROUND_COVER_MAX_PIXEL
 	for node in _ground_cover:
 		node.visible = close
@@ -130,6 +151,19 @@ func _process(_delta: float) -> void:
 	_hud.set_hover_text("(%d, %d)  %s  ·  height %s  ·  %d °C  ·  humidity %d%%" % [
 		tile.x, tile.y, Biomes.NAMES[world.biome[i]], height_text,
 		roundi(lerpf(-30.0, 45.0, world.temperature[i])), roundi(world.humidity[i] * 100.0)])
+
+
+## Keeps the reflection camera the mirror image of the game camera across the water plane (y = 0).
+func _update_reflection() -> void:
+	if _reflection.size != _viewport.size:
+		_reflection.size = _viewport.size
+	var p := _camera.global_position
+	_reflection_camera.global_transform = Transform3D(
+			Basis.from_euler(Vector3(deg_to_rad(-PixelCamera.PITCH), deg_to_rad(PixelCamera.YAW), 0.0)),
+			Vector3(p.x, -p.y, p.z))
+	_reflection_camera.size = _camera.size
+	_reflection_camera.near = _camera.near
+	_reflection_camera.far = _camera.far
 
 
 ## Tile under a screen position, or (-1, -1): walks the camera ray until it goes under the ground.

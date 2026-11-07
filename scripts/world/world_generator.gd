@@ -516,7 +516,7 @@ static func _place_volcanoes(world: WorldData, s, rng: SeededRng) -> void:
 				if world.is_water(j):
 					continue
 				var d := sqrt(dx * dx + dy * dy)
-				if d <= 1.0:
+				if d <= 1.5:
 					world.biome[j] = Biomes.LAVA
 				elif d <= radius - v_rng.randf() * 1.5:
 					world.biome[j] = Biomes.VOLCANIC
