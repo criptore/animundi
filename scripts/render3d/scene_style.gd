@@ -6,40 +6,33 @@ extends RefCounted
 
 const TerrainShader = preload("res://shaders/terrain.gdshader")
 const WaterShader = preload("res://shaders/water.gdshader")
-const FoliageShader = preload("res://shaders/foliage.gdshader")
-const OutlineShader = preload("res://shaders/outline.gdshader")
-const GrassShader = preload("res://shaders/grass.gdshader")
-
-## Outlines are hidden when a render pixel covers more ground than this (trees are then specks).
-const OUTLINE_MAX_PIXEL := 0.16
+const SpriteShader = preload("res://shaders/sprite.gdshader")
+const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
 
 var terrain := ShaderMaterial.new()
 var water := ShaderMaterial.new()
-## Trees and bushes: ragged leafy edges, dithered light.
-var leafy := ShaderMaterial.new()
-## Rocks, cacti, mushrooms, dead trees, people, animals: plain surfaces.
-var solid := ShaderMaterial.new()
-var outline := ShaderMaterial.new()
-var grass := ShaderMaterial.new()
-var flower := ShaderMaterial.new()
+var _sprites := {}
 
 
 func _init() -> void:
 	terrain.shader = TerrainShader
 	water.shader = WaterShader
-	leafy.shader = FoliageShader
-	solid.shader = FoliageShader
-	solid.set_shader_parameter("leafy", false)
-	outline.shader = OutlineShader
-	leafy.next_pass = outline
-	solid.next_pass = outline
-	grass.shader = GrassShader
-	flower.shader = GrassShader
-	flower.set_shader_parameter("flower", true)
+	water.set_shader_parameter("shallow_color", Color("#49ccdf"))
+	water.set_shader_parameter("deep_color", Color("#1b4479"))
+
+
+## Material drawing one sprite (shared by every instance of it).
+func sprite(id: String) -> ShaderMaterial:
+	if not _sprites.has(id):
+		var m := ShaderMaterial.new()
+		m.shader = SpriteShader
+		m.set_shader_parameter("sprite", SpriteLibrary.texture(id))
+		_sprites[id] = m
+	return _sprites[id]
 
 
 ## Adds the environment (sky colour, soft bluish ambient) and the warm sun to `parent`.
-func add_lighting(parent: Node, background := Color("#2f6fa8")) -> DirectionalLight3D:
+func add_lighting(parent: Node, background := Color("#1b4479")) -> DirectionalLight3D:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = background
@@ -64,6 +57,12 @@ func add_lighting(parent: Node, background := Color("#2f6fa8")) -> DirectionalLi
 	return sun
 
 
-## Outlines about one render pixel wide for a camera whose pixel covers `world_per_pixel` units.
-func update_outline(world_per_pixel: float) -> void:
-	outline.set_shader_parameter("width", world_per_pixel * 0.9 if world_per_pixel < OUTLINE_MAX_PIXEL else 0.0)
+## Adds a MultiMesh of one sprite to `parent`.
+func add_sprites(parent: Node, id: String, multimesh: MultiMesh, cast_shadow := true) -> MultiMeshInstance3D:
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = multimesh
+	mmi.material_override = sprite(id)
+	if not cast_shadow:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mmi)
+	return mmi

@@ -31,6 +31,11 @@ var _camera := PixelCamera.new()
 var _hud := Hud.new()
 var _style := SceneStyle.new()
 var _dragging := false
+## Grass and flower layers, hidden when zoomed out (see GROUND_COVER_MAX_PIXEL).
+var _ground_cover: Array[Node3D] = []
+
+## Ground cover shows only when a render pixel covers less ground than this.
+const GROUND_COVER_MAX_PIXEL := 0.06
 
 
 func _ready() -> void:
@@ -76,29 +81,16 @@ func generate() -> void:
 	for child in _vegetation.get_children():
 		child.queue_free()
 	var plants := VegetationBuilder.build(world, _heights)
-	for kind in plants:
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = plants[kind]
-		mmi.material_override = material_for(_style, kind)
-		if VegetationBuilder.is_ground_cover(kind):
-			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_vegetation.add_child(mmi)
+	_ground_cover.clear()
+	for id in plants:
+		var cover := VegetationBuilder.is_ground_cover(id)
+		var node := _style.add_sprites(_vegetation, id, plants[id], not cover)
+		if cover:
+			_ground_cover.append(node)
 
 	show_layer(current_layer)
 	_camera.frame(Vector3(world.width / 2.0, 0.0, world.height / 2.0), world.height * 0.8)
 	_hud.set_stats(world)
-
-
-static func material_for(style: SceneStyle, kind: int) -> ShaderMaterial:
-	match kind:
-		VegetationBuilder.Kind.GRASS:
-			return style.grass
-		VegetationBuilder.Kind.FLOWER:
-			return style.flower
-		VegetationBuilder.Kind.ROCK, VegetationBuilder.Kind.CACTUS, VegetationBuilder.Kind.MUSHROOM, \
-				VegetationBuilder.Kind.DEAD:
-			return style.solid
-	return style.leafy
 
 
 func show_layer(layer: String) -> void:
@@ -129,8 +121,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
 	if world == null:
 		return
-	# Outlines one render pixel wide, hidden when zoomed far out.
-	_style.update_outline(_camera.world_per_pixel())
+	var close := _camera.world_per_pixel() < GROUND_COVER_MAX_PIXEL
+	for node in _ground_cover:
+		node.visible = close
 	var tile := pick_tile(get_viewport().get_mouse_position())
 	if tile.x < 0:
 		_hud.set_hover_text("")

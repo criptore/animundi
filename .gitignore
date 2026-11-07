@@ -7,3 +7,6 @@ build/
 # Python
 __pycache__/
 *.pyc
+
+# extract_sprites.py --debug overlays
+art/reference/debug_*.png
