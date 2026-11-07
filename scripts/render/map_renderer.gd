@@ -1,5 +1,6 @@
-## Turns a generated world into images: the biome map (8x8 pixel tiles from the terrain atlas)
-## and one-pixel-per-tile data layers (height, temperature, humidity, rivers).
+## Turns a generated world into 2D images: the flat biome map (8x8 pixel tiles from the terrain
+## atlas, used by the preview tool) and the colours of the data layers (height, temperature,
+## humidity, rivers), which the 3D terrain also uses.
 extends RefCounted
 
 const TerrainAtlas = preload("res://scripts/generated/terrain_atlas.gd")
@@ -39,26 +40,6 @@ func render_biomes(world: WorldData) -> Image:
 		for x in world.width:
 			var b := world.biome[world.index(x, y)]
 			img.blit_rect(_variants[b][_variant(x, y)], src, Vector2i(x * TILE, y * TILE))
-	return img
-
-
-## Data texture for the map shader, one pixel per tile:
-## R = land height (0 on water), G = sea depth (0 on land, shallow for lakes and rivers),
-## B = 1 where the shader draws open water (sea, lakes, rivers; not ice), A = 1.
-func render_shader_data(world: WorldData) -> Image:
-	var img := Image.create(world.width, world.height, false, Image.FORMAT_RGBA8)
-	for y in world.height:
-		for x in world.width:
-			var i := world.index(x, y)
-			var b := world.biome[i]
-			var open_water := b == Biomes.WATER or b == Biomes.DEEP_WATER
-			var land := clampf(world.land_height(i), 0.0, 1.0) if not world.is_water(i) else 0.0
-			var depth := 0.0
-			if world.water[i] == WorldData.Water.OCEAN:
-				depth = clampf(world.sea_depth(i), 0.0, 1.0)
-			elif open_water:
-				depth = 0.05
-			img.set_pixel(x, y, Color(land, depth, 1.0 if open_water else 0.0, 1.0))
 	return img
 
 

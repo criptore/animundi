@@ -25,12 +25,8 @@ func _initialize() -> void:
 func _process(_delta: float) -> bool:
 	_frames += 1
 	if _frames == 2 and _zoom > 0.0:
-		var cam: Camera2D = _main.get_node_or_null("Camera")
-		for child in _main.get_children():
-			if child is Camera2D:
-				cam = child
-		cam.zoom = Vector2(_zoom, _zoom)
-	if _frames == 10:
+		_main._camera.zoom_by(_zoom)
+	if _frames == 12:
 		root.get_viewport().get_texture().get_image().save_png(_out)
 		print("saved ", _out)
 		return true

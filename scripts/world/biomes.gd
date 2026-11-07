@@ -21,6 +21,15 @@ const TILES := [
 	"Volcanic rock", "Lava", "Mushroom land", "Cursed soil",
 ]
 
+## Ground colour of each biome in the 3D view (from the sprite palette).
+const COLORS := [
+	Color("#1d4a94"), Color("#3b8fe0"), Color("#cfe4f5"), Color("#ecd895"), Color("#e2c27a"),
+	Color("#c9b458"), Color("#6aae4a"), Color("#77b852"), Color("#3f8f3a"), Color("#2f8a3c"),
+	Color("#6b7a44"), Color("#4c7a5a"), Color("#8aa38c"), Color("#f1f6fc"), Color("#82b24a"),
+	Color("#8a8a96"), Color("#e9eef5"), Color("#3d3d4a"), Color("#ff5a1a"), Color("#c95f8c"),
+	Color("#6e3f8c"),
+]
+
 # Land height bands (0 = shore, 1 = highest point). Land height is rank-based and squared, so
 # a band above h holds about (1 - sqrt(h)) of the land: hills ~23%, mountains ~10%, peaks ~3%.
 const PEAK_HEIGHT := 0.94

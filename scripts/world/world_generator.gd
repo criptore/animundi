@@ -310,6 +310,10 @@ static func _hydrology(world: WorldData, s) -> void:
 		if world.water[i] == WorldData.Water.LAND and world.flow[i] > threshold:
 			world.water[i] = WorldData.Water.RIVER
 
+	for i in order:
+		if world.water[i] == WorldData.Water.LAKE or world.water[i] == WorldData.Water.RIVER:
+			world.water_surface[i] = filled[i]
+
 	# Fresh water makes the land around it greener.
 	var wet := world.humidity.duplicate()
 	for i in order:

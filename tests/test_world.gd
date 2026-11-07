@@ -9,6 +9,8 @@ const WorldData = preload("res://scripts/world/world_data.gd")
 const Biomes = preload("res://scripts/world/biomes.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 const PriorityQueue = preload("res://scripts/core/priority_queue.gd")
+const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
+const VegetationBuilder = preload("res://scripts/render3d/vegetation_builder.gd")
 
 var _failures := 0
 
@@ -23,6 +25,8 @@ func _initialize() -> void:
 	test_rivers_exist()
 	test_poles_are_colder()
 	test_renderer()
+	test_terrain_mesh()
+	test_vegetation()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -123,6 +127,35 @@ func test_poles_are_colder() -> void:
 		pole += w.temperature[w.index(x, 2)]
 		equator += w.temperature[w.index(x, w.height / 2)]
 	check(pole < equator, "poles are colder than the equator")
+
+
+func test_terrain_mesh() -> void:
+	var w := make("mesh", 64)
+	var h := TerrainBuilder.heights(w)
+	var mesh := TerrainBuilder.build_terrain(w, h)
+	var arrays := mesh.surface_get_arrays(0)
+	check((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() == 64 * 64, "terrain has one vertex per tile")
+	var ok := true
+	for i in w.size():
+		var land := w.water[i] == WorldData.Water.LAND
+		if land and h[i] <= 0.0 or w.water[i] == WorldData.Water.OCEAN and h[i] >= 0.0:
+			ok = false
+	check(ok, "land is above the sea plane and sea floor below it")
+
+
+func test_vegetation() -> void:
+	var w := make("trees", 128)
+	var h := TerrainBuilder.heights(w)
+	var a := VegetationBuilder.build(w, h)
+	var b := VegetationBuilder.build(w, h)
+	var total := 0
+	var same := a.keys() == b.keys()
+	for k in a:
+		total += a[k].instance_count
+		same = same and a[k].instance_count == b[k].instance_count \
+				and a[k].get_instance_transform(0) == b[k].get_instance_transform(0)
+	check(total > 500, "a 128 world has vegetation (%d plants)" % total)
+	check(same, "vegetation is the same for the same world")
 
 
 func test_renderer() -> void:

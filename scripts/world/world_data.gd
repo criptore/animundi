@@ -14,6 +14,8 @@ var sea_level := 0.5
 var temperature := PackedFloat32Array()
 ## 0 = bone dry, 1 = soaked.
 var humidity := PackedFloat32Array()
+## Height of the water surface on lake and river tiles (lakes are flat), same scale as elevation.
+var water_surface := PackedFloat32Array()
 ## Water collected from all the tiles upstream (rivers are where it gets large).
 var flow := PackedFloat32Array()
 ## Tile that water flows to from each tile, -1 for sea tiles.
@@ -33,7 +35,7 @@ func _init(w: int, h: int, seed_v: int) -> void:
 	height = h
 	seed_value = seed_v
 	var n := w * h
-	for arr in [elevation, temperature, humidity, flow]:
+	for arr in [elevation, temperature, humidity, flow, water_surface]:
 		arr.resize(n)
 	downstream.resize(n)
 	downstream.fill(-1)
@@ -61,6 +63,11 @@ func land_height(i: int) -> float:
 ## Depth below the sea, 0 at the shore and 1 at the deepest point. Negative on land.
 func sea_depth(i: int) -> float:
 	return (sea_level - elevation[i]) / sea_level
+
+
+## Like land_height, for the water surface of a lake or river tile.
+func surface_height(i: int) -> float:
+	return (water_surface[i] - sea_level) / (1.0 - sea_level)
 
 
 func is_water(i: int) -> bool:
