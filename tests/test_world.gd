@@ -50,6 +50,7 @@ func _initialize() -> void:
 	test_nature()
 	test_peoples()
 	test_villages()
+	test_kingdoms()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -677,6 +678,89 @@ func test_scripts_load() -> void:
 		var script: GDScript = load(path)
 		ok = ok and script != null and script.can_instantiate()
 	check(ok, "the HUD, main scene and map scripts compile")
+
+
+func test_kingdoms() -> void:
+	var made := make_sim("kingdoms", 192)
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.StartPeoples(PackedStringArray(["humans", "elves", "orcs"]), 14)
+	check(sim.KingdomCount() == 3, "each people starts as a kingdom (%d)" % sim.KingdomCount())
+	sim.RunSteps(30 * 60 * 14)  # 14 years
+	var kingdoms: Array = sim.KingdomTable()
+	var ruled := true
+	var villages := 0
+	for k in kingdoms:
+		ruled = ruled and k.ruler != "no ruler" and k.dynasty != ""
+		villages += k.villages
+	check(ruled, "every kingdom has a king or queen of a dynasty (%s)" % [kingdoms.map(func(k): return k.ruler)])
+	check(villages == sim.VillageCount(), "every village belongs to a kingdom (%d of %d)" % [villages, sim.VillageCount()])
+	var ranks_ok := true
+	for v in sim.VillageTable():
+		ranks_ok = ranks_ok and v.rank in ["camp", "village", "town", "city"]
+	check(ranks_ok, "settlements have ranks: camp, village, town, city")
+
+	# Plots grow before they happen; they can be cancelled or forced.
+	var a: int = kingdoms[0].index
+	var b: int = kingdoms[1].index
+	var plan: int = sim.Plot("alliance", a, b)
+	check(sim.PlanTable().size() > 0 and sim.CancelPlan(plan) and not sim.CancelPlan(plan), "a plot is shown before it happens and can be cancelled")
+	if sim.AtWar(a, b):
+		sim.ForcePlan(sim.Plot("peace", a, b))
+	sim.ForcePlan(sim.Plot("war", a, b))
+	check(sim.AtWar(a, b) and sim.WarTable().size() > 0, "a forced plot happens at once: war")
+	var reach: bool = sim.CanReach(a, b) or sim.CanReach(b, a)
+	sim.RunSteps(30 * 60 * 4)  # 4 years of war
+	check(not reach or sim.WarDeaths > 0 or sim.Conquests > 0,
+			"armies march and fight when they can reach the enemy (%d dead, %d villages taken, reachable: %s)" % [sim.WarDeaths, sim.Conquests, reach])
+	if sim.AtWar(a, b):
+		sim.ForcePlan(sim.Plot("peace", a, b))
+	check(not sim.AtWar(a, b), "peace ends the war")
+	check(sim.CountOnWater() == 0, "no one walks on water, armies included")
+
+	# A real fight: on a small world where two kingdoms can walk to each other.
+	var fought := false
+	for seed in ["war-1", "war-2", "war-3", "war-4", "war-5"]:
+		var w2 := make_sim(seed, 128)
+		var s2: Node2D = w2[1]
+		s2.SetLaw("natural_disasters", false)
+		s2.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+		s2.RunSteps(30 * 60 * 2)
+		if s2.KingdomCount() == 2 and s2.CanReach(0, 1):
+			s2.ForcePlan(s2.Plot("war", 0, 1))
+			s2.RunSteps(30 * 60 * 5)
+			fought = true
+			check(s2.WarDeaths > 0, "armies march on the enemy and fight: %d dead in war, %d villages taken (%s)" % [s2.WarDeaths, s2.Conquests, seed])
+			s2.queue_free()
+			break
+		s2.queue_free()
+	check(fought, "some small world lets two kingdoms reach each other")
+
+	# A village breaks away: a new kingdom, at war with the old one.
+	var rebel := -1
+	var rebel_kingdom := -1
+	for v in sim.VillageTable():
+		if not v.capital and v.kingdom != "":
+			rebel = v.index
+			for k in sim.KingdomTable():
+				if k.name == v.kingdom:
+					rebel_kingdom = k.index
+			break
+	if rebel >= 0:
+		var before: int = sim.KingdomCount()
+		sim.ForcePlan(sim.Plot("rebellion", rebel_kingdom, rebel))
+		check(sim.KingdomCount() == before + 1 and sim.AtWar(rebel_kingdom, sim.KingdomOf(rebel)),
+				"a rebel village founds a kingdom, at war with its old one")
+
+	# The log says who did what, by category.
+	var tagged: PackedStringArray = sim.TakeTaggedEvents()
+	var cats := {}
+	for k in range(0, tagged.size(), 2):
+		cats[tagged[k]] = true
+	check(cats.has("kings") and cats.has("wars"), "events are tagged for the log's filters (%s)" % [cats.keys()])
+	var banner: Image = load("res://scripts/ui/banner.gd").image(Color.RED, Color.WHITE, 4, 2)
+	check(banner.get_width() == 10 and banner.get_pixel(5, 6).a > 0.0, "kingdoms get a generated banner")
+	sim.queue_free()
 
 
 func test_villages() -> void:

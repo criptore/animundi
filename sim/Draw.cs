@@ -313,7 +313,7 @@ public partial class Simulation
 	private static readonly string[] WindmillFrames = { "buildings/windmill_0", "buildings/windmill_1" };
 
 	// What a drawn item is (packed with its index into a long, sorted by feet height).
-	private const long KUnit = 0, KPlant = 1, KPlantFlame = 2, KRemains = 3, KBuilding = 4, KTileFlame = 5;
+	private const long KUnit = 0, KPlant = 1, KPlantFlame = 2, KRemains = 3, KBuilding = 4, KTileFlame = 5, KVehicle = 6;
 	private long[] _items = Array.Empty<long>();
 
 	/// <summary>Animation clock in real seconds: flames, walking, the bonfire and windmills move at
@@ -400,6 +400,12 @@ public partial class Simulation
 			Add(ref n, KBuilding, b, bld.Y + 0.8f);
 			if (bld.Burning > 0f)
 				Add(ref n, KTileFlame, World.Index(bld.X, bld.Y), bld.Y + 0.8001f);
+		}
+		for (int vh = 0; vh < _vehicles.Count; vh++)
+		{
+			var (vx, vy, _) = VehiclePos(_vehicles[vh]);
+			if (!cull || InView(vx, vy, margin))
+				Add(ref n, KVehicle, vh, vy);
 		}
 		foreach (int t in _burningTiles)
 			if (!cull || InView(t % World.Width + 0.5f, t / World.Width + 0.85f, margin))
@@ -505,6 +511,17 @@ public partial class Simulation
 					WriteSprite(_unitBuffer, k * Stride, bsize.X, bsize.Y, bx, by, brect, bcolor, bsize.Y);
 					bool flat = bld.Type == _tBonfire || bld.Type == _tRuin || bld.Type == _tDummy;
 					WriteShadow(_unitShadowBuffer, k * 8, flat ? 0f : bsize.X * 0.9f, bx, by);
+					continue;
+				}
+				case KVehicle:
+				{
+					// A cart or a boat of trade: the boat's sail in its kingdom's colour.
+					var veh = _vehicles[i];
+					var (vx, vy, left) = VehiclePos(veh);
+					var (vsize, vrect, _) = SpriteInfo(veh.Boat ? "buildings/boat" : "buildings/cart");
+					var vcolor = Villages[veh.Village].Color;
+					WriteSprite(_unitBuffer, k * Stride, left ? -vsize.X : vsize.X, vsize.Y, vx * Tile, vy * Tile, vrect, vcolor, vsize.Y);
+					WriteShadow(_unitShadowBuffer, k * 8, veh.Boat ? 0f : vsize.X, vx * Tile, vy * Tile);
 					continue;
 				}
 				case KRemains:

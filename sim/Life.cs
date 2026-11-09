@@ -17,7 +17,7 @@ public partial class Simulation
 	public enum Task : byte { Wander, Graze, Drink, Hunt, Rest, Work, Deliver, Feast, Home }
 
 	/// <summary>Why a unit died (for statistics and the event log).</summary>
-	public enum Death { OldAge, Hunger, Thirst, Eaten, Fire, Other }
+	public enum Death { OldAge, Hunger, Thirst, Eaten, Fire, Other, War }
 
 	/// <summary>Seconds for hunger to go from full to starving (thirst: ThirstSeconds).</summary>
 	public const float HungerSeconds = 50f;
@@ -226,6 +226,8 @@ public partial class Simulation
 			}
 			if (sp.IsPeople)
 			{
+				// Wounds heal slowly.
+				Units.Health[i] = Math.Min(MaxHealth(i), Units.Health[i] + 3f * dt);
 				ThinkPerson(i, sp, dt);
 				continue;
 			}
@@ -426,7 +428,7 @@ public partial class Simulation
 	}
 
 	/// <summary>Every step: hunters chase their prey and catch it when close.</summary>
-	private void Chase(int i)
+	private void Chase(int i, float dt)
 	{
 		int j = Units.Prey[i];
 		if (j < 0 || !Units.Alive[j])
@@ -441,6 +443,14 @@ public partial class Simulation
 		{
 			Units.Prey[i] = -1;
 			Units.Task[i] = (byte)Task.Wander;
+			return;
+		}
+		// People of kingdoms at war: blows exchanged, not a hunt.
+		if (d2 < 0.6f * 0.6f && Assets.Species[Units.Species[i]].IsPeople && Assets.Species[Units.Species[j]].IsPeople)
+		{
+			Units.TargetX[i] = Units.X[i];
+			Units.TargetY[i] = Units.Y[i];
+			Fight(i, j, dt);
 			return;
 		}
 		if (d2 < 0.35f * 0.35f)

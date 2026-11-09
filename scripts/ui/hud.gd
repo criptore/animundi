@@ -15,6 +15,7 @@ signal spawn_requested(count: int)
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 const SetupPanel = preload("res://scripts/ui/setup_panel.gd")
+const Banner = preload("res://scripts/ui/banner.gd")
 
 var settings: WorldSettings
 
@@ -32,7 +33,13 @@ var _sim_stats := ""
 var _time_label: Label
 var _events_label: Label
 var _population_label: Label
-var _events: PackedStringArray = []
+## Recent events as [category, text], newest first, and the category shown ("" = all).
+var _events: Array = []
+var _event_filter := ""
+var _kingdoms_box: VBoxContainer
+var _plans_label: Label
+## Kingdom rows by name: banner and text are updated in place.
+var _kingdom_rows := {}
 var _villages_label: Label
 var _setup: PanelContainer
 var _root: Control
@@ -132,7 +139,9 @@ func _ready() -> void:
 
 	# Left: the time of year, the world's latest events and its living creatures.
 	var left := PanelContainer.new()
-	left.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	# Under the top bar, so the kingdoms, plots and events all fit.
+	left.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	left.position.y = 44
 	left.custom_minimum_size.x = 300
 	root.add_child(left)
 	var life := VBoxContainer.new()
@@ -184,11 +193,34 @@ func _ready() -> void:
 	_population_label = _label("")
 	_population_label.add_theme_font_size_override("font_size", 12)
 	life.add_child(_population_label)
+	life.add_child(_label("Kingdoms"))
+	_kingdoms_box = VBoxContainer.new()
+	_kingdoms_box.add_theme_constant_override("separation", 2)
+	life.add_child(_kingdoms_box)
+	_plans_label = _label("")
+	_plans_label.add_theme_font_size_override("font_size", 12)
+	_plans_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.55))
+	life.add_child(_plans_label)
 	life.add_child(_label("Villages"))
 	_villages_label = _label("")
 	_villages_label.add_theme_font_size_override("font_size", 12)
 	life.add_child(_villages_label)
-	life.add_child(_label("Events"))
+	var head := HBoxContainer.new()
+	head.add_child(_label("Events"))
+	var filters := ButtonGroup.new()
+	for cat in ["", "kings", "wars", "cities", "disasters"]:
+		var fb := Button.new()
+		fb.text = "all" if cat == "" else cat
+		fb.toggle_mode = true
+		fb.button_group = filters
+		fb.button_pressed = cat == ""
+		fb.focus_mode = Control.FOCUS_NONE
+		fb.add_theme_font_size_override("font_size", 11)
+		fb.pressed.connect(func():
+			_event_filter = cat
+			_show_events())
+		head.add_child(fb)
+	life.add_child(head)
 	_events_label = _label("")
 	_events_label.add_theme_font_size_override("font_size", 12)
 	_events_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -260,11 +292,72 @@ func set_time(text: String) -> void:
 
 
 ## A line in the event log (newest first).
-func add_event(text: String) -> void:
-	_events.insert(0, text)
-	if _events.size() > EVENTS_SHOWN:
-		_events.resize(EVENTS_SHOWN)
-	_events_label.text = "\n".join(_events)
+func add_event(text: String, category := "life") -> void:
+	_events.insert(0, [category, text])
+	if _events.size() > 200:
+		_events.resize(200)
+	_show_events()
+
+
+## The latest events of the chosen category (kings, wars, cities, disasters; all by default).
+func _show_events() -> void:
+	var lines := PackedStringArray()
+	for e in _events:
+		if _event_filter == "" or e[0] == _event_filter:
+			lines.append(e[1])
+			if lines.size() >= EVENTS_SHOWN:
+				break
+	_events_label.text = "\n".join(lines)
+
+
+## One row per kingdom: its banner, name, ruler, villages, people, wars and allies.
+func set_kingdoms(kingdoms: Array) -> void:
+	var seen := {}
+	# The 7 biggest kingdoms, one line each (the inspector cards of 0.9 tell the rest).
+	kingdoms = kingdoms.duplicate()
+	kingdoms.sort_custom(func(a, b): return a.population > b.population)
+	kingdoms = kingdoms.slice(0, 7)
+	for k in kingdoms:
+		seen[k.name] = true
+		var row: Array = _kingdom_rows.get(k.name, [])
+		if row.is_empty():
+			var h := HBoxContainer.new()
+			var icon := TextureRect.new()
+			icon.texture = Banner.texture(k.color, k.banner2, k.division, k.symbol)
+			icon.stretch_mode = TextureRect.STRETCH_KEEP
+			h.add_child(icon)
+			var l := _label("")
+			l.add_theme_font_size_override("font_size", 12)
+			l.clip_text = true
+			l.custom_minimum_size.x = 270
+			h.add_child(l)
+			_kingdoms_box.add_child(h)
+			row = [h, l]
+			_kingdom_rows[k.name] = row
+		var text := "%s (%s) %d villages, %d people" % [k.name, k.people, k.villages, k.population]
+		if k.wars != "":
+			text += " · ⚔ " + k.wars
+		elif k.allies != "":
+			text += " · ♥ " + k.allies
+		row[1].text = text
+		row[1].tooltip_text = "%s\ncapital %s · %d soldiers · founded year %d" % [k.ruler, k.capital, k.soldiers, k.founded]
+		row[1].mouse_filter = Control.MOUSE_FILTER_PASS
+	for name in _kingdom_rows.keys():
+		if not seen.has(name):
+			_kingdom_rows[name][0].queue_free()
+			_kingdom_rows.erase(name)
+
+
+## Plots under way, shown before they happen.
+func set_plans(plans: Array) -> void:
+	var lines := PackedStringArray()
+	for p in plans:
+		var what: String = {"war": "plots war on", "peace": "seeks peace with", "alliance": "courts", "rebellion": "is plotted against by"}.get(p.kind, p.kind)
+		if p.kind == "rebellion":
+			lines.append("⚑ %s plots to break away from %s (%d%%)" % [p.target, p.kingdom, int(p.progress * 100)])
+		else:
+			lines.append("⚑ %s %s %s (%d%%)" % [p.kingdom, what, p.target, int(p.progress * 100)])
+	_plans_label.text = "\n".join(lines.slice(0, 4))
 
 
 ## Living creatures by species name, the most numerous first.
@@ -297,8 +390,11 @@ func setup_visible() -> bool:
 ## One line per village: name, people, population and homes, stores, what it builds.
 func set_villages(villages: Array) -> void:
 	var lines := PackedStringArray()
-	for v in villages:
-		var line := "%s (%s) %d/%d · food %d · wood %d · stone %d" % [v.name, v.people, v.population, v.homes, v.food, v.wood, v.stone]
+	# The biggest settlements only: the kingdoms panel tells the rest.
+	var biggest := villages.duplicate()
+	biggest.sort_custom(func(a, b): return a.population > b.population)
+	for v in biggest.slice(0, 4):
+		var line := "%s %s (%s) %d/%d · food %d · wood %d · stone %d" % [v.rank.capitalize(), v.name, v.people, v.population, v.homes, v.food, v.wood, v.stone]
 		if v.metal > 0 or v.gold > 0:
 			line += " · metal %d · gold %d" % [v.metal, v.gold]
 		if v.building != "":
@@ -370,6 +466,9 @@ func clear_events() -> void:
 	_events.clear()
 	if _events_label != null:
 		_events_label.text = ""
+	for name in _kingdom_rows.keys():
+		_kingdom_rows[name][0].queue_free()
+	_kingdom_rows.clear()
 
 
 func _label(text: String) -> Label:

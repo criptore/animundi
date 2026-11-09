@@ -74,16 +74,18 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [ ] Rocks and some sprites still flicker at Ultra speed. Already ruled out: the wind phase (now from the position) and animations on simulation time (now real time). Leads: strips rebuilt every frame while plants grow fast (instance counts changing), the far-view/near-view switch, sort ties between plants and creatures at the same height
 
 ## 0.4 Civilisation
-- [ ] Settlements grow: camp → village → town → city
+- [x] Settlements grow: camp → village → town → city (by people; a city needs a town hall)
 - [ ] **Buildings by age**: every home and building redrawn for each era of a people (wood → stone → metal → industrial → modern → future), the way homes now change by tier; a village's look follows the age its culture has reached (0.8 Ages drives the eras)
 - [ ] **Notable buildings unlocked by culture and age** (later, with cultures and ages): colosseum, museum, triumphal arch, aqueduct, lighthouse, pyramid, great library, observatory, cathedral, bathhouse, amphitheatre, harbour fortress, university, monuments of each people; each with its unlock (age, culture traits, wealth, population) and an effect on the village (happiness, faith, knowledge, trade, defence)
-- [ ] Buildings generated from function × culture × age, with generated sprites
-- [ ] Boats, trade (roads done in 0.35)
-- [ ] Kingdoms: borders, capitals, rulers, dynasties, generated banners
-- [ ] Diplomacy (peace, alliance, rivalry) and war (armies, sieges, conquest)
-- [ ] Rebellions, civil wars, secessions
-- [ ] Plans shown before they happen: leaders plot wars, alliances and rebellions, with a progress icon the player can watch, cancel or force
-- [ ] Event log with filters (kings, wars, cities, disasters, favourites)
+- [ ] Buildings generated from function × culture × age, with generated sprites (moved to 0.5 AI minds and 0.8 Ages)
+- [x] Trade (`sim/Trade.cs`): routes between friendly villages with a market or stockpile; every month the surplus (food, wood, stone) goes where it is lacking, markets earn gold; carts follow land paths, boats sail between docks along water paths (paths found once per route)
+- [x] Kingdoms (`sim/Kingdoms.cs`): every people starts as a kingdom, settlers' villages join it; capital, king or queen of a dynasty (the eldest grown child inherits, else a new dynasty), the kingdom's colour on its land and roofs (a shade per village), a generated banner (colours, division, symbol)
+- [x] Diplomacy: opinions (kin peoples, temperament, borders, old wars, allies), alliances (allies join wars), war when a ruler dislikes a reachable, not stronger neighbour, peace after long or costly wars, with lasting bitterness
+- [x] War (`sim/War.cs`): armies of two thirds of the warriors march along a land road on the nearest enemy village, on rations; people of kingdoms at war fight (health, strength, training, weapons); defenders guard their land; a village without defenders is besieged (wooden buildings set alight) and taken; a kingdom with no village left falls
+- [x] Rebellions, civil wars, secessions: loyalty of each village (distance to the capital, size, people, war weariness, a dead king, conquest); big disloyal villages plot to break away and found a kingdom, disloyal neighbours join, and the old kingdom goes to war
+- [x] Plans shown before they happen: wars, peace, alliances and rebellions are plots that grow over months, shown in the panel with their progress; the simulation can cancel or force them (the god powers of 0.9 will)
+- [x] Event log with filters (kings, wars, cities, disasters); favourites come with the inspector (0.9)
+- [ ] Boats of war and invasions by sea (armies only march by land for now)
 
 ## 0.5 AI minds (the edge)
 - [ ] Small local model (llama.cpp through a GDExtension) with grammar-forced JSON output

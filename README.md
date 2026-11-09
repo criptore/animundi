@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples and 0.35 Villages
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages and 0.4 Civilisation
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -77,7 +77,20 @@ Villages now do everything WorldBox villages do (the full list, and how each rul
 
 ![Villages and their land](docs/images/villages_map_0.35.png)
 
-Next: 0.4 Civilisation (villages that grow into towns, roads, kingdoms, diplomacy and war). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+## 0.4 Civilisation
+
+![Kingdoms, their plots and their wars](docs/images/kingdoms_0.4.png)
+
+- Every people starts as a **kingdom** with a capital, a king or queen and a dynasty; its villages wear its colour on their roofs and land, and it has a generated **banner**.
+- Rulers **plot**: wars, alliances, peace. Each plot grows for months and is shown before it happens.
+- **War**: armies march along land roads on the nearest enemy village, soldiers fight, villages without defenders are **besieged and taken**, kingdoms fall.
+- Far, big or conquered villages grow disloyal and **break away**: new kingdoms and civil wars.
+- **Trade** routes carry food, wood and stone where they are lacking, by cart or by boat; markets earn gold.
+- Settlements grow from **camp to village, town and city**; the event log has **filters** (kings, wars, cities, disasters).
+
+![A human city](docs/images/city_0.4.png)
+
+Next: 0.5 AI minds (villages that grow into towns, roads, kingdoms, diplomacy and war). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -127,7 +140,7 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
-| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples and neurons (`Peoples.cs`), villages, buildings and territory (`Villages.cs`), jobs (`Jobs.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
+| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples and neurons (`Peoples.cs`), villages, buildings and territory (`Villages.cs`), jobs (`Jobs.cs`), kingdoms, diplomacy and rebellions (`Kingdoms.cs`), war (`War.cs`), trade (`Trade.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
 | `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `races.json` (the 12 peoples), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |

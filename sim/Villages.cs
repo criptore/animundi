@@ -45,6 +45,19 @@ public partial class Simulation
 		public readonly List<int> RoadPlan = new();
 		/// <summary>Village it was founded from, or -1.</summary>
 		public int Mother = -1;
+		/// <summary>Kingdom it belongs to (Kingdoms.cs), or -1.</summary>
+		public int Kingdom = -1;
+		/// <summary>Loyalty to its kingdom, -100..100 (rebels below 0).</summary>
+		public float Loyalty = 50f;
+		/// <summary>0 camp, 1 village, 2 town, 3 city.</summary>
+		public int Rank;
+		/// <summary>Siege, 0..1 (taken at 1), and the kingdom besieging it.</summary>
+		public float Siege;
+		public int SiegeBy = -1;
+		/// <summary>1 just after being conquered, fading: conquered villages are disloyal.</summary>
+		public float Conquered;
+		/// <summary>No rebellion before this time (just conquered or just broke away).</summary>
+		public double CalmUntil;
 		/// <summary>Its standing buildings by type, refreshed every two seconds (fast lookups:
 		/// the nearest store, well, mine...).</summary>
 		public readonly Dictionary<int, List<int>> ByType = new();
@@ -312,7 +325,7 @@ public partial class Simulation
 			if (chief < 0 && eldest >= 0)
 			{
 				Units.Role[eldest] = (byte)Role.Chief;
-				LogEvent($"{NameOf(eldest)} becomes chief of {village.Name}.");
+				LogEvent($"{NameOf(eldest)} becomes chief of {village.Name}.", "cities");
 			}
 			// The bonfire gives a little food of the land (berries, roots) every time.
 			village.Food += 0.4f * dt / 2f;
@@ -696,7 +709,7 @@ public partial class Simulation
 			MakeFields(v, bld.X, bld.Y);
 		PlanRoad(v, bld.X, bld.Y + 1, village.X, village.Y + 1);
 		if (!_houseTypes.Contains(bld.Type) && bld.Type != _tDummy)
-			LogEvent($"{village.Name} builds a {rec.Name.ToLower()}.");
+			LogEvent($"{village.Name} builds a {rec.Name.ToLower()}.", "cities");
 	}
 
 	// ------------------------------------------------------------------ fields and roads
@@ -817,7 +830,7 @@ public partial class Simulation
 			{
 				BuildingsBurned++;
 				if (Rec(b).Homes > 1 || bld.Type == _tWindmill)
-					LogEvent($"a {Rec(b).Name.ToLower()} of {Villages[bld.Village].Name} burns down.");
+					LogEvent($"a {Rec(b).Name.ToLower()} of {Villages[bld.Village].Name} burns down.", "disasters");
 				ToRuin(b);
 			}
 		}
@@ -889,7 +902,7 @@ public partial class Simulation
 			MarkZone(z);
 		}
 		village.Zones.Clear();
-		LogEvent($"{village.Name} is abandoned: no one lives there any more.");
+		LogEvent($"{village.Name} is abandoned: no one lives there any more.", "cities");
 	}
 
 	// ------------------------------------------------------------------ watch towers
@@ -960,6 +973,8 @@ public partial class Simulation
 			return;
 		int nv = FoundVillage(village.Species, site % World.Width, site / World.Width, v);
 		var colony = Villages[nv];
+		if (village.Kingdom >= 0)
+			JoinKingdom(nv, village.Kingdom);
 		float food = Math.Min(village.Food * 0.3f, 25f), wood = Math.Min(village.Wood * 0.3f, 12f);
 		village.Food -= food;
 		village.Wood -= wood;
@@ -982,7 +997,7 @@ public partial class Simulation
 		village.Population -= leaving.Count;
 		colony.Population = leaving.Count;
 		SettlersSent += leaving.Count;
-		LogEvent($"{leaving.Count} settlers leave {village.Name} and found {colony.Name}.");
+		LogEvent($"{leaving.Count} settlers leave {village.Name} and found {colony.Name}.", "cities");
 	}
 
 	/// <summary>A place for a new village 18 to 45 tiles away: free land in a liked biome, near

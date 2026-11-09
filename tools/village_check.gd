@@ -31,6 +31,12 @@ func _initialize() -> void:
 		print("year %d: %d people, %d animals, %.3f ms/step" % [y + 1, sim.PeopleCount(), sim.UnitCount() - sim.PeopleCount(), sim.TakeStepMs()])
 		for v in sim.VillageTable():
 			print("   %s (%s): %d people / %d homes, food %d wood %d stone %d metal %d gold %d tools %d weapons %d, %d zones, %d fields, building %s %.2f\n      [%s]\n      jobs: %s" % [v.name, v.people, v.population, v.homes, v.food, v.wood, v.stone, v.metal, v.gold, v.tools, v.weapons, v.zones, v.fields, v.building, v.site, v.buildings, v.jobs])
+		for k in sim.KingdomTable():
+			print("   KINGDOM %s (%s) %s · capital %s · %d villages, %d people, %d soldiers · wars: %s · allies: %s" % [
+				k.name, k.people, k.ruler, k.capital, k.villages, k.population, k.soldiers, k.wars, k.allies])
+		for p in sim.PlanTable():
+			print("   PLAN %s: %s → %s (%d%%)" % [p.kind, p.kingdom, p.target, int(p.progress * 100)])
+		print("   trade routes: %d, war deaths %d, conquests %d" % [sim.TradeTable().size(), sim.WarDeaths, sim.Conquests])
 		for e in sim.TakeEvents():
 			print("   ", e)
 	print("life: ", sim.LifeStats())

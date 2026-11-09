@@ -277,6 +277,25 @@ SSSSSS.SSKS.
 SKSSSSSSSSSS
 """
 
+# Trade (0.4): a cart of goods and a boat with a sail in the kingdom's colour (R = mask).
+CART = """
+..HHCH..
+.TTTTTTT
+.TKTTTKT
+..K...K.
+"""
+
+BOAT = """
+....R....
+....RR...
+....RRR..
+....RRRR.
+....T....
+TTTTTTTTT
+.TTTTTTT.
+..TTTTT..
+"""
+
 SITE = """
 .....T......
 ....T.T.....
@@ -349,6 +368,8 @@ def all_buildings():
     images["dummy"] = render(parse(DUMMY), COMMON)
     images["ruin"] = render(parse(RUIN), COMMON)
     images["site"] = render(parse(SITE), {"T": "#a87a4a"})
+    images["cart"] = render(parse(CART), COMMON)
+    images["boat"] = snap_mask(render(parse(BOAT), {**COMMON, "R": "#d000d0"}))
     return images
 
 
@@ -392,7 +413,7 @@ def main():
     tiers = [f"{t}_{{}}_{v}" for t in homes.TIERS for v in (0, 1)] + [f"{g}_{{}}" for g in GREAT]
     names = [t.format(race) for race in STYLES for t in tiers]
     shared = ["bonfire_0", "stockpile", "windmill_0", "windmill_1", "well", "mine", "dock", "market", "statue",
-              "dummy", "ruin"]
+              "dummy", "ruin", "cart", "boat"]
     names += shared + ["site"]
     sheet(images, names, len(tiers)).save(SHEET)
     print(f"{len(images)} building sprites -> {OUT}")
