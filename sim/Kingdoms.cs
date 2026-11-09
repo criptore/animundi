@@ -215,6 +215,7 @@ public partial class Simulation
 		}
 		WarStep(dt);
 		TradeStep(dt);
+		InventionStep(dt);
 	}
 
 	private void Fall(int k)
@@ -478,7 +479,7 @@ public partial class Simulation
 			var capital = Villages[kingdom.Capital];
 			float dist = MathF.Sqrt((capital.X - village.X) * (capital.X - village.X) + (capital.Y - village.Y) * (capital.Y - village.Y));
 			float l = 50f - dist / 2.5f - village.Population / 3.5f + (village.Species == kingdom.Species ? 10f : -20f)
-				- kingdom.Weariness * 35f - (kingdom.King < 0 ? 10f : 0f) - village.Conquered * 30f;
+				- kingdom.Weariness * 35f - (kingdom.King < 0 ? 10f : 0f) - village.Conquered * 30f + village.LoyaltyBonus;
 			village.Conquered = Math.Max(0f, village.Conquered - 0.05f);
 			village.Loyalty = Math.Clamp(village.Loyalty * 0.5f + l * 0.5f + (float)(_rng.NextDouble() * 10 - 5), -100f, 100f);
 			// Big disloyal villages plot to break away, at most once every eight years.

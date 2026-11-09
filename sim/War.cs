@@ -442,8 +442,15 @@ public partial class Simulation
 			float weapons = v >= 0 ? Math.Min(1f, Villages[v].Weapons / Math.Max(1f, Villages[v].Population * 0.3f)) : 0f;
 			d *= 1.3f + 0.5f * Units.Training[i] + 0.5f * weapons;
 		}
+		// Invented weapons.
+		int vi = Units.Village[i];
+		if (vi >= 0)
+			d *= 1f + Villages[vi].Attack / 100f;
 		return d * (0.7f + 0.6f * (float)_rng.NextDouble());
 	}
+
+	/// <summary>Share of a blow that gets through a person's invented armour.</summary>
+	private float Through(int i) => Units.Village[i] >= 0 ? 1f - Villages[Units.Village[i]].Defense / 100f : 1f;
 
 	/// <summary>Two people of kingdoms at war in reach: blows are exchanged, a second apart.
 	/// Returns true while the fight goes on (the attacker stays on its target).</summary>
@@ -453,7 +460,7 @@ public partial class Simulation
 		if (Units.Wait[i] > 0f)
 			return true;
 		Units.Wait[i] = 0.8f + 0.4f * (float)_rng.NextDouble();
-		Units.Health[j] -= BlowDamage(i);
+		Units.Health[j] -= BlowDamage(i) * Through(j);
 		if (Units.Health[j] <= 0f)
 		{
 			WarDied(j);
@@ -463,7 +470,7 @@ public partial class Simulation
 			return false;
 		}
 		// The other strikes back.
-		Units.Health[i] -= BlowDamage(j) * (Units.Role[j] == (byte)Role.Warrior ? 1f : 0.5f);
+		Units.Health[i] -= BlowDamage(j) * (Units.Role[j] == (byte)Role.Warrior ? 1f : 0.5f) * Through(i);
 		if (Units.Health[i] <= 0f)
 		{
 			WarDied(i);

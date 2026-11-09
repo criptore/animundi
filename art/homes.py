@@ -972,3 +972,76 @@ def all_shared():
         "market": market(rng("market")), "statue": statue(rng("statue")), "dummy": dummy(rng("dummy")),
         "ruin": ruin(rng("ruin")),
     }
+
+
+# ---------------------------------------------------------------------------------- invented buildings
+
+INVENTION_SPRITES = 32
+INV_WALLS = [("stone", (150, 146, 138)), ("planks", (150, 104, 58)), ("plaster", (226, 214, 186)),
+             ("mud", (184, 154, 100)), ("logs", (130, 88, 50)), ("shell", (232, 224, 212))]
+
+
+def invented(k):
+    """Building k of those the minds invent (0.5): assembled from parts by its number, so each
+    invention gets its own look: a body (width, height, material), a roof (gable, dome, cone, flat
+    with crenels, stepped), and extras (a tower, columns, a dome on top, banners, a chimney, a
+    second wing). Roofs and banners are in the colour mask: the inventor's kingdom colour."""
+    rng = random.Random(f"invented-{k}")
+    cv = Canvas()
+    cx, yb = 17, 28
+    mat, col = INV_WALLS[k % len(INV_WALLS)]
+    w = 11 + (k * 7 % 4) * 2
+    h = 4 + (k // 3) % 4
+    x0, x1 = cx - w // 2, cx + w // 2
+    roof = (k // 6) % 5
+    if k % 5 == 3:
+        # A second wing to one side.
+        side = 1 if k % 2 else -1
+        wx0 = x1 + 1 if side > 0 else x0 - 6
+        wall(cv, wx0, wx0 + 5, yb - h + 2, yb - 1, mat, sh(col, 0.92), rng)
+        gable_roof(cv, wx0 + 2, yb - h + 1, 3, 4, "shingles", rng)
+    wall(cv, x0, x1, yb - h, yb - 1, mat, col, rng)
+    footing(cv, x0, x1, yb, (130, 126, 120), rng)
+    if k % 4 == 1:
+        for x in range(x0 + 1, x1, 3):
+            for y in range(yb - h, yb):
+                cv.set(x, y, sh(col, 1.25))
+    door(cv, cx - 1, yb - 1, min(4, h - 1), (60, 42, 30), sh(col, 0.6), arch=k % 2 == 0, w=2 + (w > 14))
+    for wx in range(x0 + 1, x1 - 1, 4):
+        if abs(wx - cx) > 2 and h >= 4:
+            window(cv, wx, yb - h + 1, rng.choice([(126, 200, 240), (250, 220, 130), (160, 110, 210)]), sh(col, 0.65), w=1 + (k % 3 == 0))
+    top = yb - h - 1
+    if roof == 0:
+        gable_roof(cv, cx, top, w // 2, 5 + k % 3, rng.choice(["shingles", "thatch", "planks"]), rng)
+    elif roof == 1:
+        round_roof(cv, cx, top, w // 2 + 1, 4 + k % 3)
+    elif roof == 2:
+        cone(cv, cx, top, w // 2 + 1, 6 + k % 3)
+    elif roof == 3:
+        for x in range(x0, x1 + 1):
+            cv.set(x, top, MASK["base"] if x <= cx else MASK["lo"])
+            if (x - x0) % 3 != 2:
+                cv.set(x, top - 1, sh(col, 1.1))
+    else:
+        for step in range(3):
+            for x in range(x0 + step * 2, x1 - step * 2 + 1):
+                for y in range(top - step * 2 - 1, top - step * 2 + 1):
+                    cv.set(x, y, MASK["base"] if x <= cx else MASK["lo"])
+    extra = k % 8
+    if extra in (0, 4):
+        tx = x1 - 1 if extra == 0 else x0 + 1
+        wall(cv, tx - 1, tx + 1, yb - h - 8, yb - h - 1, mat, sh(col, 1.05), rng)
+        cone(cv, tx, yb - h - 9, 2, 4)
+    elif extra == 2:
+        round_roof(cv, cx, top - 6, 3, 3)
+        cv.set(cx, top - 9, (240, 200, 80))
+    elif extra == 5:
+        for x in (x0, x1):
+            flag(cv, x, yb - h - 6, None)
+    elif extra == 6:
+        chimney(cv, x1 - 2, top - 5, 4, (130, 126, 120))
+    return cv.image()
+
+
+def all_invented():
+    return {f"inv_{k}": invented(k) for k in range(INVENTION_SPRITES)}

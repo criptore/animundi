@@ -292,6 +292,9 @@ public partial class Simulation
 	/// pick one of their variants from their place.</summary>
 	private string SpriteId(int type, int species, int x, int y)
 	{
+		// Buildings invented in the game: their assembled sprite.
+		if (Assets.Buildings[type].Sprite != "")
+			return "buildings/" + Assets.Buildings[type].Sprite;
 		// Animated buildings: their first frame.
 		if (type == _tBonfire)
 			return BonfireFrames[0];

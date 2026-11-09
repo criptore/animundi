@@ -367,7 +367,7 @@ public partial class Simulation
 	private void StartWork(int i, int v, int target, float seconds, float x, float y)
 	{
 		Units.WorkTarget[i] = target;
-		Units.WorkTimer[i] = seconds / ToolSpeed(v);
+		Units.WorkTimer[i] = seconds / (ToolSpeed(v) * InventedSpeed(v, Units.Job[i]));
 		GoTo(i, x, y, Task.Work);
 	}
 
@@ -583,7 +583,8 @@ public partial class Simulation
 	private void Carry(int i, Goods goods, float amount)
 	{
 		Units.Carry[i] = (byte)goods;
-		Units.CarryAmount[i] = amount;
+		// Inventions bring more home (a better net, a plough...).
+		Units.CarryAmount[i] = amount * InventedYield(Units.Village[i], Units.Job[i]);
 	}
 
 	/// <summary>Puts out the fire on tile t: the ground, its plants and the building on it.</summary>

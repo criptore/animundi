@@ -353,6 +353,8 @@ def all_buildings():
     # Great buildings and the shared ones, in the same 3/4 style (art/homes.py).
     images.update(homes.all_great())
     images.update(homes.all_shared())
+    # Buildings the peoples' minds invent (0.5): assembled from parts, one per sprite number.
+    images.update(homes.all_invented())
     images["site"] = render(parse(SITE), {"T": "#a87a4a"})
     images["cart"] = render(parse(CART), COMMON)
     images["boat"] = snap_mask(render(parse(BOAT), {**COMMON, "R": "#d000d0"}))
@@ -400,7 +402,7 @@ def main():
     names = [t.format(race) for race in STYLES for t in tiers]
     shared = ["bonfire_0", "stockpile", "windmill_0", "windmill_1", "well", "mine", "dock", "market", "statue",
               "dummy", "ruin", "cart", "boat"]
-    names += shared + ["site"]
+    names += shared + ["site"] + [f"inv_{k}" for k in range(homes.INVENTION_SPRITES)]
     sheet(images, names, len(tiers)).save(SHEET)
     print(f"{len(images)} building sprites -> {OUT}")
 

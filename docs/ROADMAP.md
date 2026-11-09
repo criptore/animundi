@@ -88,11 +88,13 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Boats of war: when no land road leads to the enemy, soldiers walk to their dock, board a war boat (five aboard, or twenty seconds after the first), sail a water path to the shore nearest the target and go ashore to fight
 
 ## 0.5 AI minds (the edge)
-- [ ] Small local model (llama.cpp through a GDExtension) with grammar-forced JSON output
-- [ ] The invention language: objects, tools, buildings, abilities as validated data records
-- [ ] Cultures invent **objects and buildings**; their sprites are assembled from parts and the culture's palette
-- [ ] Inventions spread, get copied by neighbours, are forgotten when useless: evolution by descent, traced in the chronicle
-- [ ] Procedural fallback when no model is available
+See [INVENTIONS.md](INVENTIONS.md).
+- [x] Small local model with schema-forced JSON output: a llama.cpp server or Ollama on the player's computer, asked over HTTP in the background (`sim/Minds.cs`; a GDExtension was not needed), answers validated, 90 s timeout
+- [x] The invention language: tools, weapons, armour, techniques and buildings as validated data records (kinds, effect blocks with caps, a power budget by rank, costs that pay for the power)
+- [x] Cultures invent **objects and buildings**: each kingdom's mind once a year, from its situation (war, hunger, crowding, restlessness, its busiest job); invented buildings get sprites assembled from parts with the kingdom's colour (`art/homes.py`, 32 shapes)
+- [x] Inventions spread (kingdom, trade partners, neighbours, by usefulness), are forgotten when useless or replaced, and evolve by descent (parent, generation), traced in the chronicle (event filter "inventions")
+- [x] Procedural fallback when no model is available (and when it is slow or wrong)
+- [ ] Inventions with new effect blocks unlocked by ages (0.8), monster and nature minds (0.7), the culture mind writing laws, rituals and myths (0.6)
 
 ## 0.6 Culture
 - [ ] AI-shaped cultures: values, laws, rituals, taboos, architecture style

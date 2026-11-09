@@ -38,6 +38,7 @@ var _events: Array = []
 var _event_filter := ""
 var _kingdoms_box: VBoxContainer
 var _plans_label: Label
+var _inventions_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
 var _kingdom_rows := {}
 var _villages_label: Label
@@ -201,6 +202,12 @@ func _ready() -> void:
 	_plans_label.add_theme_font_size_override("font_size", 12)
 	_plans_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.55))
 	life.add_child(_plans_label)
+	_inventions_label = _label("")
+	_inventions_label.add_theme_font_size_override("font_size", 12)
+	_inventions_label.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
+	_inventions_label.clip_text = true
+	_inventions_label.custom_minimum_size.x = 290
+	life.add_child(_inventions_label)
 	life.add_child(_label("Villages"))
 	_villages_label = _label("")
 	_villages_label.add_theme_font_size_override("font_size", 12)
@@ -208,7 +215,7 @@ func _ready() -> void:
 	var head := HBoxContainer.new()
 	head.add_child(_label("Events"))
 	var filters := ButtonGroup.new()
-	for cat in ["", "kings", "wars", "cities", "disasters"]:
+	for cat in ["", "kings", "wars", "cities", "inventions", "disasters"]:
 		var fb := Button.new()
 		fb.text = "all" if cat == "" else cat
 		fb.toggle_mode = true
@@ -346,6 +353,20 @@ func set_kingdoms(kingdoms: Array) -> void:
 		if not seen.has(name):
 			_kingdom_rows[name][0].queue_free()
 			_kingdom_rows.erase(name)
+
+
+## The latest inventions of the peoples' minds (0.5).
+func set_inventions(inventions: Array) -> void:
+	var lines := PackedStringArray()
+	for inv in inventions.slice(0, 3):
+		var line := "✦ %s (%s, %s): %s" % [inv.name, inv.kind, inv.people, inv.effects]
+		if inv.parent != "":
+			line += " · from the " + inv.parent
+		lines.append(line)
+	_inventions_label.text = "\n".join(lines)
+	_inventions_label.tooltip_text = "\n".join(inventions.slice(0, 12).map(func(i): return "%s, %s by the %s in year %d%s: %s · known in %d villages (%s mind)" % [
+		i.name, i.kind, i.people, i.year, (" from the " + i.parent) if i.parent != "" else "", i.effects, i.villages, i.mind]))
+	_inventions_label.mouse_filter = Control.MOUSE_FILTER_PASS
 
 
 ## Plots under way, shown before they happen.

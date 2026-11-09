@@ -105,6 +105,10 @@ public sealed class BuildingRecord
 	[JsonPropertyName("material")] public string Material { get; set; } = "wood";
 	[JsonPropertyName("upgrade")] public string Upgrade { get; set; } = "";
 	[JsonPropertyName("job")] public string Job { get; set; } = "";
+	/// <summary>Sprite name for buildings invented in the game (buildings/inv_N), else "".</summary>
+	public string Sprite { get; set; } = "";
+	/// <summary>The invention this building comes from (Inventions.cs), or -1.</summary>
+	public int Invention { get; set; } = -1;
 
 	public bool Wooden => Material == "wood";
 	public float CostOf(string goods) => Cost.TryGetValue(goods, out float v) ? v : 0f;

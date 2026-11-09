@@ -93,7 +93,7 @@ public partial class Simulation
 	// ------------------------------------------------------------------ events
 
 	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life.</summary>
-	public static readonly string[] EventCategories = { "kings", "wars", "cities", "disasters", "life" };
+	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "disasters", "life" };
 
 	private void LogEvent(string text, string cat = "life")
 	{

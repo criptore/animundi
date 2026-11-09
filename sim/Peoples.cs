@@ -61,6 +61,7 @@ public partial class Simulation
 		Assets.RemovePeoples();
 		SetupVillages();
 		SetupKingdoms();
+		SetupInventions();
 		_names = Array.Empty<string>();
 		_languages.Clear();
 	}

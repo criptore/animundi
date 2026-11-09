@@ -122,6 +122,7 @@ func _process(_delta: float) -> void:
 		_hud.set_villages(_sim.VillageTable())
 		_hud.set_kingdoms(_sim.KingdomTable())
 		_hud.set_plans(_sim.PlanTable())
+		_hud.set_inventions(_sim.InventionTable())
 	_update_map_labels()
 	var mouse := get_viewport().get_mouse_position()
 	# A creature under the mouse: who it is.
