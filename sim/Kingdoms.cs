@@ -73,6 +73,8 @@ public partial class Simulation
 		_nextDiplomacy = 0;
 		_trade.Clear();
 		_armyPaths.Clear();
+		_seaRoutes.Clear();
+		_boarding.Clear();
 		_vehicles.Clear();
 	}
 
@@ -307,7 +309,7 @@ public partial class Simulation
 						best = Math.Abs(own.X - Villages[v].X) + Math.Abs(own.Y - Villages[v].Y);
 						target = v;
 					}
-		return target >= 0 && ArmyPath(a, target) != null;
+		return target >= 0 && (ArmyPath(a, target) != null || SeaRoute(a, target).path != null);
 	}
 
 	/// <summary>Soldiers a kingdom can field.</summary>

@@ -211,6 +211,18 @@ public partial class Simulation
 		EnsureNeurons();
 		int v = Units.Village[i];
 		float now0 = (float)Scheduler.Time;
+		// Aboard a war boat: nothing to do until ashore (or home again if peace came first).
+		if (Units.Task[i] == (byte)Task.Sail)
+		{
+			if (Units.Army[i] < 0 && !_vehicles.Exists(b => b.Crew != null && b.Crew.Contains(i)))
+				Units.Task[i] = (byte)Task.Wander;
+			else
+			{
+				Units.Hunger[i] = Math.Min(Units.Hunger[i], 0.5f);
+				Units.Thirst[i] = Math.Min(Units.Thirst[i], 0.5f);
+				return;
+			}
+		}
 		// Pairing and having a child need no walking: they can happen whatever the person is doing.
 		if (Neurons[NPair].Enabled && IsAdult(i) && Units.Partner[i] < 0 && _neuronReady[i * Neurons.Length + NPair] <= now0)
 		{

@@ -85,7 +85,7 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Rebellions, civil wars, secessions: loyalty of each village (distance to the capital, size, people, war weariness, a dead king, conquest); big disloyal villages plot to break away and found a kingdom, disloyal neighbours join, and the old kingdom goes to war
 - [x] Plans shown before they happen: wars, peace, alliances and rebellions are plots that grow over months, shown in the panel with their progress; the simulation can cancel or force them (the god powers of 0.9 will)
 - [x] Event log with filters (kings, wars, cities, disasters); favourites come with the inspector (0.9)
-- [ ] Boats of war and invasions by sea (armies only march by land for now)
+- [x] Boats of war: when no land road leads to the enemy, soldiers walk to their dock, board a war boat (five aboard, or twenty seconds after the first), sail a water path to the shore nearest the target and go ashore to fight
 
 ## 0.5 AI minds (the edge)
 - [ ] Small local model (llama.cpp through a GDExtension) with grammar-forced JSON output

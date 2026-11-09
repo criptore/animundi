@@ -31,6 +31,9 @@ public partial class Simulation
 		public bool Back;
 		public float At;
 		public int Village;
+		/// <summary>A war boat: the soldiers aboard and the land tile where they go ashore.</summary>
+		public List<int> Crew;
+		public int Landing = -1;
 	}
 
 	private readonly List<TradeRoute> _trade = new();
@@ -211,7 +214,22 @@ public partial class Simulation
 	private void MoveVehicles(int a, int b, float dt)
 	{
 		foreach (var v in _vehicles)
+		{
 			v.At += dt * (v.Boat ? BoatSpeed : CartSpeed);
+			if (v.Crew != null)
+			{
+				// The crew sails with the boat (hidden aboard), and goes ashore at the end.
+				var (bx, by, _) = VehiclePos(v);
+				bool ashore = v.At >= v.Path.Length - 1;
+				foreach (int i in v.Crew)
+				{
+					if (!Units.Alive[i] || Units.Task[i] != (byte)Task.Sail)
+						continue;
+					if (ashore)
+						Land(i, v.Landing);
+				}
+			}
+		}
 		_vehicles.RemoveAll(v => v.At >= v.Path.Length - 1);
 	}
 

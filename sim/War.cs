@@ -23,6 +23,12 @@ public partial class Simulation
 	}
 
 	public readonly List<War> Wars = new();
+	/// <summary>Invasions by sea: for a kingdom and a target, its dock, the water path from the
+	/// dock to the enemy's shore and the land tile where its soldiers go ashore.</summary>
+	private readonly Dictionary<(int kingdom, int target), (int dock, int[] path, int landing)> _seaRoutes = new();
+	// Soldiers waiting aboard at each dock, and when the first boarded.
+	private readonly Dictionary<int, (List<int> crew, double since)> _boarding = new();
+	public int Landings { get; private set; }
 	// The road each kingdom's army takes to its target village (a land path), or null when the
 	// target cannot be reached on foot (across the sea: boats of war come later).
 	private readonly Dictionary<(int kingdom, int target), int[]> _armyPaths = new();
@@ -128,6 +134,11 @@ public partial class Simulation
 				_armyPaths[(k, target)] = ArmyPath(k, target);
 				if (_armyPaths[(k, target)] != null)
 					LogEvent($"the army of {Kingdoms[k].Name} marches on {Villages[target].Name}.", "wars");
+				else if (SeaRoute(k, target) is var sea && sea.path != null)
+				{
+					_seaRoutes[(k, target)] = sea;
+					LogEvent($"the fleet of {Kingdoms[k].Name} sets sail for {Villages[target].Name}.", "wars");
+				}
 			}
 		}
 		if (target < 0)
@@ -174,6 +185,93 @@ public partial class Simulation
 				}
 			}
 		return from < 0 ? null : FindPath(from, World.Index(t.X, t.Y + 1), water: false);
+	}
+
+	/// <summary>A sea route for an invasion: from one of the kingdom's docks over water to the
+	/// shore nearest to `target` (a water tile next to land within 10 tiles of it). Null path
+	/// if the kingdom has no dock or no water leads there.</summary>
+	private (int dock, int[] path, int landing) SeaRoute(int k, int target)
+	{
+		var t = Villages[target];
+		for (int v = 0; v < Villages.Count; v++)
+		{
+			if (!Villages[v].Alive || Villages[v].Kingdom != k)
+				continue;
+			int dock = Nearest(v, _tDock);
+			if (dock < 0)
+				continue;
+			int from = WaterNextTo(Buildings[dock]);
+			if (from < 0)
+				continue;
+			// Breadth-first over water until a shore near the target.
+			var prev = new Dictionary<int, int> { [from] = -1 };
+			var queue = new Queue<(int t, int d)>();
+			queue.Enqueue((from, 0));
+			while (queue.Count > 0)
+			{
+				var (w, d) = queue.Dequeue();
+				int x = w % World.Width, y = w / World.Width;
+				if (Math.Abs(x - t.X) + Math.Abs(y - t.Y) <= 10)
+					for (int n = 0; n < 4; n++)
+					{
+						int lx = x + (n == 0 ? 1 : n == 1 ? -1 : 0), ly = y + (n == 2 ? 1 : n == 3 ? -1 : 0);
+						if (World.IsLand(lx, ly) && _biomeNames[World.Biome[World.Index(lx, ly)]] != "Lava")
+						{
+							var path = new List<int>();
+							for (int c = w; c >= 0; c = prev[c])
+								path.Add(c);
+							path.Reverse();
+							return (dock, path.ToArray(), World.Index(lx, ly));
+						}
+					}
+				if (d >= 400)
+					continue;
+				for (int n = 0; n < 4; n++)
+				{
+					int nx = x + (n == 0 ? 1 : n == 1 ? -1 : 0), ny = y + (n == 2 ? 1 : n == 3 ? -1 : 0);
+					if (!World.InBounds(nx, ny))
+						continue;
+					int nt = World.Index(nx, ny);
+					if (World.Water[nt] == SimWorld.WaterLand || prev.ContainsKey(nt))
+						continue;
+					prev[nt] = w;
+					queue.Enqueue((nt, d + 1));
+				}
+			}
+		}
+		return (-1, null, -1);
+	}
+
+	/// <summary>Soldiers who walked to their dock board the war boat; it sails when five are
+	/// aboard, or twenty seconds after the first.</summary>
+	private void Board(int i, int k, int target, (int dock, int[] path, int landing) sea)
+	{
+		if (!_boarding.TryGetValue(sea.dock, out var b))
+			_boarding[sea.dock] = b = (new List<int>(), Scheduler.Time);
+		if (!b.crew.Contains(i))
+			b.crew.Add(i);
+		Units.Task[i] = (byte)Task.Sail;
+		Units.Prey[i] = -1;
+		Units.TargetX[i] = Units.X[i];
+		Units.TargetY[i] = Units.Y[i];
+		b.crew.RemoveAll(c => !Units.Alive[c] || Units.Task[c] != (byte)Task.Sail);
+		if (b.crew.Count >= 5 || Scheduler.Time - b.since > 20.0)
+		{
+			_vehicles.Add(new Vehicle { Boat = true, Path = sea.path, Village = Units.Village[i], Crew = new List<int>(b.crew), Landing = sea.landing });
+			_boarding.Remove(sea.dock);
+		}
+	}
+
+	/// <summary>A soldier goes ashore at the end of the crossing, fed and rested.</summary>
+	private void Land(int i, int tile)
+	{
+		Units.X[i] = Units.TargetX[i] = tile % World.Width + 0.3f + 0.4f * (float)_rng.NextDouble();
+		Units.Y[i] = Units.TargetY[i] = tile / World.Width + 0.3f + 0.4f * (float)_rng.NextDouble();
+		Units.Task[i] = (byte)Task.Wander;
+		Units.Hunger[i] = 0f;
+		Units.Thirst[i] = 0f;
+		Units.ArmyStep[i] = -2;  // ashore: no road, straight at the target
+		Landings++;
 	}
 
 	/// <summary>A village of a kingdom at war with enemy soldiers in it and no defender left is
@@ -254,11 +352,30 @@ public partial class Simulation
 			Units.Army[i] = -1;
 			return false;
 		}
+		var t = Villages[target];
+		int k = KingdomOfUnit(i);
+		// Ashore from a war boat, or already near the target: straight at it.
+		float tdx = t.X - Units.X[i], tdy = t.Y - Units.Y[i];
+		if (Units.ArmyStep[i] == -2 || tdx * tdx + tdy * tdy < 14f * 14f)
+		{
+			GoTo(i, t.X + 0.5f + ((float)_rng.NextDouble() - 0.5f) * 4f, t.Y + 1f + ((float)_rng.NextDouble() - 0.5f) * 4f, Task.Wander);
+			return true;
+		}
 		// Along the army's road, step by step: first to the start of the road (its nearest point
 		// on this side), then from point to point, a couple of tiles ahead at a time.
-		int k = KingdomOfUnit(i);
 		if (!_armyPaths.TryGetValue((k, target), out var path) || path == null)
-			return false;
+		{
+			// No road: by sea, from the dock.
+			if (!_seaRoutes.TryGetValue((k, target), out var sea) || !Buildings[sea.dock].Alive)
+				return false;
+			var dock = Buildings[sea.dock];
+			float ddx = dock.X + 0.5f - Units.X[i], ddy = dock.Y + 1f - Units.Y[i];
+			if (ddx * ddx + ddy * ddy < 2.5f * 2.5f)
+				Board(i, k, target, sea);
+			else
+				GoTo(i, dock.X + 0.5f, dock.Y + 1.1f, Task.Wander);
+			return true;
+		}
 		float Dist(int p)
 		{
 			float dx = path[p] % World.Width + 0.5f - Units.X[i], dy = path[p] / World.Width + 0.5f - Units.Y[i];

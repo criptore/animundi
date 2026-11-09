@@ -383,7 +383,7 @@ public partial class Simulation
 		const float margin = 48f;
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
-			if (Units.Alive[i] && (!cull || InView(Units.X[i], Units.Y[i], margin)))
+			if (Units.Alive[i] && Units.Task[i] != (byte)Task.Sail && (!cull || InView(Units.X[i], Units.Y[i], margin)))
 				Add(ref n, KUnit, i, Units.Y[i]);
 		foreach (int p in _burning)
 			if (_pAlive[p] && (!cull || InView(_pX[p], _pY[p], margin)))
