@@ -17,9 +17,18 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Sprites drawn in batches (MultiMesh2D, one atlas, strips of 16 rows), sorted by screen height, drawn shadows; plants placed by biome
 - [ ] Zoom-dependent detail: dots when zoomed out, full sprites when zoomed in
 - [ ] Animated water and wind sway, cheaply
+- [x] Natural map generator: tectonic plates, mountain chains on colliding borders, warped coasts, large biome regions; no special biomes at random (see [MAP_GENERATION.md](MAP_GENERATION.md))
+- [x] Plants never overhang water; mushrooms smaller than the peoples
 - [ ] C# simulation core: world object, one manager per kind of entity, zones for spatial queries, batched ticks at different rates, world processes on timers over map slices
 - [ ] Data-driven assets: species, plants, buildings, items, powers as data records
 - [ ] Performance check: 5,000+ moving units at 60 fps on a mid-range PC
+
+## 0.16 Terrain tools
+Special biomes are never generated at random: the player places them.
+- [ ] Biome brush: paint mushroom land, cursed land, volcanic rock, lava (and the natural biomes), with a brush size
+- [ ] Stamps: ready-made presets (volcanoes of several sizes, later islands, craters, oases) pasted on the map where the player clicks; levels around them are fixed so the terrain stays valid
+- [ ] The player's own presets: select an area of the map and save it as a stamp, reuse it in any world
+- [ ] Plants and the map texture update only where the terrain changed
 
 ## 0.2 Life
 - [ ] Living flora: forests grow, spread, burn and regrow
