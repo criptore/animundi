@@ -38,6 +38,12 @@ Special biomes are never generated at random: the player places them.
 - [ ] Food chains: herbivores and predators, populations that rise and crash
 - [ ] Seasonal migrations, extinctions
 - [ ] Simple sprite animations: real walk cycles (2–3 frames) and attack, replacing the two-frame hop; colour masks for kingdom colours and biome skins (WorldBox-style phenotypes)
+- [ ] **Redraw the sprites of every living being** (animals, monsters, the 12 peoples and their roles), original art in the spirit of WorldBox (see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3):
+  - tiny, readable side views: about one tile (8–10 px) tall, a strong silhouette, few colours
+  - a set of frames per creature: idle, 2–3 walking frames, attack, swim, death; child versions
+  - colour-mask pixels for kingdom colours and biome skin ramps
+  - drawn at the size they are shown, so no scaling down from large art
+  - an art script and sheet that make adding a creature easy, generated or hand-drawn
 
 ## 0.3 Peoples
 - [ ] The 12 races placed in their preferred biomes at world start
