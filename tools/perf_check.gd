@@ -37,4 +37,11 @@ func _initialize() -> void:
 	print("units %d and %d plants on a %d² world: %.3f ms per step, %.3f ms to draw a frame, %d on water" % [
 		placed, sim.PlantCount(), size, step_ms, draw_ms, sim.CountOnWater()])
 	print("budget at 60 fps: %.1f%% of 16.7 ms" % [100.0 * (step_ms * 2.0 + draw_ms) / 16.7])
+	# Up close, plants are sorted with the creatures every frame (only what the camera sees).
+	for zoom in [0.5, 2.0]:
+		var centre := Vector2(size, size) * 4.0
+		sim.SetZoom(zoom)
+		sim.SetView(centre, Vector2(1920, 1080) / zoom)
+		sim.DrawFrames(60)
+		print("close-up at zoom %.1f (1920×1080 screen): %.3f ms to draw a frame" % [zoom, sim.TakeDrawMs()])
 	quit()
