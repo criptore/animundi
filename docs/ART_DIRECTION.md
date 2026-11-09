@@ -1,66 +1,31 @@
 # Animundi — Art direction
 
-## Main inspiration: David Holland's 3D pixel art
+## Direction: flat 2D pixel art, built like WorldBox
 
-**Reference:** David Holland, *3D pixel art rendering* — https://davidholland.netlify.app/articles/3d-pixel-art-rendering
+The world is shown **from above, flat, in 2D pixel art**, the way WorldBox does it (see [WORLDBOX_ANALYSIS.md](WORLDBOX_ANALYSIS.md)). This keeps rendering almost free, so the machine's power goes to the simulation of thousands of beings and to the AI minds, which are the game's edge.
 
-This is the look Animundi aims for. Every rendering decision is checked against it first. Holland recreates in Godot the 3D pixel art style made popular by t3ssel8r: real 3D scenes rendered at low resolution so they read as hand-made pixel art, with a cosy, soft, lived-in feel.
-
-Techniques described in the article, all to be reproduced:
-
-| Technique | What it does |
+| Layer | How it is drawn |
 |---|---|
-| Low-resolution render, nearest-neighbour upscale | the whole scene becomes crisp pixels |
-| Stable orthographic camera snapped to the pixel grid | no shimmering when the camera moves |
-| Toon lighting in a few bands, shared by every material | ground, grass and trees light the same way, nothing looks pasted on |
-| Billboarded grass blades / tufts | soft, swaying grass that is mostly visible at edges of ground shapes |
-| Pixel-perfect water: planar reflection (camera rendered to a viewport and projected on the water) + refraction | trees, characters and shores reflected in the water |
-| Procedural pixel outlines (depth / normal edges) | dark 1-pixel outlines around trees, rocks and cliffs |
-| God rays through trees and rocks | soft light shafts for the cosy mood |
+| Map | **One texture, one pixel per tile**, scaled up with sharp pixels. Biome colour with slight per-tile variation; height told by colour (the five levels: deep sea, shallow water, plain/beach, hill, mountain) and a one-pixel darker edge where the ground steps down; a light pixel pattern (grass, sand, snow, rock) appears when zoomed in |
+| Water | Depth colours from the water sheet, cheap animated glints and shore foam |
+| Sprites | The 2D sprites cut from the reference sheets, **drawn in batches** (thousands per draw call), sorted by screen height, each with a small drawn shadow |
+| Zoom | Zoomed out: units become dots in their kingdom or species colour, small plants are hidden. Zoomed in: full sprites and patterns |
+| Effects | Cheap only: wind sway, water, fire, smoke, magic and weather particles in pixels. **No real-time lighting or shadows** |
 
-Known limit noted by the author: a perfect outline shader for every model and camera angle is not possible at this resolution, so some edge compromises are expected.
+## Sprites
 
-## Shaders in the game
+All characters, animals, monsters, trees and plants come from the reference sheets in `art/reference/` (trees, small plants, biomes, water, races, roles × races, animals, monsters), cut into `assets/sprites/` by `art/extract_sprites.py`: background and drop shadows removed, each sprite brought back to its true pixel grid. Trees and small plants, drawn coarser in their sheets, are enlarged with Scale2x and given extra painted detail so every sprite shares the same pixel density. Biome ground and water colours come from the biome and water sheets.
 
-The game renders with Godot's **Forward+** renderer. Its shaders follow the techniques of the t3ssel8r / David Holland style, taken from open-source Godot implementations (credits and licenses in `shaders/vendor/README.md`):
-
-| Technique | Where | From |
-|---|---|---|
-| Pixel-art outlines (depth edges) and highlights (normal edges), toggle with E | `shaders/vendor/pixelart_stylizer.gdshader` | Leo Peltola (MIT), unmodified |
-| Stepped cel lighting shared by ground, sprites and grass | `shaders/cel.gdshaderinc` | Robert-K/godot-3d-pixel-art (MIT) |
-| Cloud shadows: the sun ray is followed up to a cloud layer that reads a scrolling noise texture | `shaders/cel.gdshaderinc` | Robert-K/godot-3d-pixel-art (MIT) |
-| Sprites and grass lit as one point at their base (`LIGHT_VERTEX`), so each is wholly in sun or shade | `shaders/sprite.gdshader`, `shaders/grass.gdshader` | Robert-K/godot-3d-pixel-art (MIT) |
-| Dense billboard grass: 3×3 tuft atlas, ground colour, wind animated at a low frame rate in groups | `shaders/grass.gdshader`, `assets/vendor/grass_atlas.png` | Robert-K/godot-3d-pixel-art (MIT) |
-| Texel-snapped camera with sub-pixel display offset (smooth panning, no shimmering) | `scripts/ui/pixel_camera.gd`, `scripts/main.gd` | Robert-K/godot-3d-pixel-art (MIT) |
-| Water: depth colours, mirrored-camera reflections with pixel ripple, glints, shore foam | `shaders/water.gdshader` | after David Holland's article |
-| Tile-top patterns, cliff strata, glowing lava | `shaders/terrain.gdshader` | Animundi |
-
-Tried and dropped: volumetric godray planes (they washed a beige veil over large parts of a world-sized map; the technique suits close-up scenes).
-
-## Sprites in the 3D world
-
-The camera never rotates, so characters, animals, monsters, trees and plants are **2D pixel-art sprites** standing upright in the 3D world, facing the camera (stretched by 1 / cos(pitch) so they keep their drawn proportions), casting shadows of their own shape on the relief. Their art comes from the reference sheets in `art/reference/` (trees, small plants, biomes, water, races, roles × races, animals, monsters), cut into `assets/sprites/` by `art/extract_sprites.py`. Biome ground and water colours are taken from the biome and water sheets.
-
-Trees and small plants are drawn at a coarser pixel size than the characters in their sheets; the extraction script enlarges them (Scale2x) and paints extra detail (leaf texture, rim light, shading) so every sprite shares the same pixel density in game.
-
-## Secondary references
-
-- **The two reference images given by the project owner** (sunflower pond, stone circle in an autumn glade):
-  - warm, soft palette (yellow-greens, light sky, nothing over-saturated);
-  - leafy trees made of clustered pixel clumps, dark outlines, a few autumn trees (orange, red, yellow);
-  - grass tufts and scattered white flowers;
-  - clear water reflecting trees and characters, light horizontal glints;
-  - long soft shadows and light shafts;
-  - light, rounded rocks.
-- **t3ssel8r**: the original creator of this style (YouTube / X videos).
-- **Tenkemo** (cozy Godot game): pixelated water, low-resolution shadows — https://80.lv/articles/check-out-water-shaders-in-this-wip-godot-powered-cozy-game
-- **Godot forum, replicating t3ssel8r grass**: ground and grass must share identical toon lighting — https://forum.godotengine.org/t/trying-to-replicate-t3ssel8r-grass-shader/123816
-- **Free stylized 3D grass shader (CC0, Godot)**: billboard blades, wind from a noise texture, dithered alpha — https://forum.godotengine.org/t/free-stylized-3d-grass-shader-cc0/134880
+**Generated content gets generated sprites.** Objects, buildings, banners and new variants invented by the generators or the AI are assembled from templates, parts and the culture's palette, in the same style as the reference sheets, and change with the age.
 
 ## Rules
 
-1. **Cosy first.** Soft, warm colours; nothing neon. Calm motion (wind in grass, water glints, drifting light).
-2. **Pixels stay pixels.** Everything is rendered at low resolution and upscaled with nearest filtering; effects are computed per render pixel.
-3. **One light model.** Terrain, grass, trees, rocks and buildings use the same banded toon lighting.
-4. **Readable from far, rich up close.** From the world view, biomes and kingdoms read clearly; zoomed in, the scene looks like the reference images.
+1. **Cheap to draw.** Every visual choice is checked against the cost of drawing thousands of units: one texture for the map, batched sprites, no per-pixel lighting.
+2. **Pixels stay pixels.** Nearest filtering everywhere, whole-pixel positions and steps.
+3. **Readable from far, rich up close.** From the world view, biomes, kingdoms and cities read like a map; zoomed in, sprites and patterns show their detail.
+4. **Cosy palette.** Soft, warm colours from the reference sheets; nothing neon.
 5. **Every visual change ships with a screenshot** compared against the references.
+
+## History: the 3D pixel-art prototype (0.1)
+
+Version 0.1 explored a 3D pixel-art look after David Holland's *3D pixel art rendering* (https://davidholland.netlify.app/articles/3d-pixel-art-rendering) and t3ssel8r: terraced 3D terrain rendered at low resolution, sprites standing in the 3D world lit at their base, cel lighting, cloud shadows, billboard grass, mirrored-camera water reflections, Leo Peltola's outline & highlight pass and a sub-pixel camera (techniques adapted from Robert-K/godot-3d-pixel-art and Leo Peltola, credited in `shaders/vendor/README.md`). It looked good but cost too much for a world with thousands of units (real-time shadows, the scene drawn twice for reflections, post-processing, Forward+ renderer), so the game moves to the flat 2D approach above. The prototype stays in the repository history (merge of pull request #2).
