@@ -91,12 +91,17 @@ The old 8×8 sprites and the 2D terrain atlas used by the preview tool are gener
 python3 art/sprites.py
 ```
 
+## Direction
+
+Animundi is **built like WorldBox** (flat 2D map drawn as one texture, sprites drawn in batches, data-driven content, batched simulation in C#) and **different where it matters**: local AI minds that invent objects, buildings and ways of life, and make them evolve over generations. Version 0.1 below is a 3D pixel-art prototype; the game moves to the 2D approach in 0.15 (see [docs/ROADMAP.md](docs/ROADMAP.md)).
+
 ## Design
 
 - [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md): everything the game must contain and how it is generated.
 - [docs/GOD_GAMES_RESEARCH.md](docs/GOD_GAMES_RESEARCH.md): what other god games let you do, and what Animundi takes.
 - [docs/ROADMAP.md](docs/ROADMAP.md): the steps to 1.0, ticked as they land.
-- [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md): the look of the game. Main inspiration: [David Holland, 3D pixel art rendering](https://davidholland.netlify.app/articles/3d-pixel-art-rendering).
+- [docs/WORLDBOX_ANALYSIS.md](docs/WORLDBOX_ANALYSIS.md): how WorldBox is built, and what Animundi takes from it.
+- [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md): the look of the game (flat 2D pixel art, built like WorldBox) and the history of the 3D prototype.
 
 Engine: Godot 4.3.
 

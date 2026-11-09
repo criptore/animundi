@@ -12,13 +12,15 @@ Animundi is a top-down, pixel-art god sandbox. The player shapes a world and wat
 
 **Progress never stops.** Peoples go from stone tools to bronze, iron, gunpowder, steam, planes, rockets and space travel, and keep going: there is no final age.
 
-**The twist:** on top of the procedural generators, small local AI models give each people, monster species and nature force a mind of its own. They invent culture and write the code of their own inventions in a small in-game language. The game must stay fully playable **without** AI: generators produce everything by default, and the AI only replaces some of their choices.
+**The twist, and our edge:** on top of the procedural generators, small local AI models give each people, monster species and nature force a mind of its own. They **invent objects, buildings and ways of life**, write the code of their inventions in a small in-game language, and make them **evolve** over generations. The game must stay fully playable **without** AI: generators produce everything by default, and the AI only replaces some of their choices.
+
+**Built like WorldBox, different where it matters.** Rendering and simulation follow WorldBox's proven, cheap approach (flat 2D map, batched sprites, data-driven content, batched updates; see [WORLDBOX_ANALYSIS.md](WORLDBOX_ANALYSIS.md)), so the machine's power goes to what WorldBox does not have: content that the world invents and evolves itself.
 
 ### Design pillars
 
 1. **One seed, one world.** Same seed + same player actions = same world (deterministic simulation).
 2. **Generators, not content.** Every kind of thing (species, people, building, item, god, word) has a generator with parameters, never a fixed list.
-3. **Readable at 8×8.** Every entity fits in one 8×8 tile (large creatures up to 16×16), from one shared palette.
+3. **Cheap to draw, rich to simulate.** A flat 2D map in one texture, small sprites drawn in batches, zoom-dependent detail: the budget goes to simulation and AI.
 4. **Emergent stories.** History is not scripted; the chronicle only records what the simulation did.
 5. **The AI adds, never blocks.** If the model is slow, missing or wrong, the world keeps living.
 
@@ -59,7 +61,7 @@ seed
 
 - Heightmap = continent mask (number of continents, falloff to the edges) + multi-octave noise + ridge noise for mountain chains.
 - Sea level cuts the heightmap into **deep water / shallow water / land**.
-- **Five terrain levels**: deep sea, shallow water (coasts, rivers, lakes), plain (and beach), hill, mountain. The heightmap is quantised into these levels, smoothed with a cellular automaton (each land tile takes the majority level of its 3×3 neighbourhood) and constrained so that two neighbouring tiles never differ by more than one level: mountains are ringed by hills, coasts and river banks are plains, deep sea is ringed by shallow water. In 3D every tile is a flat terrace with small cliffs, about one tile high per level, so the relief stays at the scale of the people on it.
+- **Five terrain levels**: deep sea, shallow water (coasts, rivers, lakes), plain (and beach), hill, mountain. The heightmap is quantised into these levels, smoothed with a cellular automaton (each land tile takes the majority level of its 3×3 neighbourhood) and constrained so that two neighbouring tiles never differ by more than one level: mountains are ringed by hills, coasts and river banks are plains, deep sea is ringed by shallow water. On the flat 2D map, levels are told by colour and a one-pixel edge where the ground steps down, as in WorldBox.
 - Volcanoes: placed on high ridges or hotspots; they create volcanic rock and lava around them.
 
 ### 3.3 Climate
@@ -107,7 +109,8 @@ Biomes are **not fixed**: they change with climate, fire, flooding, farming, def
 
 ## 4. Time and simulation
 
-- Engine: **Godot 4** (GDScript for gameplay; C# or a GDExtension in C++ for the hot loops if needed).
+- Engine: **Godot 4**. The simulation core is written in **C#** (Godot .NET) for speed; GDScript for UI and glue; a GDExtension for the local AI runtime.
+- Structure, after WorldBox: one world object holding the tile grid and **one manager per kind of entity** (units, settlements, kingdoms, cultures…); the map cut into **zones** for spatial queries; units updated **in batches**; world processes (growth, fire, corruption) on **timers over slices of the map**.
 - Fixed-step simulation (`_physics_process` or a custom fixed tick), independent from rendering. Speeds: pause, ×1, ×2, ×5, ×20, and "skip years".
 - Time units: tick → day → season → year → age. Default: 1 year ≈ 1 minute at ×1.
 - Scheduling: things update at different rates (movement every tick, needs every few ticks, settlements daily, kingdoms seasonally, AI minds yearly).
@@ -417,18 +420,14 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 
 ## 19. Graphics
 
-**Art direction:** 3D pixel art in the style of David Holland's *3D pixel art rendering* (https://davidholland.netlify.app/articles/3d-pixel-art-rendering), the main visual reference. Details and rules in [ART_DIRECTION.md](ART_DIRECTION.md).
+**Direction: flat 2D top-down pixel art, built the way WorldBox is** (analysis in [WORLDBOX_ANALYSIS.md](WORLDBOX_ANALYSIS.md), rules in [ART_DIRECTION.md](ART_DIRECTION.md)). Rendering must stay almost free so the machine's power goes to the simulation and the AI.
 
-- The world is a 3D scene rendered at low resolution and upscaled with sharp pixels (see ART_DIRECTION.md). The 8×8 sprites in `art/` remain the reference for palettes and for flat UI icons.
-- **All sprites are generated** from templates + traits + palette, and **change with the age**: a village of huts becomes a brick city, then a city of skyscrapers; clothes, weapons and vehicles follow:
-  - peoples (body + race traits + role + culture colours),
-  - animals and monsters (body plan + traits + element colours),
-  - buildings (function template + culture style + age),
-  - items and vehicles (template + materials + age),
-  - banners (shape + pattern + symbol + colours).
-- Terrain tiles with procedural variations and transitions between biomes.
-- Simple animations: walk (2 frames), attack, work, idle; fire, water and lava animated.
-- Effects: particles for magic, smoke, rain, snow, blood, explosions.
+- **The map is one texture, one pixel per tile**, scaled up on screen: biome colours with slight per-tile variation, height told by colour (darker valleys, lighter hills, rocky and snowy mountains), and a light pixel pattern when zoomed in. Editing terrain rewrites a few pixels.
+- **Sprites** (peoples, animals, monsters, trees, plants, buildings, items) are the 2D pixel-art sprites cut from the reference sheets, drawn in batches (thousands per draw call), sorted by screen height, with a small drawn shadow.
+- **Zoom-dependent detail**: zoomed out, units become dots in their kingdom or species colour and small plants are hidden.
+- **No real-time lighting or shadows.** Cheap effects only: animated water, wind sway, fire and magic particles.
+- **Generated content gets generated sprites**: buildings, items, banners and new species invented by the generators or the AI are assembled from templates, parts and palettes, and change with the age (huts → brick → skyscrapers).
+- The 3D pixel-art prototype of 0.1 (terraced terrain, real shadows, reflections, outline shaders) is kept in the history but retired: too costly for thousands of units.
 
 ---
 
@@ -439,21 +438,31 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 
 ---
 
-## 21. AI layer (after the procedural base)
+## 21. AI layer: Animundi's edge
+
+WorldBox shows the rendering and simulation can be cheap; Animundi's difference is **what the world invents**. Small local AI models give peoples, monster species and nature forces a mind that creates **new objects, new buildings and new ways of life**, and makes them **evolve** over generations. The procedural generators provide the base; the AI makes each world's history and material culture unique.
 
 | Agent | Thinks | Produces |
 |---|---|---|
-| People / culture | yearly or on major events | values drift, laws, rituals, inventions (scripts), building style, myths, chronicle text |
+| People / culture | yearly or on major events | **objects and tools** (invention scripts), **buildings and architecture** (building records + sprite parts), clothing, laws, rituals, myths, chronicle text |
 | Kingdom leader | seasonally | diplomacy and war decisions, inside what the culture allows |
-| Monster species | every few years | mutations, new abilities (scripts), lair strategy |
+| Monster species | every few years | mutations, new abilities (scripts), lair architecture |
 | Nature spirit | on events | mood, natural events, demands to peoples |
 
-- **Models:** small local models (1–3B parameters, quantised), one base model with per-domain LoRA adapters (culture, monsters, nature).
-- **Runtime:** llama.cpp linked through a Godot GDExtension, or a local Ollama server called over HTTP from Godot.
+**Procedural evolution driven by the AI**
+
+- Every object, building and ability is a **data record** (as in WorldBox), so the AI creates content by writing records in the invention language (§ 13.2); the engine validates and runs them, and assembles their sprites from templates, parts and the culture's palette.
+- **Selection in the world**: useful inventions spread to other settlements and are copied by neighbours; useless ones are forgotten. Buildings and objects therefore evolve by descent: variants of variants, traceable in the chronicle.
+- **Ages unlock new building blocks** (materials, energy, effects) for the AI to combine; there is no fixed tech tree.
+
+**Running the models**
+
+- **Models:** small local models (1–3B parameters, quantised), one base model with per-domain LoRA adapters (culture, objects & buildings, monsters, nature).
+- **Runtime:** llama.cpp linked through a Godot GDExtension (or a local Ollama server over HTTP).
 - **Input:** a compact summary of the agent's situation and memory (its chronicle).
-- **Output:** JSON forced by grammar (JSON schema / GBNF), validated by the engine like any other script.
-- **Fallback:** if no model is available, the procedural generators make the same decisions.
-- Asynchronous queue: the simulation never waits for the AI.
+- **Output:** JSON forced by grammar (JSON schema / GBNF), validated by the engine like any other record.
+- **Fallback:** if no model is available, the procedural generators make the same kinds of decisions.
+- Asynchronous queue: the simulation never waits for the AI. The AI arrives early in the roadmap (0.5), as soon as there are settlements to invent for.
 
 ---
 
@@ -467,18 +476,20 @@ The full survey of what other god games offer, and what Animundi takes from it, 
 
 ## 23. Milestones
 
+The AI is the game's edge, so it arrives as soon as there are peoples and settlements to invent for, not at the end.
+
 | Version | Content |
 |---|---|
-| **0.1 World** | seed, heightmap, climate, rivers, biomes, rendering with the current tiles, map layers, zoom/pan |
-| **0.2 Life** | flora spreading, generated animal species, needs, food chain |
-| **0.3 Peoples** | race generator, languages and names, individuals, first villages, jobs |
-| **0.4 Civilisation** | settlements growth, generated buildings, kingdoms, borders, diplomacy, war |
-| **0.5 Culture** | cultures, religions, gods, laws, rituals, chronicle |
-| **0.6 Monsters & nature** | monster generator, lairs, legendary creatures, spirits, disasters, diseases |
-| **0.7 Inventions** | the invention language, procedural inventions, ages from Stone to Medieval, magic |
-| **0.75 Industry & beyond** | Renaissance → Space ages, vehicles, planes, rockets, pollution, nuclear war, endless generated ages |
-| **0.8 God powers & UI** | full power set, inspector, chronicle views, save/load |
-| **0.9 AI minds** | local model integration for cultures, monsters and spirits |
+| **0.1 World** ✅ | seed, terrain levels, climate, rivers, biomes, sprites from the reference sheets (3D pixel-art prototype) |
+| **0.15 2D core** | WorldBox-style rendering (map texture, batched sprites, zoom detail), C# simulation core (world object, managers, zones, batched ticks), data-driven assets |
+| **0.2 Life** | flora spreading, animals with needs, food chains, migrations |
+| **0.3 Peoples** | the 12 races, languages and names, individuals, jobs, first villages |
+| **0.4 Civilisation** | settlement growth, generated buildings, kingdoms, borders, diplomacy, war |
+| **0.5 AI minds** | local model + invention language: cultures invent **objects and buildings**, which spread, get copied and evolve |
+| **0.6 Culture** | AI-shaped cultures, religions, gods, laws, rituals, AI-written chronicle |
+| **0.7 Monsters & nature** | monster species and nature spirits with AI minds, lairs, disasters, diseases |
+| **0.8 Ages** | endless progress from Stone to Space and beyond, AI-driven evolution of objects, buildings and vehicles, consequences (pollution, nuclear war) |
+| **0.9 God powers & UI** | full power set, inspector, chronicle views, save/load |
 | **1.0** | balancing, performance, audio, polish |
 
 ---
