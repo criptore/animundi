@@ -91,7 +91,7 @@ func _ready() -> void:
 		b.pressed.connect(func(): layer_selected.emit(layer))
 		layers.add_child(b)
 		_layer_buttons[layer] = b
-	var help := _label("\nWheel: zoom\nRight drag / WASD: pan\nR: random seed")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nR: random seed")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 

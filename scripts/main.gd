@@ -28,7 +28,6 @@ var _ground_cover := SpriteBatch.new()
 var _plants := SpriteBatch.new()
 var _camera := MapCamera.new()
 var _hud := Hud.new()
-var _dragging := false
 
 
 func _ready() -> void:
@@ -62,16 +61,8 @@ func show_layer(layer: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_camera.zoom_at(MapCamera.ZOOM_STEP, mb.position)
-		elif mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_camera.zoom_at(1.0 / MapCamera.ZOOM_STEP, mb.position)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT or mb.button_index == MOUSE_BUTTON_MIDDLE:
-			_dragging = mb.pressed
-	elif event is InputEventMouseMotion and _dragging:
-		_camera.pan_screen((event as InputEventMouseMotion).relative)
+	if _camera.handle_input(event):
+		get_viewport().set_input_as_handled()
 
 
 func _process(_delta: float) -> void:

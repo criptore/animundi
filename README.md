@@ -43,8 +43,8 @@ Controls:
 
 | Action | Input |
 |---|---|
-| Zoom (toward the mouse) | mouse wheel |
-| Pan | right or middle drag, WASD, arrow keys |
+| Zoom (toward the mouse) | mouse wheel, trackpad pinch, + / - keys |
+| Pan | drag with any mouse button (or click and drag on a trackpad), trackpad two-finger scroll, WASD, arrow keys |
 | New random world | R or the **Random** button |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Tile info | hover the map (bottom bar) |

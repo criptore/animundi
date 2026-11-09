@@ -1,5 +1,6 @@
-## 2D map camera: zooms toward the mouse with the wheel, pans by dragging or with WASD / arrows,
-## and keeps the map in view. Zoom is in screen pixels per world pixel (a tile is
+## 2D map camera: zooms toward the mouse (wheel, trackpad pinch, + / - keys), pans by dragging
+## with any mouse button (so a trackpad's click-and-drag works), with a trackpad's two-finger
+## scroll, a horizontal wheel or WASD / arrows, and keeps the map in view. Zoom is in screen pixels per world pixel (a tile is
 ## WorldMap.TILE world pixels).
 extends Camera2D
 
@@ -7,6 +8,12 @@ const ZOOM_STEP := 1.2
 ## Closest zoom: a tile covers TILE * MAX_ZOOM screen pixels.
 const MAX_ZOOM := 12.0
 const PAN_SPEED := 900.0  # screen pixels per second
+## Screen pixels moved per unit of a trackpad two-finger scroll (macOS sends these as gestures).
+const PAN_GESTURE_SPEED := 24.0
+## Screen pixels moved per notch of a horizontal wheel (sideways two-finger scroll elsewhere).
+const WHEEL_PAN := 60.0
+
+var _dragging := false
 
 ## Map size in world pixels, for the zoom-out limit and the panning bounds.
 var bounds := Vector2(2048, 2048)
@@ -24,6 +31,54 @@ func _process(delta: float) -> void:
 		dir.y += 1
 	if dir != Vector2.ZERO:
 		pan_screen(-dir.normalized() * PAN_SPEED * delta)
+
+
+## Handles the camera's mouse, trackpad and key input. Returns true when the event was used.
+func handle_input(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		# Trackpads send fractions of a notch in `factor` (0 when the platform doesn't say).
+		var notches := mb.factor if mb.factor > 0.0 else 1.0
+		match mb.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				if mb.pressed:
+					zoom_at(pow(ZOOM_STEP, notches), mb.position)
+				return true
+			MOUSE_BUTTON_WHEEL_DOWN:
+				if mb.pressed:
+					zoom_at(pow(ZOOM_STEP, -notches), mb.position)
+				return true
+			MOUSE_BUTTON_WHEEL_LEFT:
+				if mb.pressed:
+					pan_screen(Vector2(WHEEL_PAN * notches, 0.0))
+				return true
+			MOUSE_BUTTON_WHEEL_RIGHT:
+				if mb.pressed:
+					pan_screen(Vector2(-WHEEL_PAN * notches, 0.0))
+				return true
+			MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
+				_dragging = mb.pressed
+				return true
+	elif event is InputEventMouseMotion:
+		if _dragging:
+			pan_screen((event as InputEventMouseMotion).relative)
+			return true
+	elif event is InputEventPanGesture:
+		pan_screen(-(event as InputEventPanGesture).delta * PAN_GESTURE_SPEED)
+		return true
+	elif event is InputEventMagnifyGesture:
+		var g := event as InputEventMagnifyGesture
+		zoom_at(g.factor, g.position)
+		return true
+	elif event is InputEventKey:
+		var key := event as InputEventKey
+		if key.pressed and key.keycode in [KEY_EQUAL, KEY_PLUS, KEY_KP_ADD]:
+			zoom_at(ZOOM_STEP, _view_size() / 2.0)
+			return true
+		if key.pressed and key.keycode in [KEY_MINUS, KEY_KP_SUBTRACT]:
+			zoom_at(1.0 / ZOOM_STEP, _view_size() / 2.0)
+			return true
+	return false
 
 
 ## Smallest zoom: the whole map fits in the view, with a margin.

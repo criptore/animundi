@@ -36,6 +36,7 @@ func _initialize() -> void:
 	test_levels()
 	test_world_map()
 	test_map_camera()
+	test_trackpad()
 	test_flora()
 	test_sprite_atlas()
 	test_sprite_batch()
@@ -319,3 +320,52 @@ func test_sprite_batch() -> void:
 	check(layer.get_child_count() == 16 and batch.get_child(0).get_child_count() == 16,
 			"one strip of sprites and one of shadows per 16 rows of tiles")
 	batch.free()
+
+
+func test_trackpad() -> void:
+	var cam := MapCamera.new()
+	cam.bounds = Vector2(2048, 2048)
+	cam.look_at_point(Vector2(1024, 1024), 2.0)
+
+	var pinch := InputEventMagnifyGesture.new()
+	pinch.factor = 1.5
+	pinch.position = Vector2(640, 360)
+	check(cam.handle_input(pinch) and is_equal_approx(cam.zoom.x, 3.0), "pinching zooms")
+
+	var start := cam.position
+	var swipe := InputEventPanGesture.new()
+	swipe.delta = Vector2(2, 0)
+	cam.handle_input(swipe)
+	check(cam.position.x > start.x and is_equal_approx(cam.position.y, start.y), "two-finger scroll pans")
+
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	wheel.pressed = true
+	wheel.factor = 0.5
+	wheel.position = Vector2(640, 360)
+	var before := cam.zoom.x
+	cam.handle_input(wheel)
+	check(is_equal_approx(cam.zoom.x, before * pow(MapCamera.ZOOM_STEP, 0.5)), "a fraction of a wheel notch zooms a fraction of a step")
+
+	start = cam.position
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	cam.handle_input(press)
+	var move := InputEventMouseMotion.new()
+	move.relative = Vector2(30, 0)
+	cam.handle_input(move)
+	press.pressed = false
+	cam.handle_input(press)
+	check(cam.position.x < start.x, "click and drag pans")
+	start = cam.position
+	cam.handle_input(move)
+	check(cam.position == start, "moving without a button pressed does not pan")
+
+	var plus := InputEventKey.new()
+	plus.keycode = KEY_EQUAL
+	plus.pressed = true
+	before = cam.zoom.x
+	cam.handle_input(plus)
+	check(cam.zoom.x > before, "the + key zooms in")
+	cam.free()
