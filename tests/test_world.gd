@@ -11,6 +11,8 @@ const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 const PriorityQueue = preload("res://scripts/core/priority_queue.gd")
 const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
 const VegetationBuilder = preload("res://scripts/render3d/vegetation_builder.gd")
+const WorldMap = preload("res://scripts/render2d/world_map.gd")
+const MapCamera = preload("res://scripts/ui/map_camera.gd")
 
 var _failures := 0
 
@@ -28,6 +30,8 @@ func _initialize() -> void:
 	test_terrain_mesh()
 	test_vegetation()
 	test_levels()
+	test_world_map()
+	test_map_camera()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -186,3 +190,54 @@ func test_renderer() -> void:
 	for layer in MapRenderer.LAYERS:
 		if layer != "Biomes":
 			check(r.render_layer(w, layer).get_size() == Vector2i(64, 64), "%s layer renders" % layer)
+
+
+func test_world_map() -> void:
+	var w := make("map", 64)
+	var map := WorldMap.new()
+	map.set_world(w)
+	check(map.texture.get_size() == Vector2(64, 64), "the map is one texture, one texel per tile")
+	check(map.pixel_size() == Vector2(64, 64) * WorldMap.TILE, "a tile is %d world pixels" % WorldMap.TILE)
+	check(map.tile_at(Vector2(3.5, 10.2) * WorldMap.TILE) == Vector2i(3, 10)
+			and map.tile_at(Vector2(-1, 5)) == Vector2i(-1, -1)
+			and map.tile_at(Vector2(64, 5) * WorldMap.TILE) == Vector2i(-1, -1),
+			"points map to the tile under them, outside the map to (-1, -1)")
+	var ok := true
+	for b in Biomes.COUNT:
+		ok = ok and WorldMap.pattern(b) >= 0 and WorldMap.pattern(b) < WorldMap.Pattern.size()
+	check(ok, "every biome has a ground pattern")
+	var a := map.color_image().duplicate() as Image
+	var again := WorldMap.new()
+	again.set_world(make("map", 64))
+	check(a.get_data() == again.color_image().get_data(), "the same world gives the same map")
+
+	# Changing a tile redraws that texel only.
+	var i := w.index(20, 30)
+	var before := a.get_pixel(20, 30)
+	w.biome[i] = Biomes.LAVA if w.biome[i] != Biomes.LAVA else Biomes.SNOW
+	map.update_tiles(PackedInt32Array([i]))
+	var img := map.color_image().duplicate() as Image
+	check(img.get_pixel(20, 30) != before and img.get_pixel(21, 30) == a.get_pixel(21, 30),
+			"updating a tile changes its texel and leaves its neighbours")
+
+	map.show_layer("Height")
+	check(map.color_image().get_data() != img.get_data(), "data layers recolour the map")
+	map.free()
+	again.free()
+
+
+func test_map_camera() -> void:
+	var cam := MapCamera.new()
+	cam.bounds = Vector2(2048, 2048)
+	cam.frame_all()
+	check(cam.position == Vector2(1024, 1024) and cam.zoom.x <= 720.0 / 2048.0,
+			"framing shows the whole map")
+	var screen := Vector2(900, 200)
+	var under := cam.screen_to_world(screen)
+	cam.zoom_at(2.0, screen)
+	check(cam.screen_to_world(screen).distance_to(under) < 0.01, "zooming keeps the point under the mouse")
+	cam.zoom_at(1000.0, screen)
+	check(cam.zoom.x == MapCamera.MAX_ZOOM, "zoom stops at the closest level")
+	cam.pan_screen(Vector2(1e6, 1e6))
+	check(cam.position == Vector2.ZERO, "the view stays on the map")
+	cam.free()

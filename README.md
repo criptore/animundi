@@ -6,13 +6,17 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.1 World
+## Status: 0.15 2D core (in progress)
 
-![A generated world](docs/images/world_0.1.png)
+![A generated world](docs/images/world_0.15.png)
 
-The world is a 3D scene of flat terraces on five levels (deep sea, shallow water, plain, hill, mountain) with shadows and water, rendered at low resolution and scaled up with sharp pixels, seen through a fixed tilted orthographic camera. Trees, plants, peoples, animals and monsters are **2D pixel-art sprites standing in that 3D world** ("HD-2D"), cut from the reference sheets in `art/reference/`. Tile tops carry pixel patterns (grass tufts, sand ripples, snow sparkles, rock cracks, moving lava), volcanoes rise as cones with a lava crater, and water is coloured by its real depth, reflects shores, trees and people (mirrored camera), with glints and shore foam.
+The world is a **flat 2D map drawn as one texture, one texel per tile**, scaled up with sharp pixels: the whole map costs one draw call whatever its size, the way WorldBox does it. Each tile has its biome colour, lighter on higher levels, with a slight variation so big biomes are not one flat colour. Zoomed in, a shader cuts each tile into 8×8 pattern pixels (the pixel size of the sprites) and draws a light ground pattern (grass, forest floor, sand ripples, snow sparkles, rock, glowing lava, water glints) and **step edges** where the ground goes down a level: a dark cliff face on the south side, darker lines on the sides, a light rim on the north. Zoomed out, patterns fade and the map reads like a map.
+
+![Close up](docs/images/world_0.15_close.png)
 
 Every world is generated from a seed: continents, five terrain levels, climate (latitude, altitude, winds and rain shadows), rivers and lakes, and 21 biomes, including volcanoes, mushroom lands and cursed lands.
+
+Next in 0.15: sprites drawn in batches on the map (trees, plants, peoples, animals), zoom-dependent detail, animated water. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are only used by the asset sheet tool for now.
 
 ## Asset sheets
 
@@ -37,12 +41,10 @@ Controls:
 
 | Action | Input |
 |---|---|
-| Zoom | mouse wheel |
+| Zoom (toward the mouse) | mouse wheel |
 | Pan | right or middle drag, WASD, arrow keys |
 | New random world | R or the **Random** button |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
-| Pixel size | **Pixel size** box (1 = full resolution, 3 = default) |
-| Pixel-art outlines and highlights on / off | E |
 | Tile info | hover the map (bottom bar) |
 
 Type any word or number as the seed: the same seed and settings always give the same world.
@@ -52,17 +54,18 @@ Type any word or number as the seed: the same seed and settings always give the 
 | Path | Content |
 |---|---|
 | `scripts/world/` | world settings, data and the generator (shape → climate → hydrology → biomes) |
-| `scripts/render3d/` | 3D terrain, water, vegetation and creature builders, shared scene style |
+| `scripts/render2d/` | the world map: one texture, one texel per tile |
 | `scripts/render/` | 2D map renderer (preview tool) and data layer colours |
-| `scripts/ui/` | pixel camera and HUD |
-| `shaders/` | terrain, water, foliage, grass and outline shaders (banded dithered light, depth, foam) |
+| `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
+| `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
+| `shaders/` | `map.gdshader` (ground patterns and step edges); the others belong to the retired 3D view |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
 | `assets/tiles/` | terrain atlas used by the game |
 | `assets/sprites/` | game sprites (trees, plants, peoples, races, animals, monsters), cut by `art/extract_sprites.py` |
 | `art/` | reference sheets (`reference/`), sprite extraction script, old 8×8 sprite generator (not imported by Godot) |
 | `tests/` | headless tests |
-| `tools/` | headless preview renderer and screenshot tool |
+| `tools/` | headless preview renderer, screenshot and asset sheet tools |
 | `docs/` | game design and research |
 
 ## Tests and tools
@@ -79,6 +82,12 @@ godot --headless --path . --script res://tests/test_world.gd
 godot --headless --path . --script res://tools/render_preview.gd -- <seed> <size> <out_dir>
 ```
 
+Screenshot of the game (needs a display; on a headless machine wrap it in `xvfb-run`). `zoom` is screen pixels per world pixel, a tile being 8 world pixels; 0 shows the whole map:
+
+```bash
+godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [volcano]
+```
+
 To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, NumPy, SciPy):
 
 ```bash
@@ -93,7 +102,7 @@ python3 art/sprites.py
 
 ## Direction
 
-Animundi is **built like WorldBox** (flat 2D map drawn as one texture, sprites drawn in batches, data-driven content, batched simulation in C#) and **different where it matters**: local AI minds that invent objects, buildings and ways of life, and make them evolve over generations. Version 0.1 below is a 3D pixel-art prototype; the game moves to the 2D approach in 0.15 (see [docs/ROADMAP.md](docs/ROADMAP.md)).
+Animundi is **built like WorldBox** (flat 2D map drawn as one texture, sprites drawn in batches, data-driven content, batched simulation in C#) and **different where it matters**: local AI minds that invent objects, buildings and ways of life, and make them evolve over generations. Version 0.1 was a 3D pixel-art prototype; the game moved to the 2D approach in 0.15 (see [docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ## Design
 
@@ -107,4 +116,4 @@ Engine: Godot 4.3.
 
 ## Next steps
 
-See the milestones in [docs/GAME_DESIGN.md § 23](docs/GAME_DESIGN.md#23-milestones). Next: **0.2 Life** (flora spreading, generated animal species, food chains).
+See the milestones in [docs/GAME_DESIGN.md § 23](docs/GAME_DESIGN.md#23-milestones). Now: **0.15 2D core** (see the roadmap), then **0.2 Life** (flora spreading, generated animal species, food chains).
