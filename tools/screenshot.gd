@@ -1,7 +1,8 @@
 ## Opens the game, waits for the world to be shown, saves a screenshot and quits.
 ##   godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [volcano]
 ## `zoom` is in screen pixels per world pixel (a tile is 8 world pixels; 0 = whole map).
-## With "volcano", the view is centred on the world's first volcano, else on the map centre.
+## With "volcano", the view is centred on the world's first volcano (when it has one, placed with
+## the terrain tools), else on the map centre.
 ## Needs a display (use xvfb-run on a headless machine).
 extends SceneTree
 

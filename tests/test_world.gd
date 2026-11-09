@@ -259,10 +259,37 @@ func test_flora() -> void:
 	check(a.id.size() > 500, "a 128 world has plants (%d)" % a.id.size())
 	var ok := true
 	for k in a.id.size():
-		var t := Vector2i(floori(a.pos[k].x), floori(a.pos[k].y))
-		if not w.in_bounds(t.x, t.y) or w.is_water(w.index(t.x, t.y)):
+		if not Flora.on_land(w, a.pos[k], SpriteLibrary.world_size(a.id[k]) * a.scale[k]):
 			ok = false
-	check(ok, "every plant stands on a land tile")
+	check(ok, "every plant's sprite stands over land, never over water")
+	var mushroom := SpriteLibrary.world_size("plants/Red_mushroom")
+	var villager := SpriteLibrary.world_size("peoples/Elves_Villager")
+	check(mushroom.y < villager.y * 0.6, "mushrooms are smaller than the peoples")
+
+	# Changing a tile only changes the plants on and right around it.
+	var before := {}
+	for k in a.id.size():
+		before["%s@%s" % [a.id[k], a.pos[k]]] = true
+	var i := -1
+	for k in w.size():
+		if w.biome[k] == Biomes.FOREST:
+			i = k
+			break
+	w.biome[i] = Biomes.DESERT
+	var c := Flora.place(w)
+	var moved := 0
+	for k in c.id.size():
+		if not before.has("%s@%s" % [c.id[k], c.pos[k]]):
+			moved += 1
+	check(moved <= 2, "editing one tile leaves the other plants in place (%d new)" % moved)
+
+	var specials := 0
+	for seed_text in ["s1", "s2", "s3"]:
+		var sw := make(seed_text, 128)
+		for k in sw.size():
+			if sw.biome[k] in [Biomes.MUSHROOM, Biomes.CURSED, Biomes.VOLCANIC, Biomes.LAVA]:
+				specials += 1
+	check(specials == 0, "no special biome is generated at random")
 
 
 func test_sprite_atlas() -> void:

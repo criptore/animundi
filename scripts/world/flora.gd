@@ -6,6 +6,7 @@ extends RefCounted
 const WorldData = preload("res://scripts/world/world_data.gd")
 const Biomes = preload("res://scripts/world/biomes.gd")
 const SeededRng = preload("res://scripts/core/seeded_rng.gd")
+const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
 
 ## Per biome: list of [sprite id, chance per tile]. A chance above 1 places several per tile.
 const FLORA := {
@@ -37,24 +38,52 @@ const GROUND_COVER := ["plants/Flowers", "plants/Grass"]
 ## Every plant of the world: {"id": PackedStringArray, "pos": PackedVector2Array (in tiles, the
 ## point where the plant touches the ground; tile (x, y) covers x..x+1, y..y+1),
 ## "flip": PackedByteArray, "scale": PackedFloat32Array}. Same world, same plants.
+## Each tile draws its plants from its own seed, so changing a few tiles (god tools) only changes
+## the plants there. A plant is kept only if its whole sprite stands over land, so trees never
+## hang over the sea, lakes or rivers.
 static func place(world: WorldData) -> Dictionary:
-	var rng := SeededRng.new(world.seed_value).stream("flora")
+	var base := SeededRng.new(world.seed_value).sub_seed("flora")
+	var rng := RandomNumberGenerator.new()
 	var ids := PackedStringArray()
 	var pos := PackedVector2Array()
 	var flip := PackedByteArray()
 	var scale := PackedFloat32Array()
+	var sizes := {}
 	for y in world.height:
 		for x in world.width:
 			var i := world.index(x, y)
 			if world.is_water(i) or not FLORA.has(world.biome[i]):
 				continue
+			rng.seed = hash(Vector3i(base, x, y))
 			for entry in FLORA[world.biome[i]]:
+				var id: String = entry[0]
 				var chance: float = entry[1]
 				while chance > 0.0:
 					if rng.randf() < chance:
-						ids.append(entry[0])
-						pos.append(Vector2(x + rng.randf_range(0.1, 0.9), y + rng.randf_range(0.2, 0.95)))
-						flip.append(1 if rng.randf() < 0.5 else 0)
-						scale.append(rng.randf_range(0.85, 1.15))
+						var p := Vector2(x + rng.randf_range(0.1, 0.9), y + rng.randf_range(0.2, 0.95))
+						var f := 1 if rng.randf() < 0.5 else 0
+						var sc := rng.randf_range(0.85, 1.15)
+						if not sizes.has(id):
+							sizes[id] = SpriteLibrary.world_size(id)
+						if on_land(world, p, sizes[id] * sc):
+							ids.append(id)
+							pos.append(p)
+							flip.append(f)
+							scale.append(sc)
 					chance -= 1.0
 	return {"id": ids, "pos": pos, "flip": flip, "scale": scale}
+
+
+## Whether a sprite of `size` (tiles) with its feet at `feet` covers only land tiles. The sprite's
+## outer edges are trimmed a little: sprite images have some empty margin.
+static func on_land(world: WorldData, feet: Vector2, size: Vector2) -> bool:
+	var half := size.x * 0.4
+	var x0 := floori(feet.x - half)
+	var x1 := floori(feet.x + half)
+	var y0 := floori(feet.y - size.y * 0.9)
+	var y1 := floori(feet.y)
+	for ty in range(y0, y1 + 1):
+		for tx in range(x0, x1 + 1):
+			if not world.in_bounds(tx, ty) or world.is_water(world.index(tx, ty)):
+				return false
+	return true

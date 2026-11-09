@@ -46,7 +46,7 @@ seed
 
 - **RNG:** one seeded PRNG (e.g. xoshiro128) with a named sub-stream per generator (`rng("biomes")`, `rng("people:3")`), so adding a generator never changes the others.
 - **Noise:** simplex / value noise with octaves for every continuous field.
-- **World settings** (chosen before generation): size, sea level, number of continents, climate (ice age ↔ hot), magic level, monster density, number of starting peoples, length of prehistory.
+- **World settings** (chosen before generation): size, sea level, number of continents, climate (ice age ↔ hot), monster density, number of starting peoples, length of prehistory.
 
 ---
 
@@ -59,10 +59,10 @@ seed
 
 ### 3.2 Terrain shape
 
-- Heightmap = continent mask (number of continents, falloff to the edges) + multi-octave noise + ridge noise for mountain chains.
+- Heightmap from **tectonic plates**: continental and oceanic plates drift; mountain chains rise where they collide, rifts open where they part; warped fractal noise roughens the coasts (details and alternatives in [MAP_GENERATION.md](MAP_GENERATION.md)).
 - Sea level cuts the heightmap into **deep water / shallow water / land**.
 - **Five terrain levels**: deep sea, shallow water (coasts, rivers, lakes), plain (and beach), hill, mountain. The heightmap is quantised into these levels, smoothed with a cellular automaton (each land tile takes the majority level of its 3×3 neighbourhood) and constrained so that two neighbouring tiles never differ by more than one level: mountains are ringed by hills, coasts and river banks are plains, deep sea is ringed by shallow water. On the flat 2D map, levels are told by colour and a one-pixel edge where the ground steps down, as in WorldBox.
-- Volcanoes: placed on high ridges or hotspots; they create volcanic rock and lava around them.
+- Volcanoes and special biomes (mushroom land, cursed land) are **not generated at random**: the player places them with the terrain tools (biome brush, volcano stamps, their own saved presets).
 
 ### 3.3 Climate
 

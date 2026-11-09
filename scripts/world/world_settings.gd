@@ -17,9 +17,6 @@ var temperature_offset := 0.0
 var humidity_offset := 0.0
 ## 0 = few, short rivers; 1 = many long rivers.
 var rivers := 0.5
-var volcanoes := 2
-## 0 = no magical biomes, 1 = many.
-var magic := 0.5
 
 
 func set_size(tiles: int) -> void:
@@ -30,6 +27,6 @@ func set_size(tiles: int) -> void:
 func duplicate_settings() -> RefCounted:
 	var copy = get_script().new()
 	for p in ["seed_text", "width", "height", "continents", "water_ratio", "temperature_offset",
-			"humidity_offset", "rivers", "volcanoes", "magic"]:
+			"humidity_offset", "rivers"]:
 		copy.set(p, get(p))
 	return copy

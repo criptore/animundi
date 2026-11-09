@@ -20,6 +20,10 @@ const SIZE := {
 	"plants/Grass": 0.8,
 	"plants/Flowers": 0.8,
 	"plants/Boulder": 1.4,
+	# Mushrooms stay smaller than the peoples who will walk among them.
+	"plants/Red_mushroom": 0.5,
+	"plants/Pink_mushroom": 0.5,
+	"plants/Purple_mushroom": 0.5,
 	"monsters/Dragon": 1.6,
 	"monsters/Golem": 1.3,
 	"monsters/Yeti": 1.25,
