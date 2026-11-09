@@ -277,15 +277,21 @@ public partial class Simulation
 			return BonfireFrames[(int)(time * 6f + bld.X) % 3];
 		if (bld.Type == _tWindmill)
 			return WindmillFrames[(int)(time * 3f + bld.X) % 2];
-		int species = Villages[bld.Village].Species;
-		int variant = _houseTypes.Contains(bld.Type) ? (int)((uint)(bld.X * 73856093 ^ bld.Y * 19349663) % HomeVariants) : 0;
-		if (!_buildingSprites.TryGetValue((bld.Type, species, variant), out var id))
+		return SpriteId(bld.Type, Villages[bld.Village].Species, bld.X, bld.Y);
+	}
+
+	/// <summary>The sprite of a standing building of `type` of `species` at tile (x, y): homes
+	/// pick one of their variants from their place.</summary>
+	private string SpriteId(int type, int species, int x, int y)
+	{
+		int variant = _houseTypes.Contains(type) ? (int)((uint)(x * 73856093 ^ y * 19349663) % HomeVariants) : 0;
+		if (!_buildingSprites.TryGetValue((type, species, variant), out var id))
 		{
-			string b = Assets.Buildings[bld.Type].Id;
+			string b = Assets.Buildings[type].Id;
 			string people = Assets.Species[species].Id;
-			id = _houseTypes.Contains(bld.Type) ? $"buildings/{b}_{people}_{variant}"
+			id = _houseTypes.Contains(type) ? $"buildings/{b}_{people}_{variant}"
 				: PeopleStyled.Contains(b) ? $"buildings/{b}_{people}" : $"buildings/{b}";
-			_buildingSprites[(bld.Type, species, variant)] = id;
+			_buildingSprites[(type, species, variant)] = id;
 		}
 		return id;
 	}
