@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life and 0.3 Peoples
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples and 0.35 Villages
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -62,6 +62,21 @@ A new world **waits for you to choose who lives in it**: at least two of the 12 
 
 `tools/village_check.gd` runs a world with peoples for years and prints how each village fares.
 
+## 0.35 Villages
+
+![A human village after 16 years](docs/images/villages_0.35.png)
+
+Villages now do everything WorldBox villages do (the full list, and how each rule maps, is in [docs/VILLAGES.md](docs/VILLAGES.md)):
+
+- **Territory** in zones of 8×8 tiles, claimed as the village grows, with borders drawn in the people's colour.
+- **Buildings** from `data/buildings.json`, planned once a month: huts upgraded into houses, stone houses and big houses; stockpile, well, windmill and fields, mine, dock, town hall, barracks and dummies, watch towers, market, temple, library, statue. Each people builds in its own style ([all sprites](docs/images/buildings.png)).
+- **Stores** of food, wood, stone, metal and gold; the blacksmith makes tools and weapons.
+- **Jobs** with WorldBox's limits: builders, gatherers, woodcutters, hunters, farmers, miners, fishers, blacksmith, firemen, road builders and soldiers who guard and train.
+- **Homes** for everyone; **roads** (faster walking); **fields** whose wheat follows the seasons; wooden buildings **burn** and leave **ruins**.
+- Big villages send **settlers** to found new villages of their people.
+
+![Villages and their land](docs/images/villages_map_0.35.png)
+
 Next: 0.4 Civilisation (villages that grow into towns, roads, kingdoms, diplomacy and war). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
@@ -112,7 +127,7 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
-| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples, villages, jobs and neurons (`Peoples.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
+| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples and neurons (`Peoples.cs`), villages, buildings and territory (`Villages.cs`), jobs (`Jobs.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
 | `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `races.json` (the 12 peoples), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
@@ -137,7 +152,7 @@ dotnet build
 godot --headless --path . --script res://tests/test_world.gd
 ```
 
-A world with peoples over the years (villages, food, wood, houses, events):
+A world with peoples over the years (villages, stores, homes, buildings, jobs, events):
 
 ```bash
 godot --headless --path . --script res://tools/village_check.gd -- 10 humans,elves,orcs animundi

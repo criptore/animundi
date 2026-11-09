@@ -264,11 +264,16 @@ func setup_visible() -> bool:
 	return _setup != null and _setup.visible
 
 
-## One line per village: name, people, population, stores, houses.
+## One line per village: name, people, population and homes, stores, what it builds.
 func set_villages(villages: Array) -> void:
 	var lines := PackedStringArray()
 	for v in villages:
-		lines.append("%s (%s) %d · food %d · wood %d · %d houses" % [v.name, v.people, v.population, v.food, v.wood, v.houses])
+		var line := "%s (%s) %d/%d · food %d · wood %d · stone %d" % [v.name, v.people, v.population, v.homes, v.food, v.wood, v.stone]
+		if v.metal > 0 or v.gold > 0:
+			line += " · metal %d · gold %d" % [v.metal, v.gold]
+		if v.building != "":
+			line += " · building a %s" % v.building
+		lines.append(line)
 	_villages_label.text = "\n".join(lines) if lines.size() > 0 else "none yet"
 
 

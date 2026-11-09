@@ -8,24 +8,19 @@ namespace Animundi.Sim;
 /// Peoples (0.3): the races chosen for a world (data/races.json, varied by the world's seed), their
 /// languages, individuals with families and traits, and their first villages.
 ///
-/// A village is a bonfire with houses around it and two stocks, food and wood. Every two seconds
-/// it hands out work to its adults (gatherers, woodcutters, hunters, builders) by what it lacks,
-/// and plans a new house when people run out of room. People choose what to do themselves, once
+/// Villages, their buildings and territory are in Villages.cs, their jobs in Jobs.cs (docs/VILLAGES.md).
+/// People choose what to do themselves, once
 /// a second, with a small utility AI made of "neurons" (as in WorldBox): each possible action has a
 /// weight, a cooldown and a priority; the most urgent action whose cooldown is over fires.
 /// </summary>
 public partial class Simulation
 {
 	public enum Role : byte { Villager, Warrior, Chief, Shaman }
-	public enum Job : byte { None, Gatherer, Woodcutter, Hunter, Builder }
-	public enum Goods : byte { None, Food, Wood }
-	public enum BuildingKind : byte { Bonfire, House, Site }
 
 	[Flags]
 	public enum Trait { Brave = 1, Lazy = 2, Kind = 4, Greedy = 8, Wise = 16, Strong = 32 }
 
 	public static readonly string[] RoleNames = { "villager", "warrior", "chief", "shaman" };
-	public static readonly string[] JobNames = { "idle", "gatherer", "woodcutter", "hunter", "builder" };
 
 	/// <summary>One action a person can take, as in WorldBox's neuron system: a weight (how much it
 	/// matters), a cooldown (seconds before it can fire again), a priority layer and a switch.</summary>
@@ -52,36 +47,10 @@ public partial class Simulation
 	};
 	private const int NDrink = 0, NEat = 1, NRest = 2, NBreed = 3, NPair = 4, NWork = 5, NPlay = 6, NWander = 7;
 
-	public sealed class Village
-	{
-		public string Name;
-		public int Species;
-		public int X, Y;
-		public float Food, Wood;
-		public int Population, Houses;
-		public bool Alive = true;
-		public int Founded;
-		public int Site = -1;
-	}
-
-	public sealed class Building
-	{
-		public BuildingKind Kind;
-		public int X, Y;
-		public int Village;
-		public float Progress;
-		public bool Alive = true;
-	}
-
-	public readonly List<Village> Villages = new();
-	public readonly List<Building> Buildings = new();
 	private readonly List<string> _names = new();
 	private readonly Dictionary<int, Language> _languages = new();
 	// Per unit and neuron: the time when the neuron can fire again.
 	private float[] _neuronReady = Array.Empty<float>();
-	// Building on each tile, or -1.
-	private int[] _buildingAt = Array.Empty<int>();
-	private const int HouseRoom = 5, CampRoom = 6;
 	private const float Reach = 1.3f;
 
 	// ------------------------------------------------------------------ setup
@@ -89,12 +58,9 @@ public partial class Simulation
 	private void SetupPeoples()
 	{
 		Assets.RemovePeoples();
-		Villages.Clear();
-		Buildings.Clear();
+		SetupVillages();
 		_names.Clear();
 		_languages.Clear();
-		_buildingAt = new int[World.Width * World.Height];
-		Array.Fill(_buildingAt, -1);
 	}
 
 	/// <summary>Brings the chosen peoples into the world (ids from data/races.json): each founds a
@@ -188,30 +154,6 @@ public partial class Simulation
 		return fallback;
 	}
 
-	private int FoundVillage(int species, int x, int y)
-	{
-		var v = new Village
-		{
-			Name = _languages[species].PlaceName(), Species = species, X = x, Y = y,
-			Food = 30f, Wood = 12f, Founded = Year(),
-		};
-		Villages.Add(v);
-		int id = Villages.Count - 1;
-		AddBuilding(BuildingKind.Bonfire, x, y, id);
-		return id;
-	}
-
-	private int AddBuilding(BuildingKind kind, int x, int y, int village)
-	{
-		Buildings.Add(new Building { Kind = kind, X = x, Y = y, Village = village, Progress = kind == BuildingKind.Site ? 0f : 1f });
-		int b = Buildings.Count - 1;
-		_buildingAt[World.Index(x, y)] = b;
-		// No trees where people build.
-		for (int p = _tileFirst[World.Index(x, y)]; p >= 0; p = _pNext[p])
-			RemovePlant(p);
-		return b;
-	}
-
 	private int SpawnPerson(int species, int village, float x, float y, bool newborn, bool female)
 	{
 		int i = SpawnUnit(species, x, y, newborn);
@@ -253,130 +195,6 @@ public partial class Simulation
 
 	public string NameOf(int i) => Units.Name[i] >= 0 ? _names[Units.Name[i]] : Assets.Species[Units.Species[i]].Name;
 
-	// ------------------------------------------------------------------ villages (every 2 s)
-
-	private void VillageStep(int a, int b, float dt)
-	{
-		if (Villages.Count == 0)
-			return;
-		var members = new List<int>[Villages.Count];
-		for (int v = 0; v < Villages.Count; v++)
-			members[v] = new List<int>();
-		for (int i = 0; i < Units.Capacity; i++)
-			if (Units.Alive[i] && Units.Village[i] >= 0)
-				members[Units.Village[i]].Add(i);
-		for (int v = 0; v < Villages.Count; v++)
-		{
-			var village = Villages[v];
-			if (!village.Alive)
-				continue;
-			var people = members[v];
-			if (people.Count == 0)
-			{
-				village.Alive = false;
-				LogEvent($"{village.Name} is abandoned: no one lives there any more.");
-				continue;
-			}
-			// A new chief when the old one is gone: the eldest adult.
-			int chief = -1, eldest = -1;
-			foreach (int i in people)
-			{
-				if (Units.Role[i] == (byte)Role.Chief)
-					chief = i;
-				if (IsAdult(i) && (eldest < 0 || Units.Age[i] > Units.Age[eldest]))
-					eldest = i;
-			}
-			if (chief < 0 && eldest >= 0)
-			{
-				Units.Role[eldest] = (byte)Role.Chief;
-				LogEvent($"{NameOf(eldest)} becomes chief of {village.Name}.");
-			}
-			// A new house when people run out of room and there is wood for it.
-			int room = CampRoom + HouseRoom * village.Houses;
-			if (village.Site < 0 && people.Count + 2 > room && village.Wood >= 5f)
-				PlanHouse(v);
-			HandOutWork(v, people);
-		}
-	}
-
-	private void PlanHouse(int v)
-	{
-		var village = Villages[v];
-		for (int tries = 0; tries < 40; tries++)
-		{
-			int r = 2 + tries / 8;
-			int x = village.X + _rng.Next(-r, r + 1), y = village.Y + _rng.Next(-r, r + 1);
-			if (!World.IsLand(x, y) || _buildingAt[World.Index(x, y)] >= 0)
-				continue;
-			// Keep a free tile around every building.
-			bool clear = true;
-			for (int dy = -1; dy <= 1 && clear; dy++)
-				for (int dx = -1; dx <= 1 && clear; dx++)
-					clear = !World.InBounds(x + dx, y + dy) || _buildingAt[World.Index(x + dx, y + dy)] < 0;
-			if (!clear)
-				continue;
-			village.Site = AddBuilding(BuildingKind.Site, x, y, v);
-			return;
-		}
-	}
-
-	/// <summary>Work by what the village lacks: builders for a house being built, hunters and
-	/// gatherers when food runs short, woodcutters when wood does. Chiefs and shamans and the young
-	/// don't take jobs.</summary>
-	private void HandOutWork(int v, List<int> people)
-	{
-		var village = Villages[v];
-		var workers = new List<int>();
-		foreach (int i in people)
-			if (IsAdult(i) && Units.Role[i] != (byte)Role.Chief && Units.Role[i] != (byte)Role.Shaman)
-				workers.Add(i);
-			else
-				Units.Job[i] = (byte)Job.None;
-		if (workers.Count == 0)
-			return;
-		int n = workers.Count;
-		int builders = village.Site >= 0 ? Math.Min(2, n) : 0;
-		bool hungry = village.Food < people.Count * 3f;
-		int hunters = Math.Min(n - builders, hungry ? Math.Max(1, n / 3) : n / 8);
-		int woodcutters = Math.Min(n - builders - hunters, village.Wood < 30f ? Math.Max(1, n / 4) : n / 10);
-		int[] want = new int[5];
-		want[(int)Job.Builder] = builders;
-		want[(int)Job.Hunter] = hunters;
-		want[(int)Job.Woodcutter] = woodcutters;
-		want[(int)Job.Gatherer] = n - builders - hunters - woodcutters;
-		// Keep people at the job they have when it is still wanted; move the others.
-		int[] have = new int[5];
-		var free = new List<int>();
-		foreach (int i in workers)
-		{
-			int j = Units.Job[i];
-			// Warriors prefer the hunt.
-			if (j != 0 && have[j] < want[j])
-				have[j]++;
-			else
-				free.Add(i);
-		}
-		foreach (int i in free)
-		{
-			int best = (int)Job.Gatherer;
-			if (Units.Role[i] == (byte)Role.Warrior && have[(int)Job.Hunter] < want[(int)Job.Hunter])
-				best = (int)Job.Hunter;
-			else
-				for (int j = 1; j < 5; j++)
-					if (have[j] < want[j])
-					{
-						best = j;
-						break;
-					}
-			if (Units.Job[i] != best)
-			{
-				Units.Job[i] = (byte)best;
-				Units.WorkTarget[i] = -1;
-			}
-			have[best]++;
-		}
-	}
-
 	// ------------------------------------------------------------------ people (1 / s)
 
 	/// <summary>A person's decision, once a second: each enabled neuron whose cooldown is over is
@@ -398,7 +216,7 @@ public partial class Simulation
 			Breed(i);
 		}
 		// Thirst and hunger that become urgent interrupt any task (a hunt, a walk to work).
-		bool urgent = Units.Thirst[i] > 0.75f || (Units.Hunger[i] > 0.75f && v >= 0 && Villages[v].Food >= 1f);
+		bool urgent = Units.Thirst[i] > 0.65f || (Units.Hunger[i] > 0.75f && v >= 0 && Villages[v].Food >= 1f);
 		var task = (Task)Units.Task[i];
 		if (urgent && task != Task.Drink && task != Task.Feast)
 		{
@@ -458,20 +276,34 @@ public partial class Simulation
 		switch (best)
 		{
 			case NDrink:
-				if (NearWater(i)) Units.Thirst[i] = 0f; else GoToWater(i);
+				if (NearWater(i) || NearWell(i))
+					Units.Thirst[i] = 0f;
+				else if (!GoToWell(i, v))
+					GoToWater(i);
 				break;
 			case NEat:
 				if (v >= 0 && Villages[v].Food >= 1f)
-					GoTo(i, Villages[v].X + 0.5f, Villages[v].Y + 0.9f, Task.Feast);
+				{
+					// The village's food is eaten at its stores.
+					int store = NearestStore(i, v);
+					var at = store >= 0 ? Buildings[store] : null;
+					GoTo(i, (at?.X ?? Villages[v].X) + 0.5f + ((float)_rng.NextDouble() - 0.5f), (at?.Y ?? Villages[v].Y) + 1.1f, Task.Feast);
+				}
 				else if (!SeekGrass(i, sp))
 					WanderNear(i, v, 6f);
 				break;
 			case NRest:
-				if (v >= 0)
+			{
+				// At home; the homeless by the bonfire.
+				int home = Units.Home[i];
+				if (home >= 0 && Buildings[home].Alive)
+					GoTo(i, Buildings[home].X + 0.5f + ((float)_rng.NextDouble() - 0.5f) * 0.6f, Buildings[home].Y + 1.15f, Task.Home);
+				else if (v >= 0)
 					GoTo(i, Villages[v].X + 0.5f + (float)_rng.NextDouble() - 0.5f, Villages[v].Y + 1.2f, Task.Home);
 				else
 					RestHere(i);
 				break;
+			}
 			case NBreed:
 				Breed(i);
 				break;
@@ -539,7 +371,7 @@ public partial class Simulation
 		switch (task)
 		{
 			case Task.Drink:
-				if (NearWater(i))
+				if (NearWater(i) || NearWell(i))
 					Units.Thirst[i] = 0f;
 				Units.Task[i] = (byte)Task.Wander;
 				return false;
@@ -561,10 +393,7 @@ public partial class Simulation
 				return true;
 			case Task.Deliver:
 				if (v >= 0)
-				{
-					if (Units.Carry[i] == (byte)Goods.Food) Villages[v].Food += Units.CarryAmount[i];
-					else if (Units.Carry[i] == (byte)Goods.Wood) Villages[v].Wood += Units.CarryAmount[i];
-				}
+					Deliver(i, v);
 				Units.Carry[i] = 0;
 				Units.CarryAmount[i] = 0f;
 				Units.Task[i] = (byte)Task.Wander;
@@ -575,136 +404,34 @@ public partial class Simulation
 		return false;
 	}
 
-	private void Work(int i, int v, SpeciesRecord sp)
+	/// <summary>Whether a well of the person's village is right there.</summary>
+	private bool NearWell(int i)
 	{
-		var village = Villages[v];
-		if (Units.Carry[i] != 0)
-		{
-			GoTo(i, village.X + 0.5f, village.Y + 0.9f, Task.Deliver);
-			return;
-		}
-		switch ((Job)Units.Job[i])
-		{
-			case Job.Gatherer:
-			{
-				// The best grass (wild grains, berries, herbs) near the village.
-				float best = 0.45f;
-				int bt = -1;
-				// Further afield when the stores run low.
-				int r = village.Food < village.Population * 2f ? 18 : 12;
-				for (int k = 0; k < 12; k++)
-				{
-					int x = village.X + _rng.Next(-r, r + 1), y = village.Y + _rng.Next(-r, r + 1);
-					if (!World.IsLand(x, y))
-						continue;
-					int t = World.Index(x, y);
-					if (Grass[t] > best && _buildingAt[t] < 0)
-					{
-						best = Grass[t];
-						bt = t;
-					}
-				}
-				if (bt >= 0)
-				{
-					Units.WorkTarget[i] = bt;
-					Units.WorkTimer[i] = 2f;
-					GoTo(i, bt % World.Width + 0.5f, bt / World.Width + 0.6f, Task.Work);
-				}
-				else
-					WanderNear(i, v, 8f);
-				break;
-			}
-			case Job.Woodcutter:
-			{
-				int tree = FindTree(village.X, village.Y, 12);
-				if (tree < 0)
-					tree = FindTree(village.X, village.Y, 22);
-				if (tree >= 0)
-				{
-					Units.WorkTarget[i] = tree;
-					Units.WorkTimer[i] = 3f;
-					GoTo(i, _pX[tree] - 0.4f, _pY[tree], Task.Work);
-				}
-				else
-					WanderNear(i, v, 10f);
-				break;
-			}
-			case Job.Hunter:
-				if (!TryHunt(i, sp))
-					WanderNear(i, v, 12f);
-				break;
-			case Job.Builder:
-				if (village.Site >= 0 && village.Wood >= 0.5f)
-				{
-					var site = Buildings[village.Site];
-					Units.WorkTarget[i] = village.Site;
-					Units.WorkTimer[i] = 1f;
-					GoTo(i, site.X + 0.5f + ((float)_rng.NextDouble() - 0.5f), site.Y + 1.1f, Task.Work);
-				}
-				else
-					WanderNear(i, v, 4f);
-				break;
-		}
+		int v = Units.Village[i];
+		if (v < 0)
+			return false;
+		int b = BuildingWithin((int)Units.X[i], (int)(Units.Y[i] - 0.5f), 1, _tWell);
+		return b >= 0 && Buildings[b].Village == v && Buildings[b].Done;
 	}
 
-	/// <summary>A tree near (x, y), or -1 (a few random looks).</summary>
-	private int FindTree(int cx, int cy, int r)
+	/// <summary>Goes to drink at the village's nearest well when it is closer than open water.</summary>
+	private bool GoToWell(int i, int v)
 	{
-		for (int k = 0; k < 40; k++)
+		if (v < 0)
+			return false;
+		int b = Nearest(v, _tWell, i);
+		if (b < 0)
+			return false;
+		var well = Buildings[b];
+		float dx = well.X - Units.X[i], dy = well.Y - Units.Y[i];
+		int w = _nearestWater[World.Index((int)Units.X[i], (int)Units.Y[i])];
+		if (w >= 0)
 		{
-			int x = cx + _rng.Next(-r, r + 1), y = cy + _rng.Next(-r, r + 1);
-			if (!World.InBounds(x, y))
-				continue;
-			for (int p = _tileFirst[World.Index(x, y)]; p >= 0; p = _pNext[p])
-				if (_pBurn[p] == 0f && _pGrowth[p] >= 1f && _plantSprites[_pSprite[p]].StartsWith("trees/"))
-					return p;
+			float wx = w % World.Width - Units.X[i], wy = w / World.Width - Units.Y[i];
+			if (wx * wx + wy * wy < dx * dx + dy * dy)
+				return false;
 		}
-		return -1;
-	}
-
-	/// <summary>Working at the spot: harvesting, chopping or building, a second at a time.</summary>
-	private bool DoWork(int i, int v, float dt)
-	{
-		Units.WorkTimer[i] -= dt;
-		int target = Units.WorkTarget[i];
-		switch ((Job)Units.Job[i])
-		{
-			case Job.Gatherer:
-				if (Units.WorkTimer[i] > 0f)
-					return true;
-				if (target >= 0 && Grass[target] > 0.2f)
-				{
-					Grass[target] -= 0.35f;
-					Units.Carry[i] = (byte)Goods.Food;
-					Units.CarryAmount[i] = 3f;
-				}
-				break;
-			case Job.Woodcutter:
-				if (target < 0 || !_pAlive[target])
-					break;
-				if (Units.WorkTimer[i] > 0f)
-					return true;
-				RemovePlant(target);
-				Units.Carry[i] = (byte)Goods.Wood;
-				Units.CarryAmount[i] = 3f;
-				break;
-			case Job.Builder:
-			{
-				if (v < 0 || target < 0 || target != Villages[v].Site || Villages[v].Wood < 0.5f)
-					break;
-				var site = Buildings[target];
-				Villages[v].Wood -= 0.5f;
-				site.Progress += 0.1f;
-				if (site.Progress < 1f)
-					return true;
-				site.Kind = BuildingKind.House;
-				Villages[v].Houses++;
-				Villages[v].Site = -1;
-				break;
-			}
-		}
-		Units.Task[i] = (byte)Task.Wander;
-		Units.WorkTarget[i] = -1;
+		GoTo(i, well.X + 0.5f + ((float)_rng.NextDouble() - 0.5f), well.Y + 1.15f, Task.Drink);
 		return true;
 	}
 
@@ -717,8 +444,7 @@ public partial class Simulation
 		if (!Units.Female[i] || p < 0 || v < 0 || !Units.Alive[p] || Units.BreedWait[i] > 0f || !IsAdult(i))
 			return false;
 		var village = Villages[v];
-		int room = CampRoom + HouseRoom * village.Houses;
-		return village.Population < room && village.Food >= 4f && Units.Hunger[i] < 0.5f;
+		return village.Population < Homes(v) && village.Food >= 4f && Units.Hunger[i] < 0.5f;
 	}
 
 	private void Breed(int i)
@@ -736,7 +462,10 @@ public partial class Simulation
 		Units.Mother[child] = i;
 		Units.Father[child] = p;
 		Units.Age[child] = 0f;
-		float wait = YearSeconds * (0.7f + 0.6f * (float)_rng.NextDouble());
+		// Plenty of food and room: children come sooner.
+		var village = Villages[v];
+		float plenty = village.Food > village.Population * 5f && Homes(v) > village.Population + 4 ? 0.5f : 1f;
+		float wait = YearSeconds * plenty * (0.5f + 0.4f * (float)_rng.NextDouble());
 		Units.BreedWait[i] = wait;
 		Units.BreedWait[p] = wait;
 		Births++;
@@ -759,18 +488,31 @@ public partial class Simulation
 
 	// ------------------------------------------------------------------ queries (HUD, tests)
 
-	/// <summary>Villages for the HUD: name, people, population, food, wood, houses.</summary>
+	/// <summary>Villages for the HUD: name, people, population, stores, homes, buildings, land.</summary>
 	public Godot.Collections.Array VillageTable()
 	{
 		var list = new Godot.Collections.Array();
-		foreach (var v in Villages)
-			if (v.Alive)
-				list.Add(new Godot.Collections.Dictionary
-				{
-					["name"] = v.Name, ["people"] = Assets.Species[v.Species].Name, ["population"] = v.Population,
-					["food"] = (int)v.Food, ["wood"] = (int)v.Wood, ["houses"] = v.Houses, ["x"] = v.X, ["y"] = v.Y,
-					["site"] = v.Site >= 0 ? Buildings[v.Site].Progress : -1f, ["jobs"] = JobCounts(v),
-				});
+		for (int k = 0; k < Villages.Count; k++)
+		{
+			var v = Villages[k];
+			if (!v.Alive)
+				continue;
+			string site = "";
+			if (v.Site >= 0 && Buildings[v.Site].Alive)
+			{
+				var bld = Buildings[v.Site];
+				site = Assets.Buildings[bld.UpgradeTo >= 0 ? bld.UpgradeTo : bld.Type].Name.ToLower();
+			}
+			list.Add(new Godot.Collections.Dictionary
+			{
+				["index"] = k, ["name"] = v.Name, ["people"] = Assets.Species[v.Species].Name, ["population"] = v.Population,
+				["food"] = (int)v.Food, ["wood"] = (int)v.Wood, ["stone"] = (int)v.Stone, ["metal"] = (int)v.Metal,
+				["gold"] = (int)v.Gold, ["tools"] = v.Tools, ["weapons"] = v.Weapons, ["houses"] = v.Houses,
+				["homes"] = Homes(k), ["zones"] = v.Zones.Count, ["fields"] = v.Fields.Count, ["x"] = v.X, ["y"] = v.Y,
+				["site"] = v.Site >= 0 && Buildings[v.Site].Alive ? Buildings[v.Site].Progress : -1f, ["building"] = site,
+				["buildings"] = BuildingSummary(k), ["jobs"] = JobCounts(v), ["founded"] = v.Founded, ["mother"] = v.Mother,
+			});
+		}
 		return list;
 	}
 

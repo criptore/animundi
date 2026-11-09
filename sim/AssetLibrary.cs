@@ -11,6 +11,7 @@ public sealed class SpeciesRecord
 {
 	[JsonPropertyName("id")] public string Id { get; set; }
 	[JsonPropertyName("name")] public string Name { get; set; }
+	[JsonPropertyName("color")] public string Color { get; set; } = "#ffffff";
 	[JsonPropertyName("sprite")] public string Sprite { get; set; }
 	/// <summary>Tiles per second.</summary>
 	[JsonPropertyName("speed")] public float Speed { get; set; } = 1f;
@@ -48,6 +49,7 @@ public sealed class RaceRecord
 {
 	[JsonPropertyName("id")] public string Id { get; set; }
 	[JsonPropertyName("name")] public string Name { get; set; }
+	[JsonPropertyName("color")] public string Color { get; set; } = "#ffffff";
 	[JsonPropertyName("biomes")] public List<string> Biomes { get; set; } = new();
 	[JsonPropertyName("size")] public int Size { get; set; } = 5;
 	[JsonPropertyName("speed")] public float Speed { get; set; } = 1f;
@@ -86,6 +88,28 @@ public sealed class LanguageRecord
 	[JsonPropertyName("endings")] public List<string> Endings { get; set; } = new();
 }
 
+/// <summary>A village building (data/buildings.json).</summary>
+public sealed class BuildingRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	[JsonPropertyName("name")] public string Name { get; set; }
+	[JsonPropertyName("homes")] public int Homes { get; set; }
+	[JsonPropertyName("cost")] public Dictionary<string, float> Cost { get; set; } = new();
+	[JsonPropertyName("build")] public float Build { get; set; } = 10f;
+	[JsonPropertyName("pop")] public int Pop { get; set; }
+	[JsonPropertyName("requires")] public List<string> Requires { get; set; } = new();
+	[JsonPropertyName("limit")] public int Limit { get; set; }
+	[JsonPropertyName("per")] public int Per { get; set; }
+	[JsonPropertyName("place")] public string Place { get; set; } = "cluster";
+	[JsonPropertyName("near")] public string Near { get; set; } = "";
+	[JsonPropertyName("material")] public string Material { get; set; } = "wood";
+	[JsonPropertyName("upgrade")] public string Upgrade { get; set; } = "";
+	[JsonPropertyName("job")] public string Job { get; set; } = "";
+
+	public bool Wooden => Material == "wood";
+	public float CostOf(string goods) => Cost.TryGetValue(goods, out float v) ? v : 0f;
+}
+
 /// <summary>Properties of a biome (data/biomes.json).</summary>
 public sealed class BiomeRecord
 {
@@ -115,6 +139,11 @@ public sealed class AssetLibrary
 		[JsonPropertyName("species")] public List<SpeciesRecord> Species { get; set; } = new();
 	}
 
+	private sealed class BuildingsFile
+	{
+		[JsonPropertyName("buildings")] public List<BuildingRecord> Buildings { get; set; } = new();
+	}
+
 	private sealed class RacesFile
 	{
 		[JsonPropertyName("races")] public List<RaceRecord> Races { get; set; } = new();
@@ -136,6 +165,8 @@ public sealed class AssetLibrary
 	public Dictionary<string, List<PlantEntry>> Plants = new();
 	/// <summary>The 12 peoples, as written in data/races.json (unvaried).</summary>
 	public List<RaceRecord> Races = new();
+	/// <summary>Village buildings, in the order the building plan considers them.</summary>
+	public List<BuildingRecord> Buildings = new();
 	/// <summary>Biome name -> its properties.</summary>
 	public Dictionary<string, BiomeRecord> Biomes = new();
 
@@ -152,8 +183,12 @@ public sealed class AssetLibrary
 		lib.Plants = JsonSerializer.Deserialize<PlantsFile>(FileAccess.GetFileAsString(plantsPath)).Biomes;
 		lib.Biomes = JsonSerializer.Deserialize<BiomesFile>(FileAccess.GetFileAsString(biomesPath)).Biomes;
 		lib.Races = JsonSerializer.Deserialize<RacesFile>(FileAccess.GetFileAsString("res://data/races.json")).Races;
+		lib.Buildings = JsonSerializer.Deserialize<BuildingsFile>(FileAccess.GetFileAsString("res://data/buildings.json")).Buildings;
 		return lib;
 	}
+
+	/// <summary>Index of a building in data/buildings.json, or -1.</summary>
+	public int BuildingIndex(string id) => Buildings.FindIndex(b => b.Id == id);
 
 	/// <summary>Adds a species at run time (the peoples chosen for a world). Returns its index.</summary>
 	public int AddSpecies(SpeciesRecord s)

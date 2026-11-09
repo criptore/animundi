@@ -1,8 +1,9 @@
 {
-	"_about": "The 12 peoples as data records, read by sim/Peoples.cs (docs/GAME_DESIGN.md section 8). Each world varies them (stats, temperament, lifespan) from its seed, so the Elves of one world are not the Elves of the next. biomes: where they like to live (their first village goes there). size: 0-12 like animals (hunters only catch prey their size or smaller). speed: tiles per second. lifespan: years (a year lasts 60 s). temperament: aggression, curiosity, settled (0..1). stats: strength, agility, intelligence (1..10). language: the sounds its generated language draws from (docs/GAME_DESIGN.md section 9): consonants and vowels separated by spaces, syllable patterns (C consonant, V vowel) and typical name endings.",
+	"_about": "The 12 peoples as data records, read by sim/Peoples.cs (docs/GAME_DESIGN.md section 8). Each world varies them (stats, temperament, lifespan) from its seed, so the Elves of one world are not the Elves of the next. biomes: where they like to live (their first village goes there). size: 0-12 like animals (hunters only catch prey their size or smaller). speed: tiles per second. lifespan: years (a year lasts 60 s). temperament: aggression, curiosity, settled (0..1). stats: strength, agility, intelligence (1..10). color: the people's colour (territory borders, banners). language: the sounds its generated language draws from (docs/GAME_DESIGN.md section 9): consonants and vowels separated by spaces, syllable patterns (C consonant, V vowel) and typical name endings.",
 	"races": [
 		{
 			"id": "humans",
+			"color": "#4a86d0",
 			"name": "Humans",
 			"biomes": [
 				"Grassland",
@@ -43,6 +44,7 @@
 		},
 		{
 			"id": "elves",
+			"color": "#5aae55",
 			"name": "Elves",
 			"biomes": [
 				"Forest",
@@ -83,6 +85,7 @@
 		},
 		{
 			"id": "dwarves",
+			"color": "#c8503e",
 			"name": "Dwarves",
 			"biomes": [
 				"Hills",
@@ -122,6 +125,7 @@
 		},
 		{
 			"id": "orcs",
+			"color": "#8b5a2b",
 			"name": "Orcs",
 			"biomes": [
 				"Savanna",
@@ -162,6 +166,7 @@
 		},
 		{
 			"id": "goblins",
+			"color": "#c4a65a",
 			"name": "Goblins",
 			"biomes": [
 				"Swamp",
@@ -201,6 +206,7 @@
 		},
 		{
 			"id": "lizardfolk",
+			"color": "#c9b458",
 			"name": "Lizardfolk",
 			"biomes": [
 				"Swamp",
@@ -240,6 +246,7 @@
 		},
 		{
 			"id": "felines",
+			"color": "#9b59c6",
 			"name": "Felines",
 			"biomes": [
 				"Savanna",
@@ -279,6 +286,7 @@
 		},
 		{
 			"id": "merfolk",
+			"color": "#4dbfb0",
 			"name": "Merfolk",
 			"biomes": [
 				"Beach",
@@ -318,6 +326,7 @@
 		},
 		{
 			"id": "treefolk",
+			"color": "#3f7a3f",
 			"name": "Treefolk",
 			"biomes": [
 				"Forest",
@@ -357,6 +366,7 @@
 		},
 		{
 			"id": "fairies",
+			"color": "#a8e0f8",
 			"name": "Fairies",
 			"biomes": [
 				"Flower meadow",
@@ -396,6 +406,7 @@
 		},
 		{
 			"id": "bullfolk",
+			"color": "#a03a32",
 			"name": "Bullfolk",
 			"biomes": [
 				"Grassland",
@@ -435,6 +446,7 @@
 		},
 		{
 			"id": "undead",
+			"color": "#5e3a7a",
 			"name": "Undead",
 			"biomes": [
 				"Tundra",

@@ -93,6 +93,7 @@ func _process(_delta: float) -> void:
 		return
 	_sim.SetZoom(_camera.zoom.x)
 	_map.set_scorch(_sim.TakeScorchChanges())
+	_map.set_overlay(_sim.TakeOverlayChanges())
 	_map.set_frost(_sim.Coldness())
 	for e in _sim.TakeEvents():
 		_hud.add_event(e)

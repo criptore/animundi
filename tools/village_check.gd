@@ -30,7 +30,7 @@ func _initialize() -> void:
 		sim.RunSteps(60 * 30)
 		print("year %d: %d people, %d animals, %.3f ms/step" % [y + 1, sim.PeopleCount(), sim.UnitCount() - sim.PeopleCount(), sim.TakeStepMs()])
 		for v in sim.VillageTable():
-			print("   %s (%s): %d people, %d food, %d wood, %d houses, site %.2f, %s" % [v.name, v.people, v.population, v.food, v.wood, v.houses, v.site, v.jobs])
+			print("   %s (%s): %d people / %d homes, food %d wood %d stone %d metal %d gold %d tools %d weapons %d, %d zones, %d fields, building %s %.2f\n      [%s]\n      jobs: %s" % [v.name, v.people, v.population, v.homes, v.food, v.wood, v.stone, v.metal, v.gold, v.tools, v.weapons, v.zones, v.fields, v.building, v.site, v.buildings, v.jobs])
 		for e in sim.TakeEvents():
 			print("   ", e)
 	print("life: ", sim.LifeStats())

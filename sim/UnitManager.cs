@@ -63,6 +63,10 @@ public sealed class UnitManager
 	public int[] WorkTarget = Array.Empty<int>();
 	/// <summary>Personal traits, one bit each (Simulation.Trait).</summary>
 	public int[] Traits = Array.Empty<int>();
+	/// <summary>The building the person lives in, or -1.</summary>
+	public int[] Home = Array.Empty<int>();
+	/// <summary>A warrior's training on the dummies, 0..1.</summary>
+	public float[] Training = Array.Empty<float>();
 
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
@@ -105,6 +109,8 @@ public sealed class UnitManager
 		WorkTimer[i] = 0f;
 		WorkTarget[i] = -1;
 		Traits[i] = 0;
+		Home[i] = -1;
+		Training[i] = 0f;
 		Count++;
 		return i;
 	}
@@ -157,6 +163,8 @@ public sealed class UnitManager
 		Array.Resize(ref WorkTimer, size);
 		Array.Resize(ref WorkTarget, size);
 		Array.Resize(ref Traits, size);
+		Array.Resize(ref Home, size);
+		Array.Resize(ref Training, size);
 		Array.Resize(ref _free, size);
 	}
 }

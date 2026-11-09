@@ -182,8 +182,8 @@ public partial class Simulation
 	public bool IsAdult(int i) => Units.Age[i] >= AdultAge(Assets.Species[Units.Species[i]]);
 
 	/// <summary>Age (years) at which a creature is grown: a share of its lifespan, but never more
-	/// than 16 years for peoples (long-lived elves and dwarves still grow up in time to work).</summary>
-	public static float AdultAge(SpeciesRecord sp) => sp.IsPeople ? Math.Min(sp.Lifespan * Maturity, 16f) : sp.Lifespan * Maturity;
+	/// than 4 years for peoples: a village's children grow up to work within a few minutes, as in WorldBox.</summary>
+	public static float AdultAge(SpeciesRecord sp) => sp.IsPeople ? Math.Min(sp.Lifespan * Maturity, 4f) : sp.Lifespan * Maturity;
 
 	// ------------------------------------------------------------------ thinking (1 / s)
 
@@ -449,8 +449,7 @@ public partial class Simulation
 			// People fight back: warriors and the brave often win, and the beast dies instead.
 			if (Assets.Species[Units.Species[j]].IsPeople)
 			{
-				float defend = Units.Role[j] == (byte)Role.Warrior ? 0.85f : (Units.Traits[j] & (int)Trait.Brave) != 0 ? 0.65f : 0.5f;
-				if (_rng.NextDouble() < defend)
+				if (_rng.NextDouble() < DefendChance(j))
 				{
 					KillUnit(i, Death.Other);
 					return;

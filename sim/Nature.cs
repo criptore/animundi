@@ -435,6 +435,7 @@ public partial class Simulation
 				Lightning();
 			}
 		}
+		BuildingFire(dt);
 		if (_burningTiles.Count == 0 && _burning.Count == 0)
 			return;
 		// Fire spreads less in the cold.
@@ -476,6 +477,8 @@ public partial class Simulation
 			for (int p = _tileFirst[t]; p >= 0; p = _pNext[p])
 				if (_pBurn[p] == 0f && _flammable[_pSprite[p]] && _rng.NextDouble() < 1.5 * dt)
 					SetOnFire(p);
+			// Wooden buildings next to the flames.
+			HeatBuildings(x, y, dt);
 			// Creatures caught in the flames.
 			_found.Clear();
 			Zones.Query(Units, x + 0.5f, y + 0.5f, 0.75f, _found);

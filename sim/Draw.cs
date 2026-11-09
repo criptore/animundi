@@ -124,6 +124,7 @@ public partial class Simulation
 
 	private void ClearDrawing()
 	{
+		_buildingSprites.Clear();
 		_speciesFrames = Array.Empty<(Vector2, Rect2, Color)[]>();
 		_peopleFrames = Array.Empty<(Vector2, Rect2, Color)[][]>();
 		foreach (var child in _plantLayer.GetChildren())
@@ -250,9 +251,40 @@ public partial class Simulation
 	// Per species and pose: size in world pixels, atlas rectangle, average colour.
 	private (Vector2 size, Rect2 rect, Color color)[][] _speciesFrames = Array.Empty<(Vector2, Rect2, Color)[]>();
 
+	/// <summary>Buildings drawn in each people's style (art/buildings.py); the others are the same
+	/// for every people.</summary>
+	private static readonly HashSet<string> PeopleStyled = new()
+	{
+		"hut", "house", "stone_house", "big_house", "town_hall", "temple", "library", "barracks", "watch_tower",
+	};
+	private readonly Dictionary<(int, int), string> _buildingSprites = new();
+
+	/// <summary>The sprite of a building: a site while it is first built, the bonfire and the
+	/// windmill animated, homes and great buildings in their people's style.</summary>
+	private string BuildingSprite(Building bld, float time)
+	{
+		if (!bld.Done && bld.UpgradeTo < 0)
+			return "buildings/site";
+		if (bld.Type == _tBonfire)
+			return BonfireFrames[(int)(time * 6f + bld.X) % 3];
+		if (bld.Type == _tWindmill)
+			return WindmillFrames[(int)(time * 3f + bld.X) % 2];
+		int species = Villages[bld.Village].Species;
+		if (!_buildingSprites.TryGetValue((bld.Type, species), out var id))
+		{
+			string b = Assets.Buildings[bld.Type].Id;
+			id = PeopleStyled.Contains(b) ? $"buildings/{b}_{Assets.Species[species].Id}" : $"buildings/{b}";
+			_buildingSprites[(bld.Type, species)] = id;
+		}
+		return id;
+	}
+
+	private static readonly string[] BonfireFrames = { "buildings/bonfire_0", "buildings/bonfire_1", "buildings/bonfire_2" };
+	private static readonly string[] WindmillFrames = { "buildings/windmill_0", "buildings/windmill_1" };
+
 	private void DrawUnits()
 	{
-		int cap = Units.Capacity + _burning.Count + _burningTiles.Count + _remains.Count + Buildings.Count;
+		int cap = Units.Capacity + _burning.Count + _burningTiles.Count + _remains.Count + Buildings.Count * 2;
 		if (_order.Length < cap)
 		{
 			_order = new int[cap];
@@ -291,6 +323,13 @@ public partial class Simulation
 			_order[n] = -(1 << 28) - b;
 			_keys[n] = Buildings[b].Y + 0.8f;
 			n++;
+			// A burning building: a big flame in front of it (drawn like a burning tile).
+			if (Buildings[b].Burning > 0f)
+			{
+				_order[n] = int.MinValue + World.Index(Buildings[b].X, Buildings[b].Y);
+				_keys[n] = Buildings[b].Y + 0.81f;
+				n++;
+			}
 		}
 		foreach (int t in _burningTiles)
 		{
@@ -350,6 +389,9 @@ public partial class Simulation
 				int t = i - int.MinValue;
 				float life = Math.Clamp(TileBurn[t] / Math.Max(_burnTime[World.Biome[t]], 0.1f), 0f, 1f);
 				float fh = 7f * (MathF.Sin(MathF.PI * life) * 0.5f + 0.5f);
+				int burningBuilding = _buildingAt[t];
+				if (burningBuilding >= 0 && Buildings[burningBuilding].Burning > 0f)
+					fh = 12f + 2f * MathF.Sin(time * 5f + t);
 				var (trect, tcolor) = fireFrames[(int)((float)Scheduler.Time * 9f + t * 7) % 3];
 				float fx = (t % World.Width + 0.5f) * Tile;
 				float fy = (t / World.Width + 0.85f) * Tile;
@@ -361,16 +403,14 @@ public partial class Simulation
 			{
 				// A building: bonfires flicker, houses wear their people's style, sites are frames.
 				var bld = Buildings[-(1 << 28) - i];
-				string id = bld.Kind switch
-				{
-					BuildingKind.Bonfire => $"buildings/bonfire_{(int)(time * 6f + bld.X) % 3}",
-					BuildingKind.Site => "buildings/site",
-					_ => $"buildings/house_{Assets.Species[Villages[bld.Village].Species].Id}",
-				};
-				var (bsize, brect, bcolor) = SpriteInfo(id);
+				var (bsize, brect, bcolor) = SpriteInfo(BuildingSprite(bld, time));
 				float bx = (bld.X + 0.5f) * Tile, by = (bld.Y + 1f) * Tile;
+				// Burning buildings darken.
+				if (bld.Burning > 0f)
+					bcolor = bcolor.Darkened(0.4f * (1f - bld.Health));
 				WriteSprite(_unitBuffer, k * Stride, bsize.X, bsize.Y, bx, by, brect, bcolor, bsize.Y);
-				WriteShadow(_unitShadowBuffer, k * 8, bld.Kind == BuildingKind.Bonfire ? 0f : bsize.X * 0.9f, bx, by);
+				bool flat = bld.Type == _tBonfire || bld.Type == _tRuin || bld.Type == _tDummy;
+				WriteShadow(_unitShadowBuffer, k * 8, flat ? 0f : bsize.X * 0.9f, bx, by);
 				continue;
 			}
 			if (i <= -(1 << 29))

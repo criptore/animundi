@@ -349,7 +349,8 @@ public partial class Simulation : Node2D
 				continue;
 			float d = MathF.Sqrt(d2);
 			// Hunters run a little faster than they walk.
-			float step = Assets.Species[Units.Species[i]].Speed * dt * (hunting ? 1.25f : 1f);
+			// Roads make walking half again as fast.
+			float step = Assets.Species[Units.Species[i]].Speed * dt * (hunting ? 1.25f : 1f) * GroundSpeed(Units.X[i], Units.Y[i]);
 			float nx = step >= d ? Units.TargetX[i] : Units.X[i] + dx / d * step;
 			float ny = step >= d ? Units.TargetY[i] : Units.Y[i] + dy / d * step;
 			if (!World.IsLandAt(nx, ny))
