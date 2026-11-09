@@ -222,6 +222,21 @@ public partial class Simulation
 			_neuronReady[i * Neurons.Length + NBreed] = now0 + Neurons[NBreed].Cooldown;
 			Breed(i);
 		}
+		// Fire where one stands: run from it, whatever one was doing.
+		if (OnFire(Units.X[i], Units.Y[i]))
+		{
+			Units.Prey[i] = -1;
+			for (int tries = 0; tries < 8; tries++)
+			{
+				float fx = Units.X[i] + ((float)_rng.NextDouble() * 2f - 1f) * 4f, fy = Units.Y[i] + ((float)_rng.NextDouble() * 2f - 1f) * 4f;
+				if (World.IsLandAt(fx, fy) && !OnFire(fx, fy))
+				{
+					GoTo(i, fx, fy, Task.Wander);
+					break;
+				}
+			}
+			return;
+		}
 		// Thirst and hunger that become urgent interrupt any task (a hunt, a walk to work).
 		bool urgent = Units.Thirst[i] > 0.65f || (Units.Hunger[i] > 0.75f && v >= 0 && Villages[v].Food >= 1f);
 		var task = (Task)Units.Task[i];
@@ -299,8 +314,13 @@ public partial class Simulation
 				}
 				if (v >= 0 && Villages[v].Food >= 1f)
 				{
-					// The village's food is eaten at its stores.
+					// The village's food is eaten at home or at its stores, whichever is nearer.
 					int store = NearestStore(i, v);
+					int home = Units.Home[i];
+					if (home >= 0 && Buildings[home].Alive && Buildings[home].Village == v && (store < 0
+						|| MathF.Abs(Buildings[home].X - Units.X[i]) + MathF.Abs(Buildings[home].Y - Units.Y[i])
+						< MathF.Abs(Buildings[store].X - Units.X[i]) + MathF.Abs(Buildings[store].Y - Units.Y[i])))
+						store = home;
 					var at = store >= 0 ? Buildings[store] : null;
 					GoTo(i, (at?.X ?? Villages[v].X) + 0.5f + ((float)_rng.NextDouble() - 0.5f), (at?.Y ?? Villages[v].Y) + 1.1f, Task.Feast);
 				}

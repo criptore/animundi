@@ -4,7 +4,7 @@
 		{ "id": "bonfire", "name": "Bonfire", "homes": 3, "cost": {}, "build": 0, "pop": 0, "limit": 1, "place": "center", "material": "stone" },
 		{ "id": "hut", "name": "Hut", "homes": 4, "cost": { "wood": 6 }, "build": 8, "pop": 0, "limit": 0, "place": "cluster", "material": "wood" },
 		{ "id": "stockpile", "name": "Stockpile", "homes": 0, "cost": { "wood": 10 }, "build": 8, "pop": 10, "limit": 1, "place": "cluster", "material": "wood" },
-		{ "id": "well", "name": "Well", "homes": 3, "cost": { "wood": 6 }, "build": 6, "pop": 8, "limit": 1, "per": 40, "place": "cluster", "material": "stone" },
+		{ "id": "well", "name": "Well", "homes": 3, "cost": { "wood": 6 }, "build": 6, "pop": 8, "limit": 1, "per": 25, "place": "cluster", "material": "stone" },
 		{ "id": "windmill", "name": "Windmill", "homes": 0, "cost": { "wood": 14 }, "build": 12, "pop": 14, "limit": 1, "per": 35, "place": "apart", "material": "wood", "job": "farmer" },
 		{ "id": "mine", "name": "Mine", "homes": 0, "cost": { "wood": 12 }, "build": 10, "pop": 16, "limit": 1, "place": "mine", "material": "wood", "job": "miner" },
 		{ "id": "dock", "name": "Dock", "homes": 0, "cost": { "wood": 12 }, "build": 10, "pop": 18, "limit": 1, "place": "shore", "material": "wood", "job": "fisher" },

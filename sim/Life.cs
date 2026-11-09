@@ -149,6 +149,17 @@ public partial class Simulation
 	/// <summary>Seconds the remains of a dead creature stay on the ground.</summary>
 	public const float RemainsSeconds = 5f;
 
+	private readonly Dictionary<string, int> _deathNotes = new();
+	/// <summary>Deaths of people from hunger and thirst by what they were doing (job, task,
+	/// water nearby, food in store): finds where needs go unmet (tools/village_check.gd).</summary>
+	public Godot.Collections.Dictionary DeathNotes()
+	{
+		var d = new Godot.Collections.Dictionary();
+		foreach (var (k, v) in _deathNotes)
+			d[k] = v;
+		return d;
+	}
+
 	private void KillUnit(int i, Death cause)
 	{
 		if (!Units.Alive[i])
@@ -156,6 +167,15 @@ public partial class Simulation
 		int s = Units.Species[i];
 		if (Assets.Species[s].IsPeople)
 		{
+			if (cause == Death.Thirst || cause == Death.Hunger)
+			{
+				int t = World.Index((int)Units.X[i], (int)Units.Y[i]);
+				int w = _nearestWater[t];
+				int wd = w < 0 ? 99 : Math.Abs(w % World.Width - (int)Units.X[i]) + Math.Abs(w / World.Width - (int)Units.Y[i]);
+				int v = Units.Village[i];
+				string key = $"{cause}/{(IsAdult(i) ? JobNames[Units.Job[i]] : "child")}/{(Task)Units.Task[i]}/water{(wd < 3 ? "<3" : wd < 10 ? "<10" : "10+")}/food{(v >= 0 && Villages[v].Food >= 1 ? "yes" : "no")}";
+				_deathNotes[key] = _deathNotes.TryGetValue(key, out int c) ? c + 1 : 1;
+			}
 			PersonDied(i);
 			PeopleDeaths[(int)cause]++;
 		}
@@ -288,8 +308,14 @@ public partial class Simulation
 		}
 	}
 
-	private bool AtTarget(int i) =>
-		MathF.Abs(Units.TargetX[i] - Units.X[i]) + MathF.Abs(Units.TargetY[i] - Units.Y[i]) < 0.01f;
+	/// <summary>Whether a unit stands on its target. The same distance as Move's (which stops
+	/// moving under 0.01 tiles), so a unit that stopped always counts as arrived; a looser test
+	/// once left units stuck a hair from their target, never arriving, until they starved.</summary>
+	private bool AtTarget(int i)
+	{
+		float dx = Units.TargetX[i] - Units.X[i], dy = Units.TargetY[i] - Units.Y[i];
+		return dx * dx + dy * dy < 1.2e-4f;
+	}
 
 	private static float Hash01(int i) => (float)((uint)(i * 2654435761u) % 1000u) / 1000f;
 
@@ -323,9 +349,11 @@ public partial class Simulation
 
 	private bool NearWater(int i)
 	{
+		// People reach a little further (a bucket, a cupped hand): two tiles.
 		int x = (int)Units.X[i], y = (int)Units.Y[i];
-		for (int dy = -1; dy <= 1; dy++)
-			for (int dx = -1; dx <= 1; dx++)
+		int r = Assets.Species[Units.Species[i]].IsPeople ? 2 : 1;
+		for (int dy = -r; dy <= r; dy++)
+			for (int dx = -r; dx <= r; dx++)
 				if (World.InBounds(x + dx, y + dy) && World.Water[World.Index(x + dx, y + dy)] != SimWorld.WaterLand)
 					return true;
 		return false;
