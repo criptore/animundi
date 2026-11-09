@@ -93,6 +93,14 @@ public partial class Simulation
 	{
 		if (!_spriteInfo.TryGetValue(id, out var info))
 		{
+			// A sprite missing from the atlas: no size (callers fall back), drawn as nothing.
+			if (!_regions.ContainsKey(id))
+			{
+				GD.PushWarning($"sprite not in the atlas: {id}");
+				info = (Vector2.Zero, new Rect2(), Colors.Magenta);
+				_spriteInfo[id] = info;
+				return info;
+			}
 			// Effects made in the atlas (flames) have no file: their size is their pixel size.
 			info = (id.StartsWith("effects/") ? _atlasSizes[id].AsVector2() : _library.Call("world_size", id).AsVector2() * Tile,
 				_regions.ContainsKey(id) ? _regions[id].AsRect2() : new Rect2(),
@@ -284,6 +292,11 @@ public partial class Simulation
 	/// pick one of their variants from their place.</summary>
 	private string SpriteId(int type, int species, int x, int y)
 	{
+		// Animated buildings: their first frame.
+		if (type == _tBonfire)
+			return BonfireFrames[0];
+		if (type == _tWindmill)
+			return WindmillFrames[0];
 		int variant = _houseTypes.Contains(type) ? (int)((uint)(x * 73856093 ^ y * 19349663) % HomeVariants) : 0;
 		if (!_buildingSprites.TryGetValue((type, species, variant), out var id))
 		{
