@@ -22,7 +22,7 @@ func _initialize() -> void:
 	var sim: Node2D = load("res://sim/Simulation.cs").new()
 	root.add_child(sim)
 	sim.Start(world, PackedStringArray(Biomes.NAMES))
-	var placed: int = sim.SpawnMany(units)
+	var placed: int = sim.SpawnNatural(units)
 	sim.TakeStepMs()
 	sim.RunSteps(steps)
 	var step_ms: float = sim.TakeStepMs()

@@ -1,9 +1,6 @@
 {
- "_about": "Plants as data records, read by scripts/world/flora.gd. For each biome (names from scripts/world/biomes.gd): the plant sprites that grow there and how many per tile on average (above 1 places several). ground_cover: low plants drawn under the others and hidden when zoomed out.",
- "ground_cover": [
-  "plants/Flowers",
-  "plants/Grass"
- ],
+ "_about": "Plants as data records, read by scripts/world/flora.gd. For each biome (names from scripts/world/biomes.gd): the plant sprites that grow there and how many per tile on average (above 1 places several). ground_cover: low plants drawn under the others and hidden when zoomed out (none for now: flowers are single pixels drawn by the map shader, as in WorldBox).",
+ "ground_cover": [],
  "biomes": {
   "Forest": [
    {
@@ -83,10 +80,6 @@
    {
     "sprite": "plants/Grassy_rock",
     "per_tile": 0.012
-   },
-   {
-    "sprite": "plants/Flowers",
-    "per_tile": 0.06
    }
   ],
   "Flower meadow": [
@@ -97,10 +90,6 @@
    {
     "sprite": "plants/Bush",
     "per_tile": 0.03
-   },
-   {
-    "sprite": "plants/Flowers",
-    "per_tile": 0.35
    }
   ],
   "Hills": [

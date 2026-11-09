@@ -32,10 +32,12 @@ Special biomes are never generated at random: the player places them.
 
 ## 0.2 Life
 - [ ] Living flora: forests grow, spread, burn and regrow
+- [x] Natural spawning as data: each species lists the biomes it is born in, with weights; monsters only in special biomes; a fresh world has animals, never monsters
+- [ ] Animals born over time by biome (world law "animal spawn"), and creatures that only the player, events or deaths bring (zombies, golems, dragons…)
 - [ ] Animals that move, with needs (hunger, thirst, rest, reproduction)
 - [ ] Food chains: herbivores and predators, populations that rise and crash
 - [ ] Seasonal migrations, extinctions
-- [ ] Simple sprite animations (2-frame walk, attack)
+- [ ] Simple sprite animations: real walk cycles (2–3 frames) and attack, replacing the two-frame hop; colour masks for kingdom colours and biome skins (WorldBox-style phenotypes)
 
 ## 0.3 Peoples
 - [ ] The 12 races placed in their preferred biomes at world start

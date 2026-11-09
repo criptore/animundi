@@ -10,7 +10,7 @@ The twist: every people, monster species and force of nature (forest, volcano, o
 
 ![A generated world](docs/images/world_0.15.png)
 
-The world is a **flat 2D map drawn as one texture, one texel per tile**, scaled up with sharp pixels: the whole map costs one draw call whatever its size, the way WorldBox does it. Each tile has its biome colour, lighter on higher levels, with a slight variation so big biomes are not one flat colour. Zoomed in, a shader cuts each tile into 8×8 pattern pixels and draws a light ground pattern (grass, forest floor, sand ripples, snow sparkles, rock, glowing lava, water glints) and **step edges** where the ground goes down a level: a dark cliff face on the south side, darker lines on the sides, a light rim on the north. Zoomed out, patterns fade and the map reads like a map.
+The world is a **flat 2D map drawn as one texture, one texel per tile**, scaled up with sharp pixels: the whole map costs one draw call whatever its size, the way WorldBox does it. Each tile has its biome colour, lighter on higher levels, with a slight variation so big biomes are not one flat colour. Zoomed in, a shader cuts each tile into 8×8 pattern pixels and draws a light ground pattern (grass with single-pixel flowers, forest floor, sand ripples, snow sparkles, rock, glowing lava, water glints) and **step edges** where the ground goes down a level: a dark cliff face on the south side, darker lines on the sides, a light rim on the north. Zoomed out, patterns fade and the map reads like a map.
 
 ![Close up](docs/images/world_0.15_close.png)
 
@@ -18,7 +18,7 @@ Every world is generated from a seed with **tectonic plates**: continents grow f
 
 Plants (trees, bushes, rocks, cacti, mushrooms, flowers) are scattered over the map by biome from the seed, and **drawn in batches**: every sprite is packed into one atlas texture at start, and all of them go into a few MultiMeshes, one per strip of 16 tile rows, sorted by the height of their feet so nearer sprites cover the ones behind. A 512 world draws its ~22,000 plants in a few dozen MultiMeshes instead of 22,000 draws. Each sprite has a small drawn shadow (no real-time lighting) and tall ones sway in the wind. Zoomed far out, every sprite becomes a crisp dot of its average colour and shadows and flowers are hidden. Water moves: a slow swell of light, twinkling glints and foam coming and going on the shores.
 
-The simulation runs in **C#** (`sim/`), built like WorldBox's: one world object, one manager per kind of entity (units for now), zones of 8×8 tiles for spatial queries, and a scheduler running each system at its own rate in batches (walking every step, decisions once a second over 10 batches, world processes over slices of the map). Content is data (`data/species.json`, `data/plants.json`). Animals wander their biomes; their sprites go straight into one MultiMesh buffer each frame, sorted by height. 5,000 animals cost about 0.25 ms per simulation step and 2 ms per frame to draw on the CPU.
+The simulation runs in **C#** (`sim/`), built like WorldBox's: one world object, one manager per kind of entity (units for now), zones of 8×8 tiles for spatial queries, and a scheduler running each system at its own rate in batches (walking every step, decisions once a second over 10 batches, world processes over slices of the map). Content is data (`data/species.json`, `data/plants.json`). Animals are born only in the biomes their species lives in (monsters only in special biomes, which the player creates), wander and hop as they walk; their sprites go straight into one MultiMesh buffer each frame, sorted by height. 5,000 animals cost about 0.25 ms per simulation step and 2 ms per frame to draw on the CPU.
 
 Next: 0.16 terrain tools, then 0.2 Life. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
@@ -68,7 +68,7 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
 | `sim/` | C# simulation core: world tiles, unit manager, zones, scheduler, data records, drawing of units |
-| `data/` | content as data records: `species.json` (animals), `plants.json` (plants per biome) |
+| `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `plants.json` (plants per biome) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
 | `assets/tiles/` | terrain atlas used by the game |

@@ -15,8 +15,11 @@ public sealed class SpeciesRecord
 	[JsonPropertyName("speed")] public float Speed { get; set; } = 1f;
 	/// <summary>How far, in tiles, it wanders from where it stands.</summary>
 	[JsonPropertyName("roam")] public float Roam { get; set; } = 6f;
-	/// <summary>Biome names (scripts/world/biomes.gd) where it is spawned.</summary>
-	[JsonPropertyName("biomes")] public List<string> Biomes { get; set; } = new();
+	/// <summary>Biome name (scripts/world/biomes.gd) -> weight, where it is born on its own.
+	/// Empty: it never appears by itself, only through the player or events.</summary>
+	[JsonPropertyName("natural")] public Dictionary<string, float> Natural { get; set; } = new();
+
+	public bool IsNatural => Natural.Count > 0;
 }
 
 /// <summary>

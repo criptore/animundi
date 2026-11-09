@@ -411,11 +411,16 @@ func test_species_data() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/species.json"))
 	var atlas := SpriteAtlas.shared()
 	var ok: bool = data.species.size() >= 5
+	var natural_monsters := []
 	for sp in data.species:
 		ok = ok and atlas.has(sp.sprite) and sp.speed > 0.0
-		for b in sp.biomes:
+		for b in sp.natural:
 			ok = ok and Biomes.NAMES.has(b)
-	check(ok, "every species record has a known sprite, biomes and a speed (%d species)" % data.species.size())
+			# Monsters may only be born in special biomes, which only the player creates.
+			if sp.sprite.begins_with("monsters/") and not b in ["Mushroom land", "Cursed land", "Volcanic rock", "Lava"]:
+				natural_monsters.append(sp.id)
+	check(ok, "every species record has a known sprite, known biomes and a speed (%d species)" % data.species.size())
+	check(natural_monsters.is_empty(), "monsters are only born in special biomes %s" % [natural_monsters])
 
 
 func test_simulation() -> void:
@@ -423,9 +428,11 @@ func test_simulation() -> void:
 	var sim: Node2D = load("res://sim/Simulation.cs").new()
 	root.add_child(sim)
 	sim.Start(w, PackedStringArray(Biomes.NAMES))
-	var placed: int = sim.SpawnMany(600)
+	var placed: int = sim.SpawnNatural(600)
 	check(placed == 600 and sim.UnitCount() == 600, "600 animals spawned (%d)" % sim.UnitCount())
 	check(sim.CountOnWater() == 0, "animals spawn on land")
+	check(sim.CountUnnatural() == 0 and sim.CountOutOfHabitat() == 0,
+			"on a fresh world only natural creatures are born, each in a biome of its species")
 	var before := []
 	for i in 50:
 		before.append(sim.UnitPosition(i))
