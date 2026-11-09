@@ -70,6 +70,9 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Settlers: big crowded villages send 6–12 adults and their children to found a new village of their people 18–45 tiles away
 - [x] Building sprites (`art/buildings.py`, [images/buildings.png](images/buildings.png)): homes redrawn in WorldBox's 3/4 style by `art/homes.py` (12 peoples × 4 tiers × 4 variants, each people its materials: timber, stumps, stone, tents, domes, mushrooms), roofs and banners in a colour mask painted in the village's colour; 5 great buildings per people, plus the shared buildings
 
+### Known issues (set aside for now)
+- [ ] Rocks and some sprites still flicker at Ultra speed. Already ruled out: the wind phase (now from the position) and animations on simulation time (now real time). Leads: strips rebuilt every frame while plants grow fast (instance counts changing), the far-view/near-view switch, sort ties between plants and creatures at the same height
+
 ## 0.4 Civilisation
 - [ ] Settlements grow: camp → village → town → city
 - [ ] **Buildings by age**: every home and building redrawn for each era of a people (wood → stone → metal → industrial → modern → future), the way homes now change by tier; a village's look follows the age its culture has reached (0.8 Ages drives the eras)
