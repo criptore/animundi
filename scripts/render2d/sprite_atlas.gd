@@ -15,6 +15,8 @@ var texture: ImageTexture
 var regions := {}
 ## Sprite id -> size in sprite pixels.
 var sizes := {}
+## Sprite id -> average colour of its opaque pixels (drawn as a dot when zoomed far out).
+var colors := {}
 
 static var _shared: RefCounted
 
@@ -59,6 +61,7 @@ func _init() -> void:
 		var img: Image = images[id]
 		atlas.blit_rect(img, Rect2i(Vector2i.ZERO, img.get_size()), places[id])
 		sizes[id] = Vector2(img.get_size())
+		colors[id] = _average(img)
 		regions[id] = Rect2(Vector2(places[id]) / Vector2(WIDTH, height), Vector2(img.get_size()) / Vector2(WIDTH, height))
 	atlas.generate_mipmaps()
 	texture = ImageTexture.create_from_image(atlas)
@@ -66,3 +69,15 @@ func _init() -> void:
 
 func has(id: String) -> bool:
 	return regions.has(id)
+
+
+static func _average(img: Image) -> Color:
+	var sum := Color(0, 0, 0, 0)
+	var n := 0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a > 0.5:
+				sum += c
+				n += 1
+	return Color(sum.r / n, sum.g / n, sum.b / n) if n > 0 else Color.BLACK

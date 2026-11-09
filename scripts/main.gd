@@ -69,6 +69,8 @@ func _process(_delta: float) -> void:
 	if world == null:
 		return
 	_ground_cover.visible = current_layer == "Biomes" and _camera.zoom.x >= GROUND_COVER_MIN_ZOOM
+	_plants.set_zoom(_camera.zoom.x)
+	_ground_cover.set_zoom(_camera.zoom.x)
 	var tile := pick_tile(get_viewport().get_mouse_position())
 	if tile.x < 0:
 		_hud.set_hover_text("")

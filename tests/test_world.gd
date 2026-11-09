@@ -314,6 +314,8 @@ func test_sprite_atlas() -> void:
 		for e in entries:
 			known = known and atlas.has(e[0])
 	check(known, "every plant of the flora table has a sprite")
+	var oak: Color = atlas.colors["trees/Oak"]
+	check(oak.g > oak.b and oak.a == 1.0, "every sprite has an average colour for its far-away dot (oak is green)")
 
 
 func test_sprite_batch() -> void:
@@ -346,6 +348,10 @@ func test_sprite_batch() -> void:
 	check(sorted and total == 2250, "sprites are drawn top to bottom, nearest last")
 	check(layer.get_child_count() == 16 and batch.get_child(0).get_child_count() == 16,
 			"one strip of sprites and one of shadows per 16 rows of tiles")
+	batch.set_zoom(0.3)
+	var far: bool = not batch.get_child(0).visible
+	batch.set_zoom(2.0)
+	check(far and batch.get_child(0).visible, "shadows hide when zoomed far out, where sprites are dots")
 	batch.free()
 
 
