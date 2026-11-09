@@ -771,6 +771,32 @@ func test_inventions() -> void:
 				"a local model is asked in the background with the language's schema and its answer becomes an invention (%s, %s)" % [answered, top.name])
 		server.stop()
 	sim.SetMindEndpoint("")
+
+	# The model built into the game: llama.cpp ships with it and loads here; a tiny random model
+	# (tests/data, made by tools/make_tiny_model.py) writes nonsense, but its grammar keeps the
+	# answer a record of the invention language, which the engine then validates.
+	var native: String = sim.MindNativeCheck()
+	check(native.begins_with("ok"), "llama.cpp, built into the game, loads on this computer (%s)" % native)
+	sim.StartMind(ProjectSettings.globalize_path("res://tests/data/tiny_random.gguf"), "", false)
+	for wait in 400:
+		if sim.MindStatus().status in ["ready", "failed", "missing"]:
+			break
+		OS.delay_msec(25)
+	check(sim.MindStatus().status == "ready", "the built-in mind loads its model (%s)" % [sim.MindStatus()])
+	if sim.MindStatus().status == "ready":
+		var asked_before: int = sim.ModelAnswers + sim.ModelFailures
+		sim.AskMind(k)
+		for wait in 800:
+			sim.RunSteps(5)
+			OS.delay_msec(25)
+			if sim.ModelAnswers + sim.ModelFailures > asked_before:
+				break
+		var record = JSON.parse_string(sim.LastModelAnswer)
+		check(record is Dictionary and record.has("kind") and record.has("effects") and not sim.LastModelError.begins_with("not valid JSON"),
+				"the built-in model answers in the background with a record of the invention language, then validated (%s)" % [
+				sim.LastModelError if sim.LastModelError != "" else "accepted"])
+	sim.StopMind()
+	check(sim.MindStatus().status == "off", "the built-in mind can be stopped: the procedural inventor takes over")
 	sim.queue_free()
 
 

@@ -68,9 +68,30 @@ Jobs: gatherer, woodcutter, hunter, builder, farmer, miner, fisher, blacksmith.
   - The request runs in the background; the world never waits.
   - If the model is slow (90 s), absent or wrong, the procedural inventor answers instead.
 
-### Running a local model
+### The model built into the game
 
-Animundi talks to a model server on your computer over HTTP. No GDExtension is needed: the game stays playable and portable without one.
+**llama.cpp is compiled with the game**, through the LLamaSharp NuGet packages (`Animundi.csproj`). Their native libraries for Windows, macOS (Intel and Apple) and Linux ship with every build. `sim/LocalModel.cs` loads the variant that fits the player's processor (AVX-512, AVX2, AVX or none). Players install nothing.
+
+The model's weights, a small instruct model in GGUF format, are found in this order:
+1. **next to the game's executable**, in `models/`. An exported build can ship them: `tools/bundle_model.sh <export folder>`;
+2. in the player's data folder (`user://models`);
+3. if neither has them, they are **downloaded once, in the background, on the first launch**. The default model is Qwen2.5 0.5B Instruct, Q4_K_M, about 400 MB, Apache 2.0.
+
+The world setup screen has a checkbox to turn the built-in mind on (it is on by default; project setting `animundi/ai/builtin_mind`). The inventions line shows its state while it downloads or loads, then which model is in use.
+
+Until the model is ready, and if it can't be used, the procedural inventor invents.
+
+The model's answers are forced into the invention language by a **grammar** (GBNF, `LocalModel.Grammar()`). It allows only records with known kinds, effects and jobs. The engine then checks caps, budget and costs as for any other record.
+
+Other settings:
+- `animundi/ai/model_file` and `animundi/ai/model_url`: another model.
+- `ANIMUNDI_LLM_LOG=1`: llama.cpp's full log.
+
+The tests load `tests/data/tiny_random.gguf`, a 110 KB model with random weights made by `tools/make_tiny_model.py`. Its answers are nonsense, but always valid JSON records thanks to the grammar. This checks the whole pipeline without downloading a real model.
+
+### A model server instead (optional)
+
+A model server the player already runs on their computer overrides the built-in model. It is reached over HTTP.
 
 With **llama.cpp**, start a server with a small instruct model (1–3B parameters, quantised):
 

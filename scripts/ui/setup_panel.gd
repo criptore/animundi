@@ -4,7 +4,8 @@
 extends PanelContainer
 
 ## The player started the world with these peoples (ids from data/races.json).
-signal start_requested(races: PackedStringArray, per_village: int)
+## `ai`: the built-in language model invents for the peoples (0.5); it is downloaded once.
+signal start_requested(races: PackedStringArray, per_village: int, ai: bool)
 
 const Races = preload("res://scripts/world/races.gd")
 
@@ -16,6 +17,7 @@ var _boxes := {}
 var _per_village: SpinBox
 var _start: Button
 var _hint: Label
+var _ai: CheckBox
 
 
 func _ready() -> void:
@@ -54,6 +56,11 @@ func _ready() -> void:
 	_per_village.value = 12
 	row.add_child(_per_village)
 
+	_ai = CheckBox.new()
+	_ai.text = "AI minds: a model built into the game invents for the peoples"
+	_ai.tooltip_text = "Downloaded once (about 400 MB) and run on this computer; until it is ready, and without it, a procedural inventor invents."
+	_ai.button_pressed = ProjectSettings.get_setting("animundi/ai/builtin_mind", true)
+	box.add_child(_ai)
 	_hint = Label.new()
 	box.add_child(_hint)
 	_start = Button.new()
@@ -86,4 +93,4 @@ func _update() -> void:
 
 func _on_start() -> void:
 	if chosen().size() >= MIN_PEOPLES:
-		start_requested.emit(chosen(), int(_per_village.value))
+		start_requested.emit(chosen(), int(_per_village.value), _ai.button_pressed)

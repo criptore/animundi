@@ -66,9 +66,14 @@ func generate() -> void:
 
 
 ## Brings the chosen peoples into the world and lets time run.
-func start_peoples(races: PackedStringArray, per_village: int) -> void:
+func start_peoples(races: PackedStringArray, per_village: int, ai := false) -> void:
 	_sim.StartPeoples(races, per_village)
 	_sim.SetTimeScale(1.0)
+	# The model built into the game (0.5 AI minds): found next to the game or in the player's data,
+	# else downloaded once in the background. The procedural inventor invents until it is ready.
+	if ai:
+		_sim.StartMind(ProjectSettings.get_setting("animundi/ai/model_file", ""),
+				ProjectSettings.get_setting("animundi/ai/model_url", ""), true)
 
 
 func show_layer(layer: String) -> void:
@@ -123,6 +128,7 @@ func _process(_delta: float) -> void:
 		_hud.set_kingdoms(_sim.KingdomTable())
 		_hud.set_plans(_sim.PlanTable())
 		_hud.set_inventions(_sim.InventionTable())
+		_hud.set_mind(_sim.MindStatus())
 	_update_map_labels()
 	var mouse := get_viewport().get_mouse_position()
 	# A creature under the mouse: who it is.

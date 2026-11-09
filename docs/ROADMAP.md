@@ -89,7 +89,7 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 
 ## 0.5 AI minds (the edge)
 See [INVENTIONS.md](INVENTIONS.md).
-- [x] Small local model with schema-forced JSON output: a llama.cpp server or Ollama on the player's computer, asked over HTTP in the background (`sim/Minds.cs`; a GDExtension was not needed), answers validated, 90 s timeout
+- [x] Small local model built into the game: llama.cpp compiled in through LLamaSharp (native libraries for every platform in every build, the right CPU variant loaded at run time), the model found next to the game or downloaded once in the background on first launch, answers forced by a GBNF grammar and validated; a llama.cpp server or Ollama the player runs can replace it (HTTP, JSON schema)
 - [x] The invention language: tools, weapons, armour, techniques and buildings as validated data records (kinds, effect blocks with caps, a power budget by rank, costs that pay for the power)
 - [x] Cultures invent **objects and buildings**: each kingdom's mind once a year, from its situation (war, hunger, crowding, restlessness, its busiest job); invented buildings get sprites assembled from parts with the kingdom's colour (`art/homes.py`, 32 shapes)
 - [x] Inventions spread (kingdom, trade partners, neighbours, by usefulness), are forgotten when useless or replaced, and evolve by descent (parent, generation), traced in the chronicle (event filter "inventions")

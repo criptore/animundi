@@ -458,7 +458,7 @@ WorldBox shows the rendering and simulation can be cheap; Animundi's difference 
 **Running the models**
 
 - **Models:** small local models (1–3B parameters, quantised), one base model with per-domain LoRA adapters (culture, objects & buildings, monsters, nature).
-- **Runtime:** a local llama.cpp server or Ollama, asked over HTTP in the background (chosen in 0.5 over a GDExtension: no native build to ship, any model the player already runs works).
+- **Runtime:** llama.cpp built into the game through LLamaSharp (native libraries for every platform ship with each build); the model is bundled with a build or downloaded once on first launch; a llama.cpp server or Ollama the player runs can replace it.
 - **Input:** a compact summary of the agent's situation and memory (its chronicle).
 - **Output:** JSON forced by grammar (JSON schema / GBNF), validated by the engine like any other record.
 - **Fallback:** if no model is available, the procedural generators make the same kinds of decisions.

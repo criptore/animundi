@@ -32,6 +32,9 @@ public partial class Simulation
 	private static string _llmModel = Environment.GetEnvironmentVariable("ANIMUNDI_LLM_MODEL") ?? "";
 	private static HttpClient _http;
 	public int ModelAnswers { get; private set; }
+	/// <summary>The model's last raw answer and why it was refused ("" if accepted): settings, tests.</summary>
+	public string LastModelAnswer { get; private set; } = "";
+	public string LastModelError { get; private set; } = "";
 	public int ModelFailures { get; private set; }
 	public const double ModelTimeout = 90.0;
 
@@ -50,6 +53,29 @@ public partial class Simulation
 
 	public string MindEndpoint() => _llmUrl;
 
+	/// <summary>Starts the model built into the game (LocalModel): found next to the game or in
+	/// the player's data, else downloaded once in the background when `download` is true.
+	/// `file` and `url` empty: the default model.</summary>
+	public void StartMind(string file, string url, bool download) => LocalModel.Start(file, url, download);
+
+	/// <summary>The built-in model's state for the HUD: status (off, missing, downloading,
+	/// loading, ready, failed), progress, file, error, and whether a server overrides it.</summary>
+	public Godot.Collections.Dictionary MindStatus() => new()
+	{
+		["status"] = LocalModel.Status.ToString().ToLowerInvariant(), ["progress"] = LocalModel.Progress,
+		["file"] = System.IO.Path.GetFileName(LocalModel.File), ["error"] = LocalModel.Error, ["server"] = _llmUrl,
+		["answers"] = ModelAnswers, ["failures"] = ModelFailures,
+	};
+
+	/// <summary>Unloads the built-in model: the procedural inventor invents again.</summary>
+	public void StopMind() => LocalModel.Stop();
+
+	/// <summary>Whether llama.cpp's native library loads on this computer, and why not.</summary>
+	public string MindNativeCheck() => LocalModel.NativeLoads(out string detail) ? "ok: " + detail : "failed: " + detail;
+
+	/// <summary>The grammar the built-in model samples under (tests, docs).</summary>
+	public string MindGrammar() => LocalModel.Grammar();
+
 	private void MindsStep()
 	{
 		for (int k = 0; k < Kingdoms.Count; k++)
@@ -65,8 +91,11 @@ public partial class Simulation
 				if (mind.Pending.IsCompleted)
 				{
 					string json = mind.Pending.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? mind.Pending.Result : null;
+					string why = mind.Pending.Exception?.GetBaseException().Message;
 					mind.Pending = null;
-					string error = json == null ? "no answer" : SubmitInventionJson(k, json, "model");
+					string error = json == null ? "no answer: " + why : SubmitInventionJson(k, json, "model");
+					LastModelAnswer = json ?? "";
+					LastModelError = error ?? "";
 					if (error == null)
 						ModelAnswers++;
 					else
@@ -96,8 +125,16 @@ public partial class Simulation
 		mind.Next = Scheduler.Time + InventSeconds * (0.8 + 0.4 * _rng.NextDouble());
 		if (_llmUrl != "" && !force)
 		{
+			// A model server the player runs (overrides the built-in model).
 			mind.Asked = Scheduler.Time;
 			mind.Pending = AskModel(Prompt(k));
+			return;
+		}
+		if (LocalModel.Status == LocalModel.State.Ready && !force)
+		{
+			// The model built into the game.
+			mind.Asked = Scheduler.Time;
+			mind.Pending = LocalModel.Generate(Prompt(k));
 			return;
 		}
 		// The procedural inventor's drafts are valid by construction; a rejection is a bug.
