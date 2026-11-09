@@ -350,23 +350,9 @@ def all_buildings():
         images[f"bonfire_{k}"] = bonfire(k)
     # Homes: 4 tiers x VARIANTS per people, drawn by art/homes.py.
     images.update(homes.all_homes())
-    for race in STYLES:
-        pal = people_palette(race)
-        # Roofs and banners in the mask: the village's colour in the game.
-        pal["R"] = "#d000d0"
-        pal["B"] = "#d000d0"
-        for name, shape in GREAT.items():
-            images[f"{name}_{race}"] = snap_mask(render(parse(shape), pal))
-    images["stockpile"] = render(parse(STOCKPILE), COMMON)
-    for k, shape in enumerate(WINDMILL):
-        images[f"windmill_{k}"] = render(parse(shape), {**COMMON, **WINDMILL_PAL})
-    images["well"] = render(parse(WELL), {**COMMON, "R": "#8a4a32"})
-    images["mine"] = render(parse(MINE), COMMON)
-    images["dock"] = render(parse(DOCK), COMMON)
-    images["market"] = render(parse(MARKET), {**COMMON, **MARKET_PAL})
-    images["statue"] = render(parse(STATUE), COMMON)
-    images["dummy"] = render(parse(DUMMY), COMMON)
-    images["ruin"] = render(parse(RUIN), COMMON)
+    # Great buildings and the shared ones, in the same 3/4 style (art/homes.py).
+    images.update(homes.all_great())
+    images.update(homes.all_shared())
     images["site"] = render(parse(SITE), {"T": "#a87a4a"})
     images["cart"] = render(parse(CART), COMMON)
     images["boat"] = snap_mask(render(parse(BOAT), {**COMMON, "R": "#d000d0"}))
@@ -410,7 +396,7 @@ def main():
     for name, img in images.items():
         img.save(OUT / f"{name}.png")
     # One row per people (homes and great buildings), then the shared buildings.
-    tiers = [f"{t}_{{}}_{v}" for t in homes.TIERS for v in (0, 1)] + [f"{g}_{{}}" for g in GREAT]
+    tiers = [f"{t}_{{}}_{v}" for t in homes.TIERS for v in (0, 1)] + [f"{g}_{{}}" for g in homes.GREAT]
     names = [t.format(race) for race in STYLES for t in tiers]
     shared = ["bonfire_0", "stockpile", "windmill_0", "windmill_1", "well", "mine", "dock", "market", "statue",
               "dummy", "ruin", "cart", "boat"]

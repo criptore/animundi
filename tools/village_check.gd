@@ -40,4 +40,10 @@ func _initialize() -> void:
 		for e in sim.TakeEvents():
 			print("   ", e)
 	print("life: ", sim.LifeStats())
+	if sim.has_method("DeathNotes"):
+		var notes: Dictionary = sim.DeathNotes()
+		var keys := notes.keys()
+		keys.sort_custom(func(a, b): return notes[a] > notes[b])
+		for k in keys.slice(0, 15):
+			print("   ", k, ": ", notes[k])
 	quit()
