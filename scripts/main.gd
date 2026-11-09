@@ -40,6 +40,7 @@ func _ready() -> void:
 	_hud.generate_requested.connect(generate)
 	_hud.layer_selected.connect(show_layer)
 	_hud.spawn_requested.connect(spawn_animals)
+	_hud.speed_selected.connect(func(v): _sim.SetTimeScale(v))
 	add_child(_hud)
 	generate()
 
@@ -69,7 +70,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_F:
-		# God power (placeholder until the powers bar): set fire where the mouse points.
+		# Test tool, not a god power yet (powers come once the simulation runs on its own): set
+		# fire where the mouse points.
 		var tile := pick_tile(get_viewport().get_mouse_position())
 		if tile.x >= 0:
 			_sim.Ignite(tile.x + 0.5, tile.y + 0.5, 1.5)
@@ -88,7 +90,8 @@ func _process(_delta: float) -> void:
 	if _stats_frames >= 30:
 		_stats_frames = 0
 		_hud.set_sim_stats(_sim.UnitCount(), _sim.TakeStepMs(), Engine.get_frames_per_second())
-		_hud.set_time("Year %d · %s" % [_sim.Year(), _sim.SeasonName()])
+		var speed: float = _sim.GetTimeScale()
+		_hud.set_time("Year %d · %s%s" % [_sim.Year(), _sim.SeasonName(), "  (paused)" if speed == 0.0 else ""])
 		_hud.set_sprite_count(_sim.PlantCount())
 		_hud.set_populations(_sim.PopulationTable())
 	var tile := pick_tile(get_viewport().get_mouse_position())

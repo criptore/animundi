@@ -44,6 +44,7 @@ func _initialize() -> void:
 	test_species_data()
 	test_simulation()
 	test_life()
+	test_scripts_load()
 	test_nature()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
@@ -569,6 +570,19 @@ func test_nature() -> void:
 	var sim: Node2D = made[1]
 	sim.SetLaw("natural_disasters", false)
 
+	# Time can be paused and sped up: the same simulation, more steps per frame.
+	var t0: float = sim.SimTime()
+	sim.SetTimeScale(0.0)
+	for k in 10:
+		sim._process(0.1)
+	var paused: float = sim.SimTime() - t0
+	sim.SetTimeScale(5.0)
+	for k in 10:
+		sim._process(0.1)
+	var fast: float = sim.SimTime() - t0
+	sim.SetTimeScale(1.0)
+	check(paused == 0.0 and absf(fast - 5.0) < 0.1, "time pauses and runs five times faster at ×5 (%.2f s in 1 s)" % fast)
+
 	# Seasons turn through the year.
 	var seasons := {}
 	var coldest := 0.0
@@ -590,10 +604,26 @@ func test_nature() -> void:
 			if w.in_bounds(forest.x + dx, forest.y + dy):
 				ash = maxi(ash, sim.ScorchAt(forest.x + dx, forest.y + dy))
 	var burned: int = sim.LifeStats()["plants_burned"]
-	check(lit > 0 and burned >= lit and ash > 0,
+	check(lit > 0 and burned > 0 and ash > 0,
 			"fire spreads through the forest and leaves ash (%d lit, %d burned down)" % [lit, burned])
 	var changes: PackedInt32Array = sim.TakeScorchChanges()
 	check(changes.size() > 0 and changes.size() % 2 == 0, "the map is told where the ground burned")
+	# Fire runs through grass too (it lives on tiles), but never into a swamp.
+	var meadow := find_tile(w, Biomes.SAVANNA)
+	if meadow.x < 0:
+		meadow = find_tile(w, Biomes.GRASSLAND)
+	sim.Ignite(meadow.x + 0.5, meadow.y + 0.5, 1.5)
+	var spread := false
+	for k in 30:
+		sim.RunSteps(3)
+		for dy in range(-3, 4):
+			for dx in range(-3, 4):
+				if maxi(absi(dx), absi(dy)) >= 2 and (sim.TileOnFire(meadow.x + dx, meadow.y + dy) or sim.ScorchAt(meadow.x + dx, meadow.y + dy) > 0):
+					spread = true
+	check(spread, "fire spreads from tile to tile through grass")
+	var swamp := find_tile(w, Biomes.SWAMP)
+	if swamp.x >= 0:
+		check(sim.Ignite(swamp.x + 0.5, swamp.y + 0.5, 1.0) == 0, "swamps never burn")
 	check(not sim.IsFlammable("plants/Rock") and not sim.IsFlammable("plants/Boulder") and sim.IsFlammable("trees/Oak"),
 			"rocks and boulders don't catch fire, trees do")
 
@@ -607,3 +637,13 @@ func test_nature() -> void:
 	check(ash_left == 0 and sim.PlantCount() > after_fire,
 			"a year later the ash has faded and plants have grown back (%d plants)" % sim.PlantCount())
 	sim.queue_free()
+
+
+## Every game script compiles (the tests above don't load the HUD or the main scene).
+func test_scripts_load() -> void:
+	var ok := true
+	for path in ["res://scripts/ui/hud.gd", "res://scripts/main.gd", "res://scripts/ui/map_camera.gd",
+			"res://scripts/render2d/world_map.gd"]:
+		var script: GDScript = load(path)
+		ok = ok and script != null and script.can_instantiate()
+	check(ok, "the HUD, main scene and map scripts compile")

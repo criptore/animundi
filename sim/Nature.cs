@@ -25,7 +25,13 @@ public partial class Simulation
 	/// <summary>Ash on each tile, 0..255, left by fire; fades over most of a year.</summary>
 	public byte[] Scorch = Array.Empty<byte>();
 	private float[] _fertility = Array.Empty<float>();
-	private float[] _dryness = Array.Empty<float>();
+	// Per biome, from data/biomes.json: chance per second that a burning neighbour lights a tile,
+	// and how long a tile burns.
+	private float[] _burnChance = Array.Empty<float>();
+	private float[] _burnTime = Array.Empty<float>();
+	/// <summary>Seconds each tile has been burning, 0 when not on fire.</summary>
+	public float[] TileBurn = Array.Empty<float>();
+	private readonly List<int> _burningTiles = new();
 	private readonly List<int> _scorchChanged = new();
 	private readonly List<string> _events = new();
 	private float _lightningIn;
@@ -64,7 +70,7 @@ public partial class Simulation
 
 	/// <summary>Whether plants with this sprite burn.</summary>
 	public bool IsFlammable(string sprite) => _flammable[PlantSprite(sprite)];
-	public int BurningCount() => _burning.Count;
+	public int BurningCount() => _burning.Count + _burningTiles.Count;
 
 	// ------------------------------------------------------------------ seasons
 
@@ -104,12 +110,17 @@ public partial class Simulation
 		Grass = new float[n];
 		Scorch = new byte[n];
 		_fertility = new float[_biomeNames.Length];
-		_dryness = new float[_biomeNames.Length];
+		_burnChance = new float[_biomeNames.Length];
+		_burnTime = new float[_biomeNames.Length];
 		for (int b = 0; b < _biomeNames.Length; b++)
-		{
-			_fertility[b] = Fertility(_biomeNames[b]);
-			_dryness[b] = Dryness(_biomeNames[b]);
-		}
+			if (Assets.Biomes.TryGetValue(_biomeNames[b], out var rec))
+			{
+				_fertility[b] = rec.Fertility;
+				_burnChance[b] = rec.BurnChance;
+				_burnTime[b] = rec.BurnTime;
+			}
+		TileBurn = new float[n];
+		_burningTiles.Clear();
 		for (int i = 0; i < n; i++)
 			Grass[i] = World.Water[i] == SimWorld.WaterLand ? _fertility[World.Biome[i]] : 0f;
 		_scorchChanged.Clear();
@@ -140,33 +151,6 @@ public partial class Simulation
 		}
 		_stripDirty = Array.Empty<bool>();
 	}
-
-	private static float Fertility(string biome) => biome switch
-	{
-		"Grassland" or "Flower meadow" => 1f,
-		"Hills" or "Jungle" => 0.8f,
-		"Forest" or "Swamp" => 0.7f,
-		"Savanna" or "Mushroom land" => 0.6f,
-		"Taiga" => 0.5f,
-		"Tundra" => 0.35f,
-		"Cursed land" => 0.2f,
-		"Beach" => 0.15f,
-		"Desert" or "Mountain" => 0.1f,
-		"Snow" => 0.05f,
-		_ => 0f,
-	};
-
-	/// <summary>How easily fire spreads in a biome.</summary>
-	private static float Dryness(string biome) => biome switch
-	{
-		"Desert" or "Savanna" => 1.4f,
-		"Grassland" or "Flower meadow" or "Hills" or "Forest" => 1f,
-		"Taiga" or "Volcanic rock" or "Cursed land" => 0.9f,
-		"Tundra" or "Mushroom land" => 0.6f,
-		"Jungle" => 0.5f,
-		"Swamp" or "Snow" => 0.3f,
-		_ => 0.8f,
-	};
 
 	private int PlantSprite(string id)
 	{
@@ -373,27 +357,46 @@ public partial class Simulation
 
 	// ------------------------------------------------------------------ fire
 
-	/// <summary>Sets fire to the plants within `radius` tiles of (x, y) (god power, lightning).
-	/// Returns how many caught fire.</summary>
+	// Fire works like WorldBox's: it lives on tiles. Each biome has a burn chance (data/biomes.json):
+	// every second, a burning tile may set each neighbour on fire, if that neighbour still has fuel
+	// (grass or plants). Plants on a burning tile catch fire too, and burning plants light the
+	// ground under them. A tile burns for its biome's burn time, then turns to ash.
+
+	/// <summary>Sets fire to the tiles (and their plants) within `radius` tiles of (x, y): lightning
+	/// now, god powers later. Returns how many tiles caught fire.</summary>
 	public int Ignite(float x, float y, float radius)
 	{
 		int n = 0;
 		for (int ty = (int)(y - radius); ty <= (int)(y + radius); ty++)
 			for (int tx = (int)(x - radius); tx <= (int)(x + radius); tx++)
 			{
-				if (!World.InBounds(tx, ty))
-					continue;
-				for (int p = _tileFirst[World.Index(tx, ty)]; p >= 0; p = _pNext[p])
-				{
-					float dx = _pX[p] - x, dy = _pY[p] - y;
-					if (dx * dx + dy * dy <= radius * radius && _pBurn[p] == 0f && _flammable[_pSprite[p]])
-					{
-						SetOnFire(p);
-						n++;
-					}
-				}
+				float dx = tx + 0.5f - x, dy = ty + 0.5f - y;
+				if (World.InBounds(tx, ty) && dx * dx + dy * dy <= radius * radius && IgniteTile(World.Index(tx, ty)))
+					n++;
 			}
 		return n;
+	}
+
+	/// <summary>Whether tile t has something to burn: grass, or a plant that burns.</summary>
+	private bool HasFuel(int t)
+	{
+		if (Grass[t] > 0.1f)
+			return true;
+		for (int p = _tileFirst[t]; p >= 0; p = _pNext[p])
+			if (_flammable[_pSprite[p]])
+				return true;
+		return false;
+	}
+
+	private bool IgniteTile(int t)
+	{
+		if (World.Water[t] != SimWorld.WaterLand || TileBurn[t] > 0f || Scorch[t] > 64)
+			return false;
+		if (_burnChance[World.Biome[t]] <= 0f || !HasFuel(t))
+			return false;
+		TileBurn[t] = 0.001f;
+		_burningTiles.Add(t);
+		return true;
 	}
 
 	private void SetOnFire(int p)
@@ -407,14 +410,20 @@ public partial class Simulation
 	{
 		if (!World.InBounds((int)x, (int)y))
 			return false;
-		for (int p = _tileFirst[World.Index((int)x, (int)y)]; p >= 0; p = _pNext[p])
+		int t = World.Index((int)x, (int)y);
+		if (TileBurn[t] > 0f)
+			return true;
+		for (int p = _tileFirst[t]; p >= 0; p = _pNext[p])
 			if (_pBurn[p] > 0f)
 				return true;
 		return false;
 	}
 
-	/// <summary>Every step: fires burn, spread to nearby plants, kill what stands in them and
-	/// leave ash. Lightning strikes now and then (world law "natural disasters").</summary>
+	public bool TileOnFire(int x, int y) => World.InBounds(x, y) && TileBurn[World.Index(x, y)] > 0f;
+
+	/// <summary>Every step: burning tiles spread to their neighbours by burn chance, set their
+	/// plants alight and kill what stands in them; burning plants light the ground under them;
+	/// burnt-out tiles turn to ash. Lightning strikes now and then (world law "natural disasters").</summary>
 	private void FireStep(int a, int b, float dt)
 	{
 		if (Law("natural_disasters"))
@@ -426,61 +435,78 @@ public partial class Simulation
 				Lightning();
 			}
 		}
-		if (_burning.Count == 0)
+		if (_burningTiles.Count == 0 && _burning.Count == 0)
 			return;
+		// Fire spreads less in the cold.
 		float damp = 1f - 0.6f * Coldness();
-		int count = _burning.Count;
-		for (int k = 0; k < count; k++)
+
+		int plantCount = _burning.Count;
+		for (int k = 0; k < plantCount; k++)
 		{
 			int p = _burning[k];
 			if (!_pAlive[p])
 				continue;
 			_pBurn[p] += dt;
-			int tx = (int)_pX[p], ty = (int)_pY[p];
-			int t = World.Index(tx, ty);
-			// Spread to plants on the 3x3 tiles around.
-			float chance = 0.035f * _dryness[World.Biome[t]] * damp;
-			for (int dy = -1; dy <= 1; dy++)
-				for (int dx = -1; dx <= 1; dx++)
-				{
-					if (!World.InBounds(tx + dx, ty + dy))
-						continue;
-					for (int q = _tileFirst[World.Index(tx + dx, ty + dy)]; q >= 0; q = _pNext[q])
-						if (_pBurn[q] == 0f && _flammable[_pSprite[q]] && _rng.NextDouble() < chance)
-							SetOnFire(q);
-				}
-			// Creatures caught in the flames.
-			_found.Clear();
-			Zones.Query(Units, _pX[p], _pY[p] - 0.3f, 0.8f, _found);
-			foreach (int u in _found)
-				if (Units.Alive[u] && _rng.NextDouble() < 0.15)
-					KillUnit(u, Death.Fire);
+			int t = World.Index((int)_pX[p], (int)_pY[p]);
+			if (TileBurn[t] == 0f && _rng.NextDouble() < 2.0 * dt)
+				IgniteTile(t);
 			if (_pBurn[p] >= BurnSeconds)
 			{
 				RemovePlant(p);
 				PlantsBurned++;
+			}
+		}
+		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
+
+		int tileCount = _burningTiles.Count;
+		for (int k = 0; k < tileCount; k++)
+		{
+			int t = _burningTiles[k];
+			TileBurn[t] += dt;
+			int x = t % World.Width, y = t / World.Width;
+			for (int d = 0; d < 4; d++)
+			{
+				int nx = x + (d == 0 ? 1 : d == 1 ? -1 : 0), ny = y + (d == 2 ? 1 : d == 3 ? -1 : 0);
+				if (!World.InBounds(nx, ny))
+					continue;
+				int nt = World.Index(nx, ny);
+				if (TileBurn[nt] == 0f && _rng.NextDouble() < _burnChance[World.Biome[nt]] * damp * dt)
+					IgniteTile(nt);
+			}
+			for (int p = _tileFirst[t]; p >= 0; p = _pNext[p])
+				if (_pBurn[p] == 0f && _flammable[_pSprite[p]] && _rng.NextDouble() < 1.5 * dt)
+					SetOnFire(p);
+			// Creatures caught in the flames.
+			_found.Clear();
+			Zones.Query(Units, x + 0.5f, y + 0.5f, 0.75f, _found);
+			foreach (int u in _found)
+				if (Units.Alive[u] && _rng.NextDouble() < 4.0 * dt)
+					KillUnit(u, Death.Fire);
+			if (TileBurn[t] >= _burnTime[World.Biome[t]])
+			{
+				TileBurn[t] = 0f;
 				Scorch[t] = 255;
 				Grass[t] = 0f;
 				_scorchChanged.Add(t);
 			}
 		}
-		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
+		_burningTiles.RemoveAll(t => TileBurn[t] == 0f);
 	}
 
 	private void Lightning()
 	{
-		if (_plantCount == 0)
-			return;
-		for (int tries = 0; tries < 30; tries++)
+		// Strike a random land tile with fuel, preferring biomes that burn well.
+		for (int tries = 0; tries < 40; tries++)
 		{
-			int p = _rng.Next(_plantCap);
-			if (!_pAlive[p] || _pBurn[p] > 0f || !_flammable[_pSprite[p]])
+			int t = _rng.Next(World.Width * World.Height);
+			if (World.Water[t] != SimWorld.WaterLand || !HasFuel(t))
 				continue;
-			string biome = _biomeNames[World.Biome[World.Index((int)_pX[p], (int)_pY[p])]];
-			if (_dryness[World.Biome[World.Index((int)_pX[p], (int)_pY[p])]] < 0.6f && tries < 25)
+			int b = World.Biome[t];
+			if (_burnChance[b] < 0.3f && tries < 35)
 				continue;
-			Ignite(_pX[p], _pY[p], 1.5f);
-			LogEvent($"lightning sets the {biome.ToLower()} ablaze near ({(int)_pX[p]}, {(int)_pY[p]}).");
+			int x = t % World.Width, y = t / World.Width;
+			if (Ignite(x + 0.5f, y + 0.5f, 1.2f) > 0)
+				LogEvent($"lightning sets the {_biomeNames[b].ToLower()} ablaze near ({x}, {y}).");
 			return;
 		}
 	}

@@ -37,6 +37,17 @@ public sealed class SpeciesRecord
 	public bool Eats => Diet != "none";
 }
 
+/// <summary>Properties of a biome (data/biomes.json).</summary>
+public sealed class BiomeRecord
+{
+	/// <summary>How much grass grows, 0..1.</summary>
+	[JsonPropertyName("fertility")] public float Fertility { get; set; }
+	/// <summary>Per second, the chance a burning neighbour sets this tile on fire.</summary>
+	[JsonPropertyName("burn_chance")] public float BurnChance { get; set; }
+	/// <summary>Seconds a tile burns before turning to ash.</summary>
+	[JsonPropertyName("burn_time")] public float BurnTime { get; set; } = 2.5f;
+}
+
 /// <summary>A plant that grows in a biome (data/plants.json).</summary>
 public sealed class PlantEntry
 {
@@ -55,6 +66,11 @@ public sealed class AssetLibrary
 		[JsonPropertyName("species")] public List<SpeciesRecord> Species { get; set; } = new();
 	}
 
+	private sealed class BiomesFile
+	{
+		[JsonPropertyName("biomes")] public Dictionary<string, BiomeRecord> Biomes { get; set; } = new();
+	}
+
 	private sealed class PlantsFile
 	{
 		[JsonPropertyName("biomes")] public Dictionary<string, List<PlantEntry>> Biomes { get; set; } = new();
@@ -64,9 +80,11 @@ public sealed class AssetLibrary
 	private readonly Dictionary<string, int> _speciesIndex = new();
 	/// <summary>Biome name -> plants that grow there.</summary>
 	public Dictionary<string, List<PlantEntry>> Plants = new();
+	/// <summary>Biome name -> its properties.</summary>
+	public Dictionary<string, BiomeRecord> Biomes = new();
 
 	public static AssetLibrary Load(string speciesPath = "res://data/species.json",
-		string plantsPath = "res://data/plants.json")
+		string plantsPath = "res://data/plants.json", string biomesPath = "res://data/biomes.json")
 	{
 		var lib = new AssetLibrary();
 		var file = JsonSerializer.Deserialize<SpeciesFile>(FileAccess.GetFileAsString(speciesPath));
@@ -76,6 +94,7 @@ public sealed class AssetLibrary
 			lib.Species.Add(s);
 		}
 		lib.Plants = JsonSerializer.Deserialize<PlantsFile>(FileAccess.GetFileAsString(plantsPath)).Biomes;
+		lib.Biomes = JsonSerializer.Deserialize<BiomesFile>(FileAccess.GetFileAsString(biomesPath)).Biomes;
 		return lib;
 	}
 

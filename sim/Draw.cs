@@ -242,7 +242,7 @@ public partial class Simulation
 	/// (lowest) last. Flames are stored in the order as ~plant (negative numbers).</summary>
 	private void DrawUnits()
 	{
-		int cap = Units.Capacity + _burning.Count;
+		int cap = Units.Capacity + _burning.Count + _burningTiles.Count;
 		if (_order.Length < cap)
 		{
 			_order = new int[cap];
@@ -263,6 +263,13 @@ public partial class Simulation
 				continue;
 			_order[n] = ~p;
 			_keys[n] = _pY[p] + 0.01f;
+			n++;
+		}
+		// Burning tiles: codes below -2^30 (int.MinValue + tile).
+		foreach (int t in _burningTiles)
+		{
+			_order[n] = int.MinValue + t;
+			_keys[n] = t / World.Width + 0.85f;
 			n++;
 		}
 		Array.Sort(_keys, _order, 0, n);
@@ -291,6 +298,19 @@ public partial class Simulation
 		for (int k = 0; k < n; k++)
 		{
 			int i = _order[k];
+			if (i < -(1 << 30))
+			{
+				// A burning tile: a small flame standing in the middle of it.
+				int t = i - int.MinValue;
+				float life = Math.Clamp(TileBurn[t] / Math.Max(_burnTime[World.Biome[t]], 0.1f), 0f, 1f);
+				float fh = 7f * (MathF.Sin(MathF.PI * life) * 0.5f + 0.5f);
+				var (trect, tcolor) = fireFrames[(int)((float)Scheduler.Time * 9f + t * 7) % 3];
+				float fx = (t % World.Width + 0.5f) * Tile;
+				float fy = (t / World.Width + 0.85f) * Tile;
+				WriteSprite(_unitBuffer, k * Stride, fh * 0.75f, fh, fx, fy, trect, tcolor, fh);
+				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+				continue;
+			}
 			if (i < 0)
 			{
 				// A flame over a burning plant: as wide as the plant, rising then dying down,

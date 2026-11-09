@@ -280,19 +280,31 @@ public partial class Simulation : Node2D
 
 	public double SimTime() => Scheduler.Time;
 
+	/// <summary>Speed of time: 0 = paused, 1 = normal, up to MaxTimeScale.</summary>
+	public float TimeScale { get; private set; } = 1f;
+	public const float MaxTimeScale = 10f;
+
+	/// <summary>Sets the speed of time (0 pauses). The simulation stays the same, only faster:
+	/// more fixed steps run per frame.</summary>
+	public void SetTimeScale(float scale) => TimeScale = Math.Clamp(scale, 0f, MaxTimeScale);
+
+	public float GetTimeScale() => TimeScale;
+
 	public override void _Process(double delta)
 	{
 		if (World == null)
 			return;
-		_accumulate += (float)delta;
+		_accumulate += (float)delta * TimeScale;
+		// At most a few frames' worth of steps, so a slow frame never snowballs.
+		int maxSteps = Math.Max(5, (int)MathF.Ceiling(TimeScale * 5f));
 		int steps = 0;
-		while (_accumulate >= Scheduler.Step && steps < 5)
+		while (_accumulate >= Scheduler.Step && steps < maxSteps)
 		{
 			_accumulate -= Scheduler.Step;
 			TimedStep();
 			steps++;
 		}
-		if (steps == 5)
+		if (steps == maxSteps)
 			_accumulate = 0f;
 		DrawAll();
 	}
