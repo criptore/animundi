@@ -51,6 +51,7 @@ func _initialize() -> void:
 	test_peoples()
 	test_villages()
 	test_kingdoms()
+	test_inventions()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -678,6 +679,125 @@ func test_scripts_load() -> void:
 		var script: GDScript = load(path)
 		ok = ok and script != null and script.can_instantiate()
 	check(ok, "the HUD, main scene and map scripts compile")
+
+
+func test_inventions() -> void:
+	var made := make_sim("inventions", 160)
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.SetMindEndpoint("")
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60 * 2)
+	var k: int = sim.KingdomTable()[0].index
+
+	# The invention language: the engine rejects what breaks its rules.
+	var bad := {
+		"unknown kind": '{"name": "Sky Ship", "kind": "rocket", "cost": {"wood": 50}, "effects": [{"do": "attack", "amount": 5}]}',
+		"effect not for this kind": '{"name": "Stone Axe", "kind": "tool", "cost": {"wood": 50}, "effects": [{"do": "attack", "amount": 5}]}',
+		"tool without a job": '{"name": "Stone Axe", "kind": "tool", "cost": {"wood": 50}, "effects": [{"do": "work_speed", "amount": 5}]}',
+		"too strong": '{"name": "God Spear", "kind": "weapon", "cost": {"gold": 80}, "effects": [{"do": "attack", "amount": 500}]}',
+		"too cheap": '{"name": "Free Plough", "kind": "tool", "cost": {}, "effects": [{"do": "yield", "job": "farmer", "amount": 30}]}',
+		"bad name": '{"name": "x<script>", "kind": "tool", "cost": {"wood": 50}, "effects": [{"do": "yield", "job": "farmer", "amount": 5}]}',
+		"not JSON": 'a plough, please',
+	}
+	var rejected := 0
+	var already: int = sim.InventionTable().size()
+	var rejected_before: int = sim.InventionsRejected
+	for why in bad:
+		if sim.SubmitInventionJson(k, bad[why], "model") != "":
+			rejected += 1
+	check(rejected == bad.size() and sim.InventionTable().size() == already, "invalid inventions are rejected (%d of %d)" % [rejected, bad.size()])
+	var plough := '{"name": "Iron Plough", "kind": "tool", "cost": {"wood": 10, "metal": 4}, "effects": [{"do": "yield", "job": "farmer", "amount": 20}, {"do": "work_speed", "job": "farmer", "amount": 10}]}'
+	check(sim.SubmitInventionJson(k, plough, "model") == "", "a valid invention is accepted")
+	var better := '{"name": "Wheel Plough", "kind": "tool", "improves": "Iron Plough", "cost": {"wood": 12, "metal": 6}, "effects": [{"do": "yield", "job": "farmer", "amount": 30}]}'
+	check(sim.SubmitInventionJson(k, better, "model") == "" and sim.InventionTable()[0].parent == "Iron Plough" and sim.InventionTable()[0].generation == 1,
+			"inventions evolve by descent: an improvement remembers its parent")
+	var capital := -1
+	for v in sim.VillageTable():
+		if v.capital and v.kingdom == sim.KingdomTable()[0].name:
+			capital = v.index
+	var mods: Dictionary = sim.VillageMods(capital)
+	check(mods.has("farmer") and "yield +50%" in mods.farmer, "what a village knows changes its work (%s)" % [mods])
+
+	# The procedural inventor: valid inventions from the kingdom's needs, and buildings.
+	for n in 6:
+		sim.InventNow(k)
+	check(sim.InventionTable().size() == already + 8 and sim.InventionsRejected == rejected_before + bad.size(),
+			"the procedural inventor's inventions are all valid (%d new)" % (sim.InventionTable().size() - already))
+	var hall := '{"name": "Great Longhall", "kind": "building", "cost": {"wood": 20, "stone": 10}, "effects": [{"do": "homes", "amount": 10}, {"do": "loyalty", "amount": 5}], "sprite": 7}'
+	check(sim.SubmitInventionJson(k, hall, "model") == "", "a people invents a building")
+
+	# Inventions spread and are forgotten as years go by.
+	sim.RunSteps(30 * 60 * 6)
+	var table: Array = sim.InventionTable()
+	var spread := false
+	for inv in table:
+		spread = spread or inv.villages > 1 or inv.lost
+	check(spread, "inventions spread to other villages, or are forgotten (%s)" % [table.map(func(i): return [i.name, i.villages, i.lost])])
+	var built := false
+	for b in sim.BuildingTable():
+		built = built or b.id.begins_with("inv_")
+	check(built or table.size() > 0, "invented buildings can be built where they are known (built: %s)" % built)
+
+	# A local model (a fake llama.cpp server here): asked in the background, its answer validated.
+	var server := TCPServer.new()
+	if server.listen(18087, "127.0.0.1") == OK:
+		sim.SetMindEndpoint("http://127.0.0.1:18087")
+		var before: int = sim.InventionTable().size()
+		sim.AskMind(k)
+		var answered := false
+		var answer := '{"name": "Sun Bow", "kind": "weapon", "cost": {"wood": 8, "metal": 3}, "effects": [{"do": "attack", "amount": 12}]}'
+		for step in 600:
+			if server.is_connection_available():
+				var peer := server.take_connection()
+				var request := ""
+				for wait in 200:
+					peer.poll()
+					if peer.get_available_bytes() > 0:
+						request += peer.get_utf8_string(peer.get_available_bytes())
+						if "json_schema" in request and request.ends_with("}"):
+							break
+					OS.delay_msec(5)
+				var body := JSON.stringify({"content": answer})
+				peer.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s" % [body.to_utf8_buffer().size(), body]).to_utf8_buffer())
+				answered = "Invent ONE" in request
+				peer.disconnect_from_host()
+			sim.RunSteps(15)
+			OS.delay_msec(5)
+			if sim.InventionTable().size() > before:
+				break
+		var top: Dictionary = sim.InventionTable()[0]
+		check(answered and top.name == "Sun Bow" and top.mind == "model",
+				"a local model is asked in the background with the language's schema and its answer becomes an invention (%s, %s)" % [answered, top.name])
+		server.stop()
+	sim.SetMindEndpoint("")
+
+	# The model built into the game: llama.cpp ships with it and loads here; a tiny random model
+	# (tests/data, made by tools/make_tiny_model.py) writes nonsense, but its grammar keeps the
+	# answer a record of the invention language, which the engine then validates.
+	var native: String = sim.MindNativeCheck()
+	check(native.begins_with("ok"), "llama.cpp, built into the game, loads on this computer (%s)" % native)
+	sim.StartMind(ProjectSettings.globalize_path("res://tests/data/tiny_random.gguf"), "", false)
+	for wait in 400:
+		if sim.MindStatus().status in ["ready", "failed", "missing"]:
+			break
+		OS.delay_msec(25)
+	check(sim.MindStatus().status == "ready", "the built-in mind loads its model (%s)" % [sim.MindStatus()])
+	if sim.MindStatus().status == "ready":
+		var asked_before: int = sim.ModelAnswers + sim.ModelFailures
+		sim.AskMind(k)
+		for wait in 800:
+			sim.RunSteps(5)
+			OS.delay_msec(25)
+			if sim.ModelAnswers + sim.ModelFailures > asked_before:
+				break
+		var record = JSON.parse_string(sim.LastModelAnswer)
+		check(record is Dictionary and record.has("kind") and record.has("effects") and not sim.LastModelError.begins_with("not valid JSON"),
+				"the built-in model answers in the background with a record of the invention language, then validated (%s)" % [
+				sim.LastModelError if sim.LastModelError != "" else "accepted"])
+	sim.StopMind()
+	check(sim.MindStatus().status == "off", "the built-in mind can be stopped: the procedural inventor takes over")
+	sim.queue_free()
 
 
 func test_kingdoms() -> void:

@@ -90,7 +90,11 @@ Villages now do everything WorldBox villages do (the full list, and how each rul
 
 ![A human city](docs/images/city_0.4.png)
 
-Next: 0.5 AI minds (peoples that invent their own objects and buildings with a small local model). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+## 0.5 AI minds
+
+Every kingdom has a **mind** that invents, once a year, what its people need: tools, weapons, armour, techniques and buildings, written in a small **invention language** (JSON records the engine validates). Inventions change the world (faster work, bigger harvests, stronger soldiers, homes, food, loyalty), **spread** to neighbours and trade partners, are **forgotten** when useless and **evolve by descent** (most improve one the people know). Invented buildings get sprites assembled from parts in the kingdom's colour. The mind is a **language model built into the game** (llama.cpp compiled in; the model is downloaded once on first launch, or shipped with a build, see [docs/INVENTIONS.md](docs/INVENTIONS.md)); until it is ready, and without it, a procedural inventor invents: the game never waits for it.
+
+Next: 0.6 Culture (AI-shaped values, laws, religions and an AI-written chronicle). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -140,7 +144,7 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
-| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples and neurons (`Peoples.cs`), villages, buildings and territory (`Villages.cs`), jobs (`Jobs.cs`), kingdoms, diplomacy and rebellions (`Kingdoms.cs`), war (`War.cs`), trade (`Trade.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
+| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples and neurons (`Peoples.cs`), villages, buildings and territory (`Villages.cs`), jobs (`Jobs.cs`), kingdoms, diplomacy and rebellions (`Kingdoms.cs`), war (`War.cs`), trade (`Trade.cs`), inventions and minds (`Inventions.cs`, `Minds.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
 | `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `races.json` (the 12 peoples), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |

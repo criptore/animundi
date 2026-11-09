@@ -6,7 +6,7 @@ signal layer_selected(layer: String)
 ## The player picked a speed of time (0 = pause).
 signal speed_selected(scale: float)
 ## The player started the world with these peoples (from the setup panel).
-signal start_requested(races: PackedStringArray, per_village: int)
+signal start_requested(races: PackedStringArray, per_village: int, ai: bool)
 ## The player asked to run time to `year` in about `seconds` of real time (0 = as fast as possible).
 signal go_to_year_requested(year: int, seconds: float)
 ## The player asked for more animals (stress test of the simulation).
@@ -38,6 +38,7 @@ var _events: Array = []
 var _event_filter := ""
 var _kingdoms_box: VBoxContainer
 var _plans_label: Label
+var _inventions_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
 var _kingdom_rows := {}
 var _villages_label: Label
@@ -201,6 +202,12 @@ func _ready() -> void:
 	_plans_label.add_theme_font_size_override("font_size", 12)
 	_plans_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.55))
 	life.add_child(_plans_label)
+	_inventions_label = _label("")
+	_inventions_label.add_theme_font_size_override("font_size", 12)
+	_inventions_label.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0))
+	_inventions_label.clip_text = true
+	_inventions_label.custom_minimum_size.x = 290
+	life.add_child(_inventions_label)
 	life.add_child(_label("Villages"))
 	_villages_label = _label("")
 	_villages_label.add_theme_font_size_override("font_size", 12)
@@ -208,7 +215,7 @@ func _ready() -> void:
 	var head := HBoxContainer.new()
 	head.add_child(_label("Events"))
 	var filters := ButtonGroup.new()
-	for cat in ["", "kings", "wars", "cities", "disasters"]:
+	for cat in ["", "kings", "wars", "cities", "inventions", "disasters"]:
 		var fb := Button.new()
 		fb.text = "all" if cat == "" else cat
 		fb.toggle_mode = true
@@ -348,6 +355,40 @@ func set_kingdoms(kingdoms: Array) -> void:
 			_kingdom_rows.erase(name)
 
 
+## The built-in model's state, on the inventions line's tooltip and before it while it is not ready.
+var _mind_text := ""
+
+
+func set_mind(status: Dictionary) -> void:
+	match status.status:
+		"downloading":
+			_mind_text = "AI mind: downloading the model, %d%%" % int(status.progress * 100.0)
+		"loading":
+			_mind_text = "AI mind: loading the model"
+		"ready":
+			_mind_text = "AI mind: %s (%d inventions)" % [status.file, status.answers]
+		"failed":
+			_mind_text = "AI mind unavailable (%s): procedural inventor" % status.error.left(60)
+		_:
+			_mind_text = ""
+
+
+## The latest inventions of the peoples' minds (0.5).
+func set_inventions(inventions: Array) -> void:
+	var lines := PackedStringArray()
+	for inv in inventions.slice(0, 3):
+		var line := "✦ %s (%s, %s): %s" % [inv.name, inv.kind, inv.people, inv.effects]
+		if inv.parent != "":
+			line += " · from the " + inv.parent
+		lines.append(line)
+	if _mind_text != "":
+		lines.insert(0, _mind_text)
+	_inventions_label.text = "\n".join(lines)
+	_inventions_label.tooltip_text = "\n".join(inventions.slice(0, 12).map(func(i): return "%s, %s by the %s in year %d%s: %s · known in %d villages (%s mind)" % [
+		i.name, i.kind, i.people, i.year, (" from the " + i.parent) if i.parent != "" else "", i.effects, i.villages, i.mind]))
+	_inventions_label.mouse_filter = Control.MOUSE_FILTER_PASS
+
+
 ## Plots under way, shown before they happen.
 func set_plans(plans: Array) -> void:
 	var lines := PackedStringArray()
@@ -376,9 +417,9 @@ func set_populations(table: Dictionary) -> void:
 func show_setup() -> void:
 	if _setup == null:
 		_setup = SetupPanel.new()
-		_setup.start_requested.connect(func(races, n):
+		_setup.start_requested.connect(func(races, n, ai):
 			_setup.visible = false
-			start_requested.emit(races, n))
+			start_requested.emit(races, n, ai))
 		_root.add_child(_setup)
 	_setup.visible = true
 

@@ -58,6 +58,12 @@ public partial class Simulation
 		public float Conquered;
 		/// <summary>No rebellion before this time (just conquered or just broke away).</summary>
 		public double CalmUntil;
+		/// <summary>Inventions it knows (Inventions.cs) and the bonuses they give, by job.</summary>
+		public readonly HashSet<int> Known = new();
+		public bool ModsDirty = true;
+		public readonly float[] JobSpeed = new float[JobNames.Length];
+		public readonly float[] JobYield = new float[JobNames.Length];
+		public float Attack, Defense, FoodBonus, LoyaltyBonus;
 		/// <summary>Its standing buildings by type, refreshed every two seconds (fast lookups:
 		/// the nearest store, well, mine...).</summary>
 		public readonly Dictionary<int, List<int>> ByType = new();
@@ -334,6 +340,8 @@ public partial class Simulation
 			if (Scheduler.Time >= village.NextPlan)
 			{
 				village.NextPlan = Scheduler.Time + PlanSeconds;
+				// Food from inventions (techniques, granaries...), every month.
+				village.Food += village.FoodBonus;
 				if (village.Zones.Count < Math.Min(9 + people.Count / 3, 90))
 					Expand(v);
 				Plan(v, people.Count);
@@ -451,6 +459,9 @@ public partial class Simulation
 	{
 		var rec = Assets.Buildings[type];
 		if (pop < rec.Pop || type == _tRuin || type == _tBonfire)
+			return false;
+		// An invented building is built only where its invention is known.
+		if (rec.Invention >= 0 && !Villages[v].Known.Contains(rec.Invention))
 			return false;
 		foreach (var req in rec.Requires)
 			if (CountOf(v, Assets.BuildingIndex(req), true) == 0)
@@ -707,6 +718,7 @@ public partial class Simulation
 		var rec = Assets.Buildings[bld.Type];
 		if (bld.Type == _tWindmill)
 			MakeFields(v, bld.X, bld.Y);
+		village.ModsDirty = true;
 		PlanRoad(v, bld.X, bld.Y + 1, village.X, village.Y + 1);
 		if (!_houseTypes.Contains(bld.Type) && bld.Type != _tDummy)
 			LogEvent($"{village.Name} builds a {rec.Name.ToLower()}.", "cities");
@@ -975,6 +987,9 @@ public partial class Simulation
 		var colony = Villages[nv];
 		if (village.Kingdom >= 0)
 			JoinKingdom(nv, village.Kingdom);
+		// Settlers take what their village knows with them.
+		foreach (int id in village.Known)
+			Learn(nv, id);
 		float food = Math.Min(village.Food * 0.3f, 25f), wood = Math.Min(village.Wood * 0.3f, 12f);
 		village.Food -= food;
 		village.Wood -= wood;

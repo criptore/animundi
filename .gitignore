@@ -10,3 +10,6 @@ __pycache__/
 
 # extract_sprites.py --debug overlays
 art/reference/debug_*.png
+
+# Language models (downloaded or bundled at export, never committed)
+models/*.gguf

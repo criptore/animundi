@@ -36,9 +36,14 @@ func _initialize() -> void:
 				k.name, k.people, k.ruler, k.capital, k.villages, k.population, k.soldiers, k.wars, k.allies])
 		for p in sim.PlanTable():
 			print("   PLAN %s: %s → %s (%d%%)" % [p.kind, p.kingdom, p.target, int(p.progress * 100)])
-		print("   trade routes: %d, war deaths %d, conquests %d" % [sim.TradeTable().size(), sim.WarDeaths, sim.Conquests])
+		print("   trade routes: %d, war deaths %d, conquests %d, landings %d" % [sim.TradeTable().size(), sim.WarDeaths, sim.Conquests, sim.Landings])
 		for e in sim.TakeEvents():
 			print("   ", e)
+	print("inventions (%d, %d rejected):" % [sim.InventionTable().size(), sim.InventionsRejected])
+	for inv in sim.InventionTable().slice(0, 25):
+		print("   %s %s (%s) by the %s, year %d%s · %s · known in %d villages%s" % [
+			inv.kind, inv.name, inv.mind, inv.people, inv.year, (" · improves " + inv.parent) if inv.parent != "" else "",
+			inv.effects, inv.villages, " · LOST" if inv.lost else ""])
 	print("life: ", sim.LifeStats())
 	if sim.has_method("DeathNotes"):
 		var notes: Dictionary = sim.DeathNotes()

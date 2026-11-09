@@ -14,7 +14,7 @@ namespace Animundi.Sim;
 public partial class Simulation
 {
 	/// <summary>What a unit is doing.</summary>
-	public enum Task : byte { Wander, Graze, Drink, Hunt, Rest, Work, Deliver, Feast, Home }
+	public enum Task : byte { Wander, Graze, Drink, Hunt, Rest, Work, Deliver, Feast, Home, Sail }
 
 	/// <summary>Why a unit died (for statistics and the event log).</summary>
 	public enum Death { OldAge, Hunger, Thirst, Eaten, Fire, Other, War }

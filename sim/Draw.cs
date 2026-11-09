@@ -292,6 +292,9 @@ public partial class Simulation
 	/// pick one of their variants from their place.</summary>
 	private string SpriteId(int type, int species, int x, int y)
 	{
+		// Buildings invented in the game: their assembled sprite.
+		if (Assets.Buildings[type].Sprite != "")
+			return "buildings/" + Assets.Buildings[type].Sprite;
 		// Animated buildings: their first frame.
 		if (type == _tBonfire)
 			return BonfireFrames[0];
@@ -383,7 +386,7 @@ public partial class Simulation
 		const float margin = 48f;
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
-			if (Units.Alive[i] && (!cull || InView(Units.X[i], Units.Y[i], margin)))
+			if (Units.Alive[i] && Units.Task[i] != (byte)Task.Sail && (!cull || InView(Units.X[i], Units.Y[i], margin)))
 				Add(ref n, KUnit, i, Units.Y[i]);
 		foreach (int p in _burning)
 			if (_pAlive[p] && (!cull || InView(_pX[p], _pY[p], margin)))
