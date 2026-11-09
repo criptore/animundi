@@ -33,7 +33,7 @@ public partial class Simulation
 	public float[] TileBurn = Array.Empty<float>();
 	private readonly List<int> _burningTiles = new();
 	private readonly List<int> _scorchChanged = new();
-	private readonly List<string> _events = new();
+	private readonly List<(string cat, string text)> _events = new();
 	private float _lightningIn;
 
 	// Plants, as parallel arrays (index = plant).
@@ -92,12 +92,35 @@ public partial class Simulation
 
 	// ------------------------------------------------------------------ events
 
-	private void LogEvent(string text) => _events.Add($"Year {Year()}, {SeasonName().ToLower()}: {text}");
+	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life.</summary>
+	public static readonly string[] EventCategories = { "kings", "wars", "cities", "disasters", "life" };
+
+	private void LogEvent(string text, string cat = "life")
+	{
+		_events.Add((cat, $"Year {Year()}, {SeasonName().ToLower()}: {text}"));
+		if (_events.Count > 2000)
+			_events.RemoveRange(0, 1000);
+	}
 
 	/// <summary>Events since the last call (deaths of species, fires...).</summary>
 	public string[] TakeEvents()
 	{
-		var e = _events.ToArray();
+		var e = new string[_events.Count];
+		for (int k = 0; k < e.Length; k++)
+			e[k] = _events[k].text;
+		_events.Clear();
+		return e;
+	}
+
+	/// <summary>Events since the last call with their category: [category, text, category, text...].</summary>
+	public string[] TakeTaggedEvents()
+	{
+		var e = new string[_events.Count * 2];
+		for (int k = 0; k < _events.Count; k++)
+		{
+			e[k * 2] = _events[k].cat;
+			e[k * 2 + 1] = _events[k].text;
+		}
 		_events.Clear();
 		return e;
 	}
@@ -509,7 +532,7 @@ public partial class Simulation
 				continue;
 			int x = t % World.Width, y = t / World.Width;
 			if (Ignite(x + 0.5f, y + 0.5f, 1.2f) > 0)
-				LogEvent($"lightning sets the {_biomeNames[b].ToLower()} ablaze near ({x}, {y}).");
+				LogEvent($"lightning sets the {_biomeNames[b].ToLower()} ablaze near ({x}, {y}).", "disasters");
 			return;
 		}
 	}

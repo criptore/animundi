@@ -67,6 +67,12 @@ public sealed class UnitManager
 	public int[] Home = Array.Empty<int>();
 	/// <summary>A warrior's training on the dummies, 0..1.</summary>
 	public float[] Training = Array.Empty<float>();
+	/// <summary>Village an army soldier marches on, or -1 (War.cs).</summary>
+	public int[] Army = Array.Empty<int>();
+	/// <summary>How far along its army's road a soldier is (index in the path), or -1.</summary>
+	public int[] ArmyStep = Array.Empty<int>();
+	/// <summary>A person's health in fights (War.cs); dies at 0.</summary>
+	public float[] Health = Array.Empty<float>();
 
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
@@ -111,6 +117,9 @@ public sealed class UnitManager
 		Traits[i] = 0;
 		Home[i] = -1;
 		Training[i] = 0f;
+		Army[i] = -1;
+		ArmyStep[i] = -1;
+		Health[i] = 100f;
 		Count++;
 		return i;
 	}
@@ -165,6 +174,9 @@ public sealed class UnitManager
 		Array.Resize(ref Traits, size);
 		Array.Resize(ref Home, size);
 		Array.Resize(ref Training, size);
+		Array.Resize(ref Army, size);
+		Array.Resize(ref ArmyStep, size);
+		Array.Resize(ref Health, size);
 		Array.Resize(ref _free, size);
 	}
 }

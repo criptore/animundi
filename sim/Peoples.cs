@@ -60,6 +60,7 @@ public partial class Simulation
 	{
 		Assets.RemovePeoples();
 		SetupVillages();
+		SetupKingdoms();
 		_names = Array.Empty<string>();
 		_languages.Clear();
 	}
@@ -114,7 +115,8 @@ public partial class Simulation
 					Units.Age[i] = AdultAge(sp) + Math.Min(sp.Lifespan * 0.3f, 40f) * (float)_rng.NextDouble();
 				Units.Role[i] = (byte)(k == 0 ? Role.Chief : k == 1 ? Role.Shaman : k <= 3 ? Role.Warrior : Role.Villager);
 			}
-			LogEvent($"the {race.Name} found the village of {Villages[v].Name}.");
+			int kingdom = CreateKingdom(s, v);
+			LogEvent($"the {race.Name} found the village of {Villages[v].Name}, heart of the kingdom of {Kingdoms[kingdom].Name}.", "kings");
 			founded++;
 		}
 		Zones.Rebuild(Units);
@@ -168,6 +170,7 @@ public partial class Simulation
 		for (int k = 0; k < 2; k++)
 			traits |= 1 << _rng.Next(6);
 		Units.Traits[i] = traits;
+		Units.Health[i] = MaxHealth(i);
 		Units.BreedWait[i] = YearSeconds * 0.3f;
 		Villages[village].Population++;
 		EnsureNeurons();
@@ -187,12 +190,13 @@ public partial class Simulation
 		int p = Units.Partner[i];
 		if (p >= 0 && p < Units.Capacity && Units.Partner[p] == i)
 			Units.Partner[p] = -1;
+		RulerDied(i);
 		int v = Units.Village[i];
 		if (v >= 0)
 		{
 			Villages[v].Population--;
 			if (Units.Role[i] == (byte)Role.Chief)
-				LogEvent($"{NameOf(i)}, chief of {Villages[v].Name}, has died.");
+				LogEvent($"{NameOf(i)}, chief of {Villages[v].Name}, has died.", "cities");
 		}
 	}
 
@@ -285,6 +289,14 @@ public partial class Simulation
 					GoToWater(i);
 				break;
 			case NEat:
+				// Soldiers on campaign eat rations from their village's stores where they are.
+				if (Units.Army[i] >= 0 && v >= 0 && Villages[v].Food >= 1f)
+				{
+					Villages[v].Food -= 1f;
+					Units.Hunger[i] = 0f;
+					Units.Suffering[i] = 0f;
+					break;
+				}
 				if (v >= 0 && Villages[v].Food >= 1f)
 				{
 					// The village's food is eaten at its stores.
@@ -297,9 +309,11 @@ public partial class Simulation
 				break;
 			case NRest:
 			{
-				// At home; the homeless by the bonfire.
+				// At home; the homeless by the bonfire; soldiers on campaign where they stand.
 				int home = Units.Home[i];
-				if (home >= 0 && Buildings[home].Alive)
+				if (Units.Army[i] >= 0)
+					RestHere(i);
+				else if (home >= 0 && Buildings[home].Alive)
 					GoTo(i, Buildings[home].X + 0.5f + ((float)_rng.NextDouble() - 0.5f) * 0.6f, Buildings[home].Y + 1.15f, Task.Home);
 				else if (v >= 0)
 					GoTo(i, Villages[v].X + 0.5f + (float)_rng.NextDouble() - 0.5f, Villages[v].Y + 1.2f, Task.Home);
@@ -514,6 +528,8 @@ public partial class Simulation
 				["homes"] = Homes(k), ["zones"] = v.Zones.Count, ["fields"] = v.Fields.Count, ["x"] = v.X, ["y"] = v.Y,
 				["site"] = v.Site >= 0 && Buildings[v.Site].Alive ? Buildings[v.Site].Progress : -1f, ["building"] = site,
 				["buildings"] = BuildingSummary(k), ["jobs"] = JobCounts(v), ["founded"] = v.Founded, ["mother"] = v.Mother,
+				["rank"] = RankNames[v.Rank], ["kingdom"] = v.Kingdom >= 0 ? Kingdoms[v.Kingdom].Name : "",
+				["capital"] = v.Kingdom >= 0 && Kingdoms[v.Kingdom].Capital == k, ["siege"] = v.Siege, ["loyalty"] = (int)v.Loyalty,
 			});
 		}
 		return list;

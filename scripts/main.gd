@@ -99,8 +99,9 @@ func _process(_delta: float) -> void:
 	_map.set_scorch(_sim.TakeScorchChanges())
 	_map.set_overlay(_sim.TakeOverlayChanges())
 	_map.set_frost(_sim.Coldness())
-	for e in _sim.TakeEvents():
-		_hud.add_event(e)
+	var tagged: PackedStringArray = _sim.TakeTaggedEvents()
+	for k in range(0, tagged.size(), 2):
+		_hud.add_event(tagged[k + 1], tagged[k])
 	_stats_frames += 1
 	if _stats_frames >= 30:
 		_stats_frames = 0
@@ -119,6 +120,8 @@ func _process(_delta: float) -> void:
 		_hud.set_sprite_count(_sim.PlantCount())
 		_hud.set_populations(_sim.PopulationTable())
 		_hud.set_villages(_sim.VillageTable())
+		_hud.set_kingdoms(_sim.KingdomTable())
+		_hud.set_plans(_sim.PlanTable())
 	_update_map_labels()
 	var mouse := get_viewport().get_mouse_position()
 	# A creature under the mouse: who it is.
@@ -144,10 +147,18 @@ func _update_map_labels() -> void:
 	var labels := []
 	if _camera.zoom.x >= 0.8 and current_layer == "Biomes":
 		var view := get_viewport().get_visible_rect().size
-		for v in _sim.VillageTable():
+		for v in _sim.VillageLabels():
 			var p := (Vector2(v.x + 0.5, v.y) * WorldMap.TILE - _camera.position) * _camera.zoom.x + view / 2.0
 			if Rect2(Vector2.ZERO, view).has_point(p):
-				labels.append([v.name, p])
+				# The rank (town, city), a crown on capitals, a siege under way.
+				var text: String = v.name
+				if v.capital:
+					text = "♛ " + text
+				if v.rank == "town" or v.rank == "city":
+					text += " (%s)" % v.rank
+				if v.siege > 0.0:
+					text += "  ⚔ siege %d%%" % int(v.siege * 100.0)
+				labels.append([text, p])
 	_hud.set_map_labels(labels)
 
 

@@ -211,6 +211,9 @@ public partial class Simulation
 	private void Work(int i, int v, SpeciesRecord sp)
 	{
 		var village = Villages[v];
+		// On campaign, what a soldier takes goes to the army's supplies (the village's stores).
+		if (Units.Carry[i] != 0 && Units.Army[i] >= 0)
+			Deliver(i, v);
 		if (Units.Carry[i] != 0)
 		{
 			int store = NearestStore(i, v);
@@ -345,7 +348,10 @@ public partial class Simulation
 			}
 			case Job.Soldier:
 			{
-				// Beasts in the village's land first; then training on the dummies; else the hunt.
+				// At war: march with the army and fight. Then enemies and beasts in the village's
+				// land; then training on the dummies; else the hunt.
+				if (Units.Army[i] >= 0 && SoldierAtWar(i, v))
+					break;
 				if (GuardVillage(i, v))
 					break;
 				int dummy = Nearest(v, _tDummy, i);
@@ -415,6 +421,11 @@ public partial class Simulation
 	private bool GuardVillage(int i, int v)
 	{
 		var village = Villages[v];
+		// Enemy soldiers in the village's land come first.
+		if (EngageEnemy(i, 9f) && Owns(v, (int)Units.X[Units.Prey[i]], (int)Units.Y[Units.Prey[i]]))
+			return true;
+		Units.Prey[i] = -1;
+		Units.Task[i] = (byte)Task.Wander;
 		_found.Clear();
 		Zones.Query(Units, village.X + 0.5f, village.Y + 0.5f, 14f, _found);
 		foreach (int j in _found)

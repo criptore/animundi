@@ -70,6 +70,9 @@ public partial class Simulation : Node2D
 		// Fire: every step. Births over time: twice a second.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "fire", Global = true, Interval = Scheduler.Step, Batches = 1, Run = (_, _, dt) => FireStep(0, 0, dt) });
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spawn", Global = true, Interval = 0.5f, Batches = 1, Run = (_, _, dt) => SpawnOverTime(0, 0, dt) });
+		// Kingdoms: rulers, plots, wars, sieges, trade, every two seconds; carts and boats every step.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "kingdoms", Global = true, Interval = KingdomStepSeconds, Batches = 1, Run = KingdomStep });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "vehicles", Global = true, Interval = Scheduler.Step, Batches = 1, Run = MoveVehicles });
 		// Villages hand out work and plan houses every two seconds.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "villages", Global = true, Interval = 2f, Batches = 1, Run = VillageStep });
 		// Nature (grass, ash, plants): one slice of the map at a time.
@@ -446,7 +449,7 @@ public partial class Simulation : Node2D
 			bool hunting = Units.Task[i] == (byte)Task.Hunt;
 			if (hunting)
 			{
-				Chase(i);
+				Chase(i, dt);
 				if (!Units.Alive[i] || Units.Task[i] != (byte)Task.Hunt)
 					continue;
 			}
