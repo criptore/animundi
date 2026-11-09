@@ -69,7 +69,7 @@ A new world **waits for you to choose who lives in it**: at least two of the 12 
 Villages now do everything WorldBox villages do (the full list, and how each rule maps, is in [docs/VILLAGES.md](docs/VILLAGES.md)):
 
 - **Territory** in zones of 8×8 tiles, claimed as the village grows, with borders drawn in the people's colour.
-- **Buildings** from `data/buildings.json`, planned once a month: huts upgraded into houses, stone houses and big houses; stockpile, well, windmill and fields, mine, dock, town hall, barracks and dummies, watch towers, market, temple, library, statue. Each people builds in its own style ([all sprites](docs/images/buildings.png)).
+- **Buildings** from `data/buildings.json`, planned once a month: huts upgraded into houses, stone houses and big houses; stockpile, well, windmill and fields, mine, dock, town hall, barracks and dummies, watch towers, market, temple, library, statue. Homes are drawn in WorldBox's 3/4 style, 4 variants per tier and per people, their roofs in the village's colour ([all sprites](docs/images/buildings.png)).
 - **Stores** of food, wood, stone, metal and gold; the blacksmith makes tools and weapons.
 - **Jobs** with WorldBox's limits: builders, gatherers, woodcutters, hunters, farmers, miners, fishers, blacksmith, firemen, road builders and soldiers who guard and train.
 - **Homes** for everyone; **roads** (faster walking); **fields** whose wheat follows the seasons; wooden buildings **burn** and leave **ruins**.

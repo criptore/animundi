@@ -263,7 +263,9 @@ public partial class Simulation
 	{
 		"hut", "house", "stone_house", "big_house", "town_hall", "temple", "library", "barracks", "watch_tower",
 	};
-	private readonly Dictionary<(int, int), string> _buildingSprites = new();
+	private readonly Dictionary<(int, int, int), string> _buildingSprites = new();
+	/// <summary>Homes come in variants (art/homes.py VARIANTS), picked by the building's place.</summary>
+	private const int HomeVariants = 4;
 
 	/// <summary>The sprite of a building: a site while it is first built, the bonfire and the
 	/// windmill animated, homes and great buildings in their people's style.</summary>
@@ -276,11 +278,14 @@ public partial class Simulation
 		if (bld.Type == _tWindmill)
 			return WindmillFrames[(int)(time * 3f + bld.X) % 2];
 		int species = Villages[bld.Village].Species;
-		if (!_buildingSprites.TryGetValue((bld.Type, species), out var id))
+		int variant = _houseTypes.Contains(bld.Type) ? (int)((uint)(bld.X * 73856093 ^ bld.Y * 19349663) % HomeVariants) : 0;
+		if (!_buildingSprites.TryGetValue((bld.Type, species, variant), out var id))
 		{
 			string b = Assets.Buildings[bld.Type].Id;
-			id = PeopleStyled.Contains(b) ? $"buildings/{b}_{Assets.Species[species].Id}" : $"buildings/{b}";
-			_buildingSprites[(bld.Type, species)] = id;
+			string people = Assets.Species[species].Id;
+			id = _houseTypes.Contains(bld.Type) ? $"buildings/{b}_{people}_{variant}"
+				: PeopleStyled.Contains(b) ? $"buildings/{b}_{people}" : $"buildings/{b}";
+			_buildingSprites[(bld.Type, species, variant)] = id;
 		}
 		return id;
 	}
@@ -472,6 +477,9 @@ public partial class Simulation
 					var bld = Buildings[i];
 					var (bsize, brect, bcolor) = SpriteInfo(BuildingSprite(bld, time));
 					float bx = (bld.X + 0.5f) * Tile, by = (bld.Y + 1f) * Tile;
+					// The village's colour paints the roofs (the colour mask) and the far-away dot.
+					if (bld.Type != _tRuin && (bld.Done || bld.UpgradeTo >= 0))
+						bcolor = Villages[bld.Village].Color;
 					// Burning buildings darken.
 					if (bld.Burning > 0f)
 						bcolor = bcolor.Darkened(0.4f * (1f - bld.Health));

@@ -68,10 +68,12 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Fire: wooden buildings catch fire from burning land, burn down to ruins unless firemen put them out; ruins crumble after two years; abandoned villages fall to ruins and free their land
 - [x] Watch towers shoot beasts in range
 - [x] Settlers: big crowded villages send 6–12 adults and their children to found a new village of their people 18–45 tiles away
-- [x] Building sprites (`art/buildings.py`, [images/buildings.png](images/buildings.png)): 4 home tiers and 5 great buildings in three families of shapes (timber, round, tents and longhouses) for each of the 12 peoples, plus the shared buildings
+- [x] Building sprites (`art/buildings.py`, [images/buildings.png](images/buildings.png)): homes redrawn in WorldBox's 3/4 style by `art/homes.py` (12 peoples × 4 tiers × 4 variants, each people its materials: timber, stumps, stone, tents, domes, mushrooms), roofs and banners in a colour mask painted in the village's colour; 5 great buildings per people, plus the shared buildings
 
 ## 0.4 Civilisation
 - [ ] Settlements grow: camp → village → town → city
+- [ ] **Buildings by age**: every home and building redrawn for each era of a people (wood → stone → metal → industrial → modern → future), the way homes now change by tier; a village's look follows the age its culture has reached (0.8 Ages drives the eras)
+- [ ] **Notable buildings unlocked by culture and age** (later, with cultures and ages): colosseum, museum, triumphal arch, aqueduct, lighthouse, pyramid, great library, observatory, cathedral, bathhouse, amphitheatre, harbour fortress, university, monuments of each people; each with its unlock (age, culture traits, wealth, population) and an effect on the village (happiness, faith, knowledge, trade, defence)
 - [ ] Buildings generated from function × culture × age, with generated sprites
 - [ ] Boats, trade (roads done in 0.35)
 - [ ] Kingdoms: borders, capitals, rulers, dynasties, generated banners

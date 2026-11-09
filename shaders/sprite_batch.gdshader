@@ -57,6 +57,13 @@ void fragment() {
 		float height_px = info.a * 256.0 * zoom;
 		if (height_px >= dot_below) {
 			COLOR = tex;
+			// The colour mask (magenta shades: roofs, banners): painted in the instance's colour
+			// (a building's village), keeping the shade, as WorldBox paints kingdom colours.
+			if (tex.g < 0.02 && abs(tex.r - tex.b) < 0.02 && tex.r > 0.25) {
+				float k = tex.r / 0.816;
+				vec3 c = info.rgb;
+				COLOR.rgb = k <= 1.0 ? c * k : mix(c, vec3(1.0), (k - 1.0) * 1.5);
+			}
 		} else {
 			// A dot of the sprite's average colour, 1 to 3 screen pixels wide, at its feet.
 			float dot_px = clamp(height_px * 0.5, 1.0, 3.0);
