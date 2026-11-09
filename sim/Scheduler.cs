@@ -46,15 +46,31 @@ public sealed class Scheduler
 	public readonly List<WorldProcess> WorldProcesses = new();
 	/// <summary>Simulated seconds since the start.</summary>
 	public double Time;
+	/// <summary>Coarse steps for the ultra-fast speed: one step covers this many fixed steps.
+	/// Systems that run every step (walking, fire) then run once with the longer time, so a
+	/// century costs a fraction of what it does at normal speed. 1 = normal.</summary>
+	public int StepScale = 1;
 
 	/// <summary>Runs one fixed step of every system and process that is due.</summary>
 	public void DoStep(int unitCapacity, int mapHeight)
 	{
-		Time += Step;
+		float dt = Step * StepScale;
+		Time += dt;
 		foreach (var s in UnitSystems)
 		{
-			s.Clock += Step;
+			s.Clock += dt;
 			float slice = s.Interval / s.Batches;
+			if (s.Batches == 1 && s.Clock >= slice * 2f)
+			{
+				// Several runs due at once (coarse steps): one run over the whole time.
+				int due = (int)(s.Clock / slice);
+				s.Clock -= due * slice;
+				if (s.Global)
+					s.Run(0, 0, s.Interval * due);
+				else if (unitCapacity > 0)
+					s.Run(0, unitCapacity, s.Interval * due);
+				continue;
+			}
 			while (s.Clock >= slice)
 			{
 				s.Clock -= slice;
@@ -70,16 +86,17 @@ public sealed class Scheduler
 		}
 		foreach (var p in WorldProcesses)
 		{
-			p.Clock += Step;
-			if (p.Clock < p.Interval)
-				continue;
-			p.Clock -= p.Interval;
-			int rows = (mapHeight + p.Slices - 1) / p.Slices;
-			int a = p.Next * rows;
-			int b = Math.Min(mapHeight, a + rows);
-			if (a < b)
-				p.Run(a, b);
-			p.Next = (p.Next + 1) % p.Slices;
+			p.Clock += dt;
+			while (p.Clock >= p.Interval)
+			{
+				p.Clock -= p.Interval;
+				int rows = (mapHeight + p.Slices - 1) / p.Slices;
+				int a = p.Next * rows;
+				int b = Math.Min(mapHeight, a + rows);
+				if (a < b)
+					p.Run(a, b);
+				p.Next = (p.Next + 1) % p.Slices;
+			}
 		}
 	}
 }

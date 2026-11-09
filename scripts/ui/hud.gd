@@ -40,7 +40,8 @@ var _name_labels: Array[Label] = []
 ## Event lines kept on screen.
 const EVENTS_SHOWN := 6
 ## Speeds of time offered (0 = pause).
-const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0]
+## Speeds of time; above ×10 is the ultra-fast mode (coarse steps, to watch centuries go by).
+const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 
 var _speed_buttons := []
 var _speed := 1.0
@@ -141,12 +142,12 @@ func _ready() -> void:
 	var speed_group := ButtonGroup.new()
 	for v in SPEEDS:
 		var b := Button.new()
-		b.text = "Pause" if v == 0.0 else "×%d" % v
+		b.text = "Pause" if v == 0.0 else ("Ultra" if v > 10.0 else "×%d" % v)
 		b.toggle_mode = true
 		b.button_group = speed_group
 		b.button_pressed = v == 1.0
 		b.focus_mode = Control.FOCUS_NONE  # Space must not press a focused button
-		b.tooltip_text = "Space: pause / resume · , and . : slower / faster"
+		b.tooltip_text = "Space: pause / resume · , and . : slower / faster" + ("\nUltra: ×100, in coarser steps (a century in a minute)" if v > 10.0 else "")
 		b.pressed.connect(func(): _set_speed(v))
 		speeds.add_child(b)
 		_speed_buttons.append(b)

@@ -292,11 +292,32 @@ public partial class Simulation : Node2D
 
 	/// <summary>Speed of time: 0 = paused, 1 = normal, up to MaxTimeScale.</summary>
 	public float TimeScale { get; private set; } = 1f;
-	public const float MaxTimeScale = 10f;
+	public const float MaxTimeScale = 100f;
+	/// <summary>Above this speed, time runs in coarse steps (ultra-fast mode).</summary>
+	public const float UltraFrom = 10f;
+	public const int UltraStepScale = 6;
 
-	/// <summary>Sets the speed of time (0 pauses). The simulation stays the same, only faster:
-	/// more fixed steps run per frame.</summary>
-	public void SetTimeScale(float scale) => TimeScale = Math.Clamp(scale, 0f, MaxTimeScale);
+	/// <summary>Sets the speed of time (0 pauses). Up to x10 the simulation stays the same, only
+	/// faster (more fixed steps per frame); above, the ultra-fast mode runs coarse steps of
+	/// UltraStepScale fixed steps each, to watch centuries go by.</summary>
+	public void SetTimeScale(float scale)
+	{
+		TimeScale = Math.Clamp(scale, 0f, MaxTimeScale);
+		Scheduler.StepScale = TimeScale > UltraFrom ? UltraStepScale : 1;
+	}
+
+	/// <summary>Coarse steps for tools that run long histories without a window (1 = normal).</summary>
+	public void SetStepScale(int scale) => Scheduler.StepScale = Math.Clamp(scale, 1, 30);
+
+	/// <summary>Runs `years` of history as fast as possible, in coarse steps of `stepScale`.</summary>
+	public void RunYears(float years, int stepScale)
+	{
+		int old = Scheduler.StepScale;
+		Scheduler.StepScale = Math.Clamp(stepScale, 1, 30);
+		int steps = (int)(years * YearSeconds / (Scheduler.Step * Scheduler.StepScale));
+		RunSteps(steps);
+		Scheduler.StepScale = old;
+	}
 
 	public float GetTimeScale() => TimeScale;
 
@@ -306,11 +327,12 @@ public partial class Simulation : Node2D
 			return;
 		_accumulate += (float)delta * TimeScale;
 		// At most a few frames' worth of steps, so a slow frame never snowballs.
-		int maxSteps = Math.Max(5, (int)MathF.Ceiling(TimeScale * 5f));
+		float stepLength = Scheduler.Step * Scheduler.StepScale;
+		int maxSteps = Math.Max(5, (int)MathF.Ceiling(TimeScale * 5f / Scheduler.StepScale));
 		int steps = 0;
-		while (_accumulate >= Scheduler.Step && steps < maxSteps)
+		while (_accumulate >= stepLength && steps < maxSteps)
 		{
-			_accumulate -= Scheduler.Step;
+			_accumulate -= stepLength;
 			TimedStep();
 			steps++;
 		}

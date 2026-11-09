@@ -47,7 +47,8 @@ public partial class Simulation
 	};
 	private const int NDrink = 0, NEat = 1, NRest = 2, NBreed = 3, NPair = 4, NWork = 5, NPlay = 6, NWander = 7;
 
-	private readonly List<string> _names = new();
+	// Name of each person, by unit slot (reused when the slot is).
+	private string[] _names = Array.Empty<string>();
 	private readonly Dictionary<int, Language> _languages = new();
 	// Per unit and neuron: the time when the neuron can fire again.
 	private float[] _neuronReady = Array.Empty<float>();
@@ -59,7 +60,7 @@ public partial class Simulation
 	{
 		Assets.RemovePeoples();
 		SetupVillages();
-		_names.Clear();
+		_names = Array.Empty<string>();
 		_languages.Clear();
 	}
 
@@ -159,8 +160,10 @@ public partial class Simulation
 		int i = SpawnUnit(species, x, y, newborn);
 		Units.Village[i] = village;
 		Units.Female[i] = female;
-		Units.Name[i] = _names.Count;
-		_names.Add(_languages[species].PersonName());
+		if (_names.Length < Units.Capacity)
+			Array.Resize(ref _names, Math.Max(Units.Capacity, _names.Length * 2));
+		Units.Name[i] = i;
+		_names[i] = _languages[species].PersonName();
 		int traits = 0;
 		for (int k = 0; k < 2; k++)
 			traits |= 1 << _rng.Next(6);

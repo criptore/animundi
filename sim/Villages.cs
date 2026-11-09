@@ -68,6 +68,10 @@ public partial class Simulation
 
 	public readonly List<Village> Villages = new();
 	public readonly List<Building> Buildings = new();
+	// Slots of crumbled buildings, reused by new ones (histories of thousands of years).
+	private readonly Stack<int> _freeBuildings = new();
+	private readonly List<int> _burningBuildings = new();
+	private readonly List<int> _ruins = new();
 	// Building on each tile, or -1.
 	private int[] _buildingAt = Array.Empty<int>();
 	// Territory: owner village of each zone, or -1.
@@ -85,6 +89,9 @@ public partial class Simulation
 	private readonly HashSet<int> _houseTypes = new();
 	private readonly HashSet<int> _storeTypes = new();
 
+	/// <summary>Villages one people may have (kingdoms will hold them together in 0.4).</summary>
+	public const int MaxVillagesPerPeople = 60;
+
 	public int TowerKills { get; private set; }
 	public int BuildingsBurned { get; private set; }
 	public int SettlersSent { get; private set; }
@@ -93,6 +100,9 @@ public partial class Simulation
 	{
 		Villages.Clear();
 		Buildings.Clear();
+		_freeBuildings.Clear();
+		_burningBuildings.Clear();
+		_ruins.Clear();
 		_buildingAt = new int[World.Width * World.Height];
 		Array.Fill(_buildingAt, -1);
 		_zw = (World.Width + ZoneSize - 1) / ZoneSize;
@@ -225,8 +235,18 @@ public partial class Simulation
 
 	private int AddBuilding(int type, int x, int y, int village, float progress)
 	{
-		Buildings.Add(new Building { Type = type, X = x, Y = y, Village = village, Progress = progress });
-		int b = Buildings.Count - 1;
+		var building = new Building { Type = type, X = x, Y = y, Village = village, Progress = progress };
+		int b;
+		if (_freeBuildings.Count > 0)
+		{
+			b = _freeBuildings.Pop();
+			Buildings[b] = building;
+		}
+		else
+		{
+			Buildings.Add(building);
+			b = Buildings.Count - 1;
+		}
 		int t = World.Index(x, y);
 		_buildingAt[t] = b;
 		Villages[village].Buildings.Add(b);
@@ -707,15 +727,22 @@ public partial class Simulation
 					continue;
 				int b = _buildingAt[World.Index(x + dx, y + dy)];
 				if (b >= 0 && Buildings[b].Burning == 0f && Rec(b).Wooden && Buildings[b].Type != _tRuin && _rng.NextDouble() < 0.8 * dt)
-					Buildings[b].Burning = 0.001f;
+					SetBuildingOnFire(b);
 			}
 	}
 
 	/// <summary>Burning buildings: they lose a little every step, set the land around alight and
 	/// fall to ruins when nothing is left (firemen put them out first, if they can).</summary>
+	private void SetBuildingOnFire(int b)
+	{
+		Buildings[b].Burning = 0.001f;
+		_burningBuildings.Add(b);
+	}
+
 	private void BuildingFire(float dt)
 	{
-		for (int b = 0; b < Buildings.Count; b++)
+		_burningBuildings.RemoveAll(b => !Buildings[b].Alive || Buildings[b].Burning == 0f);
+		foreach (int b in _burningBuildings.ToArray())
 		{
 			var bld = Buildings[b];
 			if (!bld.Alive || bld.Burning == 0f)
@@ -764,19 +791,27 @@ public partial class Simulation
 		bld.Burning = 0f;
 		bld.Health = 1f;
 		bld.CrumbleAt = Scheduler.Time + YearSeconds * 2;
+		_ruins.Add(b);
 	}
 
 	private void CrumbleRuins()
 	{
-		for (int b = 0; b < Buildings.Count; b++)
+		for (int k = _ruins.Count - 1; k >= 0; k--)
 		{
+			int b = _ruins[k];
 			var bld = Buildings[b];
-			if (bld.Alive && bld.Type == _tRuin && Scheduler.Time >= bld.CrumbleAt)
+			if (!bld.Alive || bld.Type != _tRuin)
 			{
-				bld.Alive = false;
-				_buildingAt[World.Index(bld.X, bld.Y)] = -1;
-				Villages[bld.Village].Buildings.Remove(b);
+				_ruins.RemoveAt(k);
+				continue;
 			}
+			if (Scheduler.Time < bld.CrumbleAt)
+				continue;
+			bld.Alive = false;
+			_buildingAt[World.Index(bld.X, bld.Y)] = -1;
+			Villages[bld.Village].Buildings.Remove(b);
+			_ruins.RemoveAt(k);
+			_freeBuildings.Push(b);
 		}
 	}
 
@@ -839,7 +874,7 @@ public partial class Simulation
 		int homes = Homes(v);
 		if (people.Count < 30 || (people.Count < homes * 0.85f && people.Count < 60))
 			return;
-		if (Villages.FindAll(o => o.Alive && o.Species == village.Species).Count >= 12)
+		if (Villages.FindAll(o => o.Alive && o.Species == village.Species).Count >= MaxVillagesPerPeople)
 			return;
 		var race = Assets.Species[village.Species].Race;
 		int site = FindSettlement(race, village.X, village.Y);
@@ -970,6 +1005,64 @@ public partial class Simulation
 		return list;
 	}
 
+	/// <summary>The whole map's territory, one int per tile: the owner's colour as 0xRRGGBBAA
+	/// (AA = 255), 0 for no one's land; building tiles are marked with AA = 1 (history tool).</summary>
+	public int[] TerritoryMap()
+	{
+		var map = new int[World.Width * World.Height];
+		for (int t = 0; t < map.Length; t++)
+		{
+			int o = _zoneOwner[ZoneOf(t % World.Width, t / World.Width)];
+			if (o < 0)
+				continue;
+			var c = Villages[o].Color;
+			uint a = _buildingAt[t] >= 0 && Buildings[_buildingAt[t]].Alive ? 1u : 255u;
+			map[t] = (int)(((uint)(c.R * 255f) << 24) | ((uint)(c.G * 255f) << 16) | ((uint)(c.B * 255f) << 8) | a);
+		}
+		return map;
+	}
+
+	/// <summary>Per people: villages alive, people, zones and buildings (history tool, HUD).</summary>
+	public Godot.Collections.Dictionary PeopleTable()
+	{
+		var d = new Godot.Collections.Dictionary();
+		for (int k = 0; k < Villages.Count; k++)
+		{
+			var v = Villages[k];
+			if (!v.Alive)
+				continue;
+			string id = Assets.Species[v.Species].Name;
+			var row = d.ContainsKey(id) ? (Godot.Collections.Dictionary)d[id]
+				: new Godot.Collections.Dictionary { ["villages"] = 0, ["people"] = 0, ["zones"] = 0, ["buildings"] = 0, ["biggest"] = 0 };
+			row["villages"] = (int)row["villages"] + 1;
+			row["people"] = (int)row["people"] + v.Population;
+			row["zones"] = (int)row["zones"] + v.Zones.Count;
+			int built = 0;
+			foreach (int b in v.Buildings)
+				if (Buildings[b].Alive && Buildings[b].Type != _tRuin)
+					built++;
+			row["buildings"] = (int)row["buildings"] + built;
+			row["biggest"] = Math.Max((int)row["biggest"], v.Population);
+			d[id] = row;
+		}
+		return d;
+	}
+
+	/// <summary>Share of the world's land owned by villages, 0..1.</summary>
+	public float LandOwned()
+	{
+		int land = 0, owned = 0;
+		for (int t = 0; t < World.Width * World.Height; t++)
+		{
+			if (World.Water[t] != SimWorld.WaterLand)
+				continue;
+			land++;
+			if (_zoneOwner[ZoneOf(t % World.Width, t / World.Width)] >= 0)
+				owned++;
+		}
+		return land > 0 ? (float)owned / land : 0f;
+	}
+
 	/// <summary>Ground made by people on tile (x, y): 0 nothing, 1 road, 2 field (tests, HUD).</summary>
 	public int GroundAt(int x, int y) => World.InBounds(x, y) ? _ground[World.Index(x, y)] : 0;
 
@@ -1007,7 +1100,7 @@ public partial class Simulation
 		int b = _buildingAt[World.Index(x, y)];
 		if (b < 0 || !Rec(b).Wooden)
 			return false;
-		Buildings[b].Burning = 0.001f;
+		SetBuildingOnFire(b);
 		return true;
 	}
 
