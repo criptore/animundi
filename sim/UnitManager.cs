@@ -40,6 +40,34 @@ public sealed class UnitManager
 	/// <summary>Unit being hunted, or -1.</summary>
 	public int[] Prey = Array.Empty<int>();
 
+	// People (0.3). Animals keep the defaults (-1, 0, false).
+	/// <summary>Village the person belongs to, or -1.</summary>
+	public int[] Village = Array.Empty<int>();
+	/// <summary>Villager, warrior, chief or shaman (Simulation.Role).</summary>
+	public byte[] Role = Array.Empty<byte>();
+	/// <summary>The village's work for this person (Simulation.Job).</summary>
+	public byte[] Job = Array.Empty<byte>();
+	public bool[] Female = Array.Empty<bool>();
+	/// <summary>Partner, mother and father (unit indices), or -1.</summary>
+	public int[] Partner = Array.Empty<int>();
+	public int[] Mother = Array.Empty<int>();
+	public int[] Father = Array.Empty<int>();
+	/// <summary>Index of the person's name in Simulation's name list, or -1.</summary>
+	public int[] Name = Array.Empty<int>();
+	/// <summary>What the person carries home (Simulation.Goods) and how much.</summary>
+	public byte[] Carry = Array.Empty<byte>();
+	public float[] CarryAmount = Array.Empty<float>();
+	/// <summary>Seconds of work left on the current task (chopping, harvesting, building).</summary>
+	public float[] WorkTimer = Array.Empty<float>();
+	/// <summary>What the work is aimed at (a plant, a tile or a building), or -1.</summary>
+	public int[] WorkTarget = Array.Empty<int>();
+	/// <summary>Personal traits, one bit each (Simulation.Trait).</summary>
+	public int[] Traits = Array.Empty<int>();
+	/// <summary>The building the person lives in, or -1.</summary>
+	public int[] Home = Array.Empty<int>();
+	/// <summary>A warrior's training on the dummies, 0..1.</summary>
+	public float[] Training = Array.Empty<float>();
+
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
 
@@ -68,6 +96,21 @@ public sealed class UnitManager
 		Suffering[i] = 0f;
 		Task[i] = 0;
 		Prey[i] = -1;
+		Village[i] = -1;
+		Role[i] = 0;
+		Job[i] = 0;
+		Female[i] = false;
+		Partner[i] = -1;
+		Mother[i] = -1;
+		Father[i] = -1;
+		Name[i] = -1;
+		Carry[i] = 0;
+		CarryAmount[i] = 0f;
+		WorkTimer[i] = 0f;
+		WorkTarget[i] = -1;
+		Traits[i] = 0;
+		Home[i] = -1;
+		Training[i] = 0f;
 		Count++;
 		return i;
 	}
@@ -107,6 +150,21 @@ public sealed class UnitManager
 		Array.Resize(ref Suffering, size);
 		Array.Resize(ref Task, size);
 		Array.Resize(ref Prey, size);
+		Array.Resize(ref Village, size);
+		Array.Resize(ref Role, size);
+		Array.Resize(ref Job, size);
+		Array.Resize(ref Female, size);
+		Array.Resize(ref Partner, size);
+		Array.Resize(ref Mother, size);
+		Array.Resize(ref Father, size);
+		Array.Resize(ref Name, size);
+		Array.Resize(ref Carry, size);
+		Array.Resize(ref CarryAmount, size);
+		Array.Resize(ref WorkTimer, size);
+		Array.Resize(ref WorkTarget, size);
+		Array.Resize(ref Traits, size);
+		Array.Resize(ref Home, size);
+		Array.Resize(ref Training, size);
 		Array.Resize(ref _free, size);
 	}
 }

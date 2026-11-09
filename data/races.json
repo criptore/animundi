@@ -1,0 +1,489 @@
+{
+	"_about": "The 12 peoples as data records, read by sim/Peoples.cs (docs/GAME_DESIGN.md section 8). Each world varies them (stats, temperament, lifespan) from its seed, so the Elves of one world are not the Elves of the next. biomes: where they like to live (their first village goes there). size: 0-12 like animals (hunters only catch prey their size or smaller). speed: tiles per second. lifespan: years (a year lasts 60 s). temperament: aggression, curiosity, settled (0..1). stats: strength, agility, intelligence (1..10). color: the people's colour (territory borders, banners). language: the sounds its generated language draws from (docs/GAME_DESIGN.md section 9): consonants and vowels separated by spaces, syllable patterns (C consonant, V vowel) and typical name endings.",
+	"races": [
+		{
+			"id": "humans",
+			"color": "#4a86d0",
+			"name": "Humans",
+			"biomes": [
+				"Grassland",
+				"Flower meadow",
+				"Hills",
+				"Forest"
+			],
+			"size": 5,
+			"speed": 1.0,
+			"lifespan": 70,
+			"temperament": {
+				"aggression": 0.5,
+				"curiosity": 0.6,
+				"settled": 0.7
+			},
+			"stats": {
+				"strength": 5,
+				"agility": 5,
+				"intelligence": 5
+			},
+			"language": {
+				"consonants": "b d f g h k l m n p r s t v",
+				"vowels": "a e i o u",
+				"patterns": [
+					"CV",
+					"CVC",
+					"CVCV"
+				],
+				"endings": [
+					"ton",
+					"ford",
+					"ia",
+					"en",
+					"ar",
+					"ham"
+				]
+			}
+		},
+		{
+			"id": "elves",
+			"color": "#5aae55",
+			"name": "Elves",
+			"biomes": [
+				"Forest",
+				"Flower meadow",
+				"Jungle"
+			],
+			"size": 5,
+			"speed": 1.1,
+			"lifespan": 400,
+			"temperament": {
+				"aggression": 0.3,
+				"curiosity": 0.8,
+				"settled": 0.8
+			},
+			"stats": {
+				"strength": 4,
+				"agility": 7,
+				"intelligence": 7
+			},
+			"language": {
+				"consonants": "l n r s th v f m",
+				"vowels": "a e i ae ia ie",
+				"patterns": [
+					"CV",
+					"VCV",
+					"CVV",
+					"CVCV"
+				],
+				"endings": [
+					"iel",
+					"wen",
+					"las",
+					"ion",
+					"ith",
+					"ara"
+				]
+			}
+		},
+		{
+			"id": "dwarves",
+			"color": "#c8503e",
+			"name": "Dwarves",
+			"biomes": [
+				"Hills",
+				"Mountain",
+				"Tundra"
+			],
+			"size": 4,
+			"speed": 0.8,
+			"lifespan": 220,
+			"temperament": {
+				"aggression": 0.5,
+				"curiosity": 0.4,
+				"settled": 0.9
+			},
+			"stats": {
+				"strength": 7,
+				"agility": 4,
+				"intelligence": 5
+			},
+			"language": {
+				"consonants": "b d g k r m n th z",
+				"vowels": "a o u i",
+				"patterns": [
+					"CVC",
+					"CVCC",
+					"CVCVC"
+				],
+				"endings": [
+					"in",
+					"ur",
+					"dum",
+					"grim",
+					"ak",
+					"or"
+				]
+			}
+		},
+		{
+			"id": "orcs",
+			"color": "#8b5a2b",
+			"name": "Orcs",
+			"biomes": [
+				"Savanna",
+				"Desert",
+				"Hills",
+				"Swamp"
+			],
+			"size": 6,
+			"speed": 1.0,
+			"lifespan": 50,
+			"temperament": {
+				"aggression": 0.85,
+				"curiosity": 0.3,
+				"settled": 0.6
+			},
+			"stats": {
+				"strength": 8,
+				"agility": 5,
+				"intelligence": 3
+			},
+			"language": {
+				"consonants": "g r k z gr kr sh m b d",
+				"vowels": "a o u",
+				"patterns": [
+					"CVC",
+					"CVCC",
+					"CV"
+				],
+				"endings": [
+					"ash",
+					"uk",
+					"gor",
+					"rak",
+					"zug",
+					"ug"
+				]
+			}
+		},
+		{
+			"id": "goblins",
+			"color": "#c4a65a",
+			"name": "Goblins",
+			"biomes": [
+				"Swamp",
+				"Jungle",
+				"Forest"
+			],
+			"size": 3,
+			"speed": 1.2,
+			"lifespan": 40,
+			"temperament": {
+				"aggression": 0.6,
+				"curiosity": 0.7,
+				"settled": 0.5
+			},
+			"stats": {
+				"strength": 3,
+				"agility": 7,
+				"intelligence": 5
+			},
+			"language": {
+				"consonants": "g b k z n t p sn",
+				"vowels": "i e a u",
+				"patterns": [
+					"CV",
+					"CVC",
+					"CVCV"
+				],
+				"endings": [
+					"ik",
+					"nik",
+					"zz",
+					"bit",
+					"eek",
+					"gob"
+				]
+			}
+		},
+		{
+			"id": "lizardfolk",
+			"color": "#c9b458",
+			"name": "Lizardfolk",
+			"biomes": [
+				"Swamp",
+				"Jungle",
+				"Beach"
+			],
+			"size": 5,
+			"speed": 1.0,
+			"lifespan": 90,
+			"temperament": {
+				"aggression": 0.6,
+				"curiosity": 0.5,
+				"settled": 0.7
+			},
+			"stats": {
+				"strength": 6,
+				"agility": 6,
+				"intelligence": 4
+			},
+			"language": {
+				"consonants": "s ss k t x z h sh",
+				"vowels": "a i e",
+				"patterns": [
+					"CVC",
+					"CVCC",
+					"VCV"
+				],
+				"endings": [
+					"ss",
+					"ix",
+					"esh",
+					"tak",
+					"zir",
+					"ash"
+				]
+			}
+		},
+		{
+			"id": "felines",
+			"color": "#9b59c6",
+			"name": "Felines",
+			"biomes": [
+				"Savanna",
+				"Jungle",
+				"Grassland"
+			],
+			"size": 5,
+			"speed": 1.3,
+			"lifespan": 60,
+			"temperament": {
+				"aggression": 0.5,
+				"curiosity": 0.8,
+				"settled": 0.3
+			},
+			"stats": {
+				"strength": 5,
+				"agility": 8,
+				"intelligence": 5
+			},
+			"language": {
+				"consonants": "m r p rr n s y l",
+				"vowels": "a i e o",
+				"patterns": [
+					"CV",
+					"CVCV",
+					"CVC"
+				],
+				"endings": [
+					"ra",
+					"ri",
+					"mau",
+					"sha",
+					"pur",
+					"ya"
+				]
+			}
+		},
+		{
+			"id": "merfolk",
+			"color": "#4dbfb0",
+			"name": "Merfolk",
+			"biomes": [
+				"Beach",
+				"Swamp",
+				"Jungle"
+			],
+			"size": 5,
+			"speed": 0.9,
+			"lifespan": 120,
+			"temperament": {
+				"aggression": 0.3,
+				"curiosity": 0.7,
+				"settled": 0.6
+			},
+			"stats": {
+				"strength": 5,
+				"agility": 6,
+				"intelligence": 6
+			},
+			"language": {
+				"consonants": "l m n s w r h",
+				"vowels": "a e i o u ue",
+				"patterns": [
+					"VCV",
+					"CVV",
+					"CVCV"
+				],
+				"endings": [
+					"el",
+					"ua",
+					"oa",
+					"ie",
+					"al",
+					"ume"
+				]
+			}
+		},
+		{
+			"id": "treefolk",
+			"color": "#3f7a3f",
+			"name": "Treefolk",
+			"biomes": [
+				"Forest",
+				"Taiga",
+				"Jungle"
+			],
+			"size": 7,
+			"speed": 0.6,
+			"lifespan": 600,
+			"temperament": {
+				"aggression": 0.2,
+				"curiosity": 0.3,
+				"settled": 0.95
+			},
+			"stats": {
+				"strength": 7,
+				"agility": 2,
+				"intelligence": 6
+			},
+			"language": {
+				"consonants": "w r m b l d n",
+				"vowels": "o u a oo",
+				"patterns": [
+					"CVC",
+					"CVVC",
+					"CVCV"
+				],
+				"endings": [
+					"oak",
+					"wood",
+					"rum",
+					"bark",
+					"mor",
+					"dur"
+				]
+			}
+		},
+		{
+			"id": "fairies",
+			"color": "#a8e0f8",
+			"name": "Fairies",
+			"biomes": [
+				"Flower meadow",
+				"Forest",
+				"Mushroom land"
+			],
+			"size": 2,
+			"speed": 1.4,
+			"lifespan": 150,
+			"temperament": {
+				"aggression": 0.1,
+				"curiosity": 0.9,
+				"settled": 0.4
+			},
+			"stats": {
+				"strength": 2,
+				"agility": 9,
+				"intelligence": 7
+			},
+			"language": {
+				"consonants": "l f p s t n b",
+				"vowels": "i e ee ia ai",
+				"patterns": [
+					"CV",
+					"CVV",
+					"CVCV"
+				],
+				"endings": [
+					"li",
+					"pip",
+					"ee",
+					"fae",
+					"lin",
+					"wi"
+				]
+			}
+		},
+		{
+			"id": "bullfolk",
+			"color": "#a03a32",
+			"name": "Bullfolk",
+			"biomes": [
+				"Grassland",
+				"Savanna",
+				"Hills"
+			],
+			"size": 8,
+			"speed": 0.9,
+			"lifespan": 80,
+			"temperament": {
+				"aggression": 0.7,
+				"curiosity": 0.3,
+				"settled": 0.7
+			},
+			"stats": {
+				"strength": 9,
+				"agility": 3,
+				"intelligence": 4
+			},
+			"language": {
+				"consonants": "m b t d r g h",
+				"vowels": "o a u oo",
+				"patterns": [
+					"CVC",
+					"CV",
+					"CVCC"
+				],
+				"endings": [
+					"tor",
+					"mok",
+					"uhr",
+					"bok",
+					"dar",
+					"om"
+				]
+			}
+		},
+		{
+			"id": "undead",
+			"color": "#5e3a7a",
+			"name": "Undead",
+			"biomes": [
+				"Tundra",
+				"Snow",
+				"Cursed land",
+				"Desert"
+			],
+			"size": 5,
+			"speed": 0.7,
+			"lifespan": 1000,
+			"temperament": {
+				"aggression": 0.8,
+				"curiosity": 0.4,
+				"settled": 0.5
+			},
+			"stats": {
+				"strength": 5,
+				"agility": 3,
+				"intelligence": 6
+			},
+			"language": {
+				"consonants": "k th v z m n s x",
+				"vowels": "a o u y",
+				"patterns": [
+					"CVC",
+					"CVCC",
+					"CVCVC"
+				],
+				"endings": [
+					"oth",
+					"ul",
+					"xar",
+					"mor",
+					"vex",
+					"yth"
+				]
+			}
+		}
+	]
+}

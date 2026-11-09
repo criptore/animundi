@@ -56,6 +56,7 @@ public partial class Simulation : Node2D
 		Scheduler.WorldProcesses.Clear();
 		Scheduler.Time = 0;
 		_processRows.Clear();
+		SetupPeoples();
 		SetupLife();
 		SetupNature();
 		ClearDrawing();
@@ -63,12 +64,14 @@ public partial class Simulation : Node2D
 		// Walking and chasing: every step, every unit.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "move", Interval = Scheduler.Step, Batches = 1, Run = Move });
 		// Needs and decisions: each unit once a second, spread over 10 batches.
-		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "think", Interval = 1f, Batches = 10, Run = Think });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "think", Interval = 1f, CoarseInterval = 2f, Batches = 10, Run = Think });
 		// Zones: rebuilt 4 times a second.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "zones", Global = true, Interval = 0.25f, Batches = 1, Run = (_, _, _) => Zones.Rebuild(Units) });
 		// Fire: every step. Births over time: twice a second.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "fire", Global = true, Interval = Scheduler.Step, Batches = 1, Run = (_, _, dt) => FireStep(0, 0, dt) });
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spawn", Global = true, Interval = 0.5f, Batches = 1, Run = (_, _, dt) => SpawnOverTime(0, 0, dt) });
+		// Villages hand out work and plan houses every two seconds.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "villages", Global = true, Interval = 2f, Batches = 1, Run = VillageStep });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}
@@ -141,7 +144,7 @@ public partial class Simulation : Node2D
 	{
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
-			if (Units.Alive[i] && !Assets.Species[Units.Species[i]].IsNatural)
+			if (Units.Alive[i] && !Assets.Species[Units.Species[i]].IsNatural && !Assets.Species[Units.Species[i]].IsPeople)
 				n++;
 		return n;
 	}
@@ -206,7 +209,11 @@ public partial class Simulation : Node2D
 	{
 		var d = new Godot.Collections.Dictionary { ["births"] = Births, ["plants_burned"] = PlantsBurned };
 		foreach (Death c in Enum.GetValues<Death>())
+		{
 			d[c.ToString()] = Deaths[(int)c];
+			d["people_" + c.ToString()] = PeopleDeaths[(int)c];
+		}
+		d["people_births"] = PeopleBirths;
 		return d;
 	}
 
@@ -285,25 +292,133 @@ public partial class Simulation : Node2D
 
 	/// <summary>Speed of time: 0 = paused, 1 = normal, up to MaxTimeScale.</summary>
 	public float TimeScale { get; private set; } = 1f;
-	public const float MaxTimeScale = 10f;
+	public const float MaxTimeScale = 100f;
+	/// <summary>Above this speed, time runs in coarse steps (ultra-fast mode).</summary>
+	public const float UltraFrom = 10f;
+	public const int UltraStepScale = 6;
 
-	/// <summary>Sets the speed of time (0 pauses). The simulation stays the same, only faster:
-	/// more fixed steps run per frame.</summary>
-	public void SetTimeScale(float scale) => TimeScale = Math.Clamp(scale, 0f, MaxTimeScale);
+	/// <summary>Sets the speed of time (0 pauses). Up to x10 the simulation stays the same, only
+	/// faster (more fixed steps per frame); above, the ultra-fast mode runs coarse steps of
+	/// UltraStepScale fixed steps each, to watch centuries go by.</summary>
+	public void SetTimeScale(float scale)
+	{
+		TargetYear = 0;
+		TimeScale = Math.Clamp(scale, 0f, MaxTimeScale);
+		Scheduler.StepScale = TimeScale > UltraFrom ? UltraStepScale : 1;
+	}
+
+	/// <summary>Real seconds spent in each system since the last call (profiling long runs).</summary>
+	public Godot.Collections.Dictionary TakeSystemTimes()
+	{
+		var d = new Godot.Collections.Dictionary();
+		foreach (var s in Scheduler.UnitSystems)
+		{
+			d[s.Name] = Math.Round(s.Ms / 1000.0, 1);
+			s.Ms = 0;
+		}
+		return d;
+	}
+
+	/// <summary>Coarse steps for tools that run long histories without a window (1 = normal).</summary>
+	public void SetStepScale(int scale) => Scheduler.StepScale = Math.Clamp(scale, 1, 30);
+
+	/// <summary>Runs `years` of history as fast as possible, in coarse steps of `stepScale`.</summary>
+	public void RunYears(float years, int stepScale)
+	{
+		int old = Scheduler.StepScale;
+		Scheduler.StepScale = Math.Clamp(stepScale, 1, 30);
+		int steps = (int)(years * YearSeconds / (Scheduler.Step * Scheduler.StepScale));
+		RunSteps(steps);
+		Scheduler.StepScale = old;
+	}
 
 	public float GetTimeScale() => TimeScale;
+
+	// ------------------------------------------------------------------ "go to year" mode
+
+	/// <summary>Target year of the "go to year" mode, or 0 when it is off.</summary>
+	public int TargetYear { get; private set; }
+	private double _targetFrom, _targetTime, _targetSeconds, _targetElapsed;
+	/// <summary>Real time the simulation may take per frame in this mode (the rest draws the world
+	/// and keeps the interface responsive).</summary>
+	public const double TargetFrameBudgetMs = 40.0;
+
+	/// <summary>Runs time to the start of `year` in about `seconds` of real time, then pauses:
+	/// the speed is worked out (years to go / seconds), in coarse steps above x10. With 0 seconds
+	/// (or a computer too slow for the time asked), it goes as fast as the computer allows,
+	/// within a frame budget so the world still shows. Returns false if the year is already past.</summary>
+	public bool GoToYear(int year, float seconds)
+	{
+		double target = (year - 1) * (double)YearSeconds;
+		if (World == null || target <= Scheduler.Time)
+			return false;
+		TargetYear = year;
+		_targetFrom = Scheduler.Time;
+		_targetTime = target;
+		_targetSeconds = Math.Max(0f, seconds);
+		_targetElapsed = 0;
+		TimeScale = 1f;
+		Scheduler.StepScale = UltraStepScale;
+		return true;
+	}
+
+	public void CancelGoToYear()
+	{
+		TargetYear = 0;
+		Scheduler.StepScale = TimeScale > UltraFrom ? UltraStepScale : 1;
+	}
+
+	/// <summary>Progress of the "go to year" mode: 0..1, and the real seconds left at the
+	/// current pace (-1 when unknown).</summary>
+	public float GoToProgress() => TargetYear == 0 ? 0f : (float)((Scheduler.Time - _targetFrom) / (_targetTime - _targetFrom));
+
+	public float GoToSecondsLeft()
+	{
+		double done = Scheduler.Time - _targetFrom;
+		if (TargetYear == 0 || done <= 0 || _targetElapsed <= 0)
+			return -1f;
+		return (float)((_targetTime - Scheduler.Time) / (done / _targetElapsed));
+	}
+
+	/// <summary>One frame of the "go to year" mode: as many coarse steps as the schedule asks
+	/// (or the frame budget allows), then the target is reached and time pauses.</summary>
+	private void GoToYearFrame(double delta)
+	{
+		_targetElapsed += delta;
+		double want = _targetSeconds > 0
+			? _targetFrom + (_targetTime - _targetFrom) * Math.Min(1.0, _targetElapsed / _targetSeconds)
+			: _targetTime;
+		long start = Stopwatch.GetTimestamp();
+		while (Scheduler.Time < want && Scheduler.Time < _targetTime
+			&& Stopwatch.GetElapsedTime(start).TotalMilliseconds < TargetFrameBudgetMs)
+			TimedStep();
+		if (Scheduler.Time >= _targetTime)
+		{
+			LogEvent($"year {TargetYear} reached.");
+			TargetYear = 0;
+			TimeScale = 0f;
+			Scheduler.StepScale = 1;
+		}
+	}
 
 	public override void _Process(double delta)
 	{
 		if (World == null)
 			return;
+		if (TargetYear > 0)
+		{
+			GoToYearFrame(delta);
+			DrawAll();
+			return;
+		}
 		_accumulate += (float)delta * TimeScale;
 		// At most a few frames' worth of steps, so a slow frame never snowballs.
-		int maxSteps = Math.Max(5, (int)MathF.Ceiling(TimeScale * 5f));
+		float stepLength = Scheduler.Step * Scheduler.StepScale;
+		int maxSteps = Math.Max(5, (int)MathF.Ceiling(TimeScale * 5f / Scheduler.StepScale));
 		int steps = 0;
-		while (_accumulate >= Scheduler.Step && steps < maxSteps)
+		while (_accumulate >= stepLength && steps < maxSteps)
 		{
-			_accumulate -= Scheduler.Step;
+			_accumulate -= stepLength;
 			TimedStep();
 			steps++;
 		}
@@ -342,7 +457,8 @@ public partial class Simulation : Node2D
 				continue;
 			float d = MathF.Sqrt(d2);
 			// Hunters run a little faster than they walk.
-			float step = Assets.Species[Units.Species[i]].Speed * dt * (hunting ? 1.25f : 1f);
+			// Roads make walking half again as fast.
+			float step = Assets.Species[Units.Species[i]].Speed * dt * (hunting ? 1.25f : 1f) * GroundSpeed(Units.X[i], Units.Y[i]);
 			float nx = step >= d ? Units.TargetX[i] : Units.X[i] + dx / d * step;
 			float ny = step >= d ? Units.TargetY[i] : Units.Y[i] + dy / d * step;
 			if (!World.IsLandAt(nx, ny))

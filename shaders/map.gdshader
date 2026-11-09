@@ -17,6 +17,11 @@ uniform sampler2D data : filter_nearest;
 uniform bool show_patterns = true;
 // Winter: frost whitens the land towards the poles (0 = none, 1 = midwinter).
 uniform float frost = 0.0;
+// Villages: territory (RGB = owner colour, A = owner key, 0 = no one's) and ground made by people
+// (R * 255: 0 nothing, 1 road, 2 bare field, 3 young wheat, 4 growing wheat, 5 ripe wheat).
+uniform sampler2D territory : filter_nearest;
+uniform sampler2D ground : filter_nearest;
+uniform bool show_territory = true;
 
 const float SUB = 8.0;
 // Pattern ids (same order as WorldMap.Pattern).
@@ -139,6 +144,24 @@ void fragment() {
 	}
 
 	if (!water && show_patterns) {
+		// Roads and fields, drawn by the villages.
+		int g = int(round(texelFetch(ground, cell, 0).r * 255.0));
+		if (g == 1) {
+			// A dirt road with pebbles.
+			float hr = hash(vec2(cell) * 8.0 + vec2(sub) + 11.0);
+			vec3 dirt = vec3(0.62, 0.50, 0.34) * (hr > 0.9 ? 0.85 : (hr < 0.08 ? 1.12 : 1.0));
+			col = mix(col, dirt, mix(0.75, 0.95, detail));
+		} else if (g >= 2) {
+			// A field: furrows of soil, wheat on every other row once sown, green then gold.
+			bool furrow = sub.y % 2 == 1;
+			vec3 soil = vec3(0.45, 0.33, 0.21) * (furrow ? 0.82 : 1.0);
+			vec3 wheat = g == 3 ? vec3(0.45, 0.70, 0.30) : (g == 4 ? vec3(0.66, 0.74, 0.30) : vec3(0.93, 0.80, 0.33));
+			float hf = hash(vec2(cell) * 8.0 + vec2(sub) + 23.0);
+			bool plant = g >= 3 && !furrow && (g >= 4 || hf < 0.6);
+			vec3 field = plant ? wheat * (hf > 0.85 ? 0.88 : 1.0) : soil;
+			vec3 far_field = g == 2 ? soil : mix(soil, wheat, 0.6);
+			col = mix(col, mix(far_field, field, detail), 0.9);
+		}
 		// Ash: burned ground turns dark grey, with lighter cinders, and fades as it heals.
 		float ash = d.a;
 		if (ash > 0.0) {
@@ -169,6 +192,22 @@ void fragment() {
 	float far_shade = south ? 0.82 : 1.0;
 	shade = mix(far_shade, shade, smoothstep(2.0, 5.0, tile_px));
 	col *= mix(1.0, shade, strength);
+
+	// Territory: a light tint of the owner's colour and a solid border where it ends.
+	vec4 own = texelFetch(territory, cell, 0);
+	if (show_territory && show_patterns && own.a > 0.0) {
+		col = mix(col, own.rgb, 0.10);
+		vec2 ms = map_size - 1.0;
+		bool e = texelFetch(territory, ivec2(clamp(vec2(cell + ivec2(1, 0)), vec2(0.0), ms)), 0).a != own.a;
+		bool w = texelFetch(territory, ivec2(clamp(vec2(cell + ivec2(-1, 0)), vec2(0.0), ms)), 0).a != own.a;
+		bool s = texelFetch(territory, ivec2(clamp(vec2(cell + ivec2(0, 1)), vec2(0.0), ms)), 0).a != own.a;
+		bool n = texelFetch(territory, ivec2(clamp(vec2(cell + ivec2(0, -1)), vec2(0.0), ms)), 0).a != own.a;
+		bool edge = (e && sub.x == 7) || (w && sub.x == 0) || (s && sub.y == 7) || (n && sub.y == 0);
+		// Up close a line one world pixel wide; far away the whole border tile is tinted.
+		float border = edge ? 0.85 : 0.0;
+		float far_border = (e || w || s || n) ? 0.6 : 0.0;
+		col = mix(col, own.rgb * 1.1, mix(far_border, border, smoothstep(2.0, 6.0, tile_px)));
+	}
 
 	COLOR = vec4(col, 1.0);
 }

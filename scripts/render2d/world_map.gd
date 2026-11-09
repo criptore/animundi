@@ -33,6 +33,12 @@ var _data := Image.new()
 var _color_tex := ImageTexture.new()
 var _data_tex := ImageTexture.new()
 var _material := ShaderMaterial.new()
+## Villages' marks on the land, one texel per tile: territory (owner colour, alpha telling
+## villages apart) and ground made by people (roads, fields and their wheat).
+var _territory := Image.new()
+var _territory_tex := ImageTexture.new()
+var _ground := Image.new()
+var _ground_tex := ImageTexture.new()
 ## Low-frequency colour variation per tile, from the world seed.
 var _variation := PackedFloat32Array()
 
@@ -71,6 +77,12 @@ func set_world(w: WorldData) -> void:
 	_data_tex = ImageTexture.create_from_image(_data)
 	_material.set_shader_parameter("data", _data_tex)
 	_material.set_shader_parameter("map_size", Vector2(w.width, w.height))
+	_territory = Image.create(w.width, w.height, false, Image.FORMAT_RGBA8)
+	_territory_tex = ImageTexture.create_from_image(_territory)
+	_material.set_shader_parameter("territory", _territory_tex)
+	_ground = Image.create(w.width, w.height, false, Image.FORMAT_R8)
+	_ground_tex = ImageTexture.create_from_image(_ground)
+	_material.set_shader_parameter("ground", _ground_tex)
 	_build_colors()
 
 
@@ -93,6 +105,28 @@ func set_scorch(pairs: PackedInt32Array) -> void:
 		c.a = pairs[k + 1] / 255.0
 		_data.set_pixel(i % world.width, i / world.width, c)
 	_data_tex.update(_data)
+
+
+## Villages' changes to the land: `triples` is (tile, ground, territory), ... as given by the
+## simulation's TakeOverlayChanges (ground: 0 nothing, 1 road, 2-5 field from bare to ripe wheat;
+## territory: the owner's colour as 0xRRGGBBAA, AA telling villages apart, 0 for no one's land).
+func set_overlay(triples: PackedInt32Array) -> void:
+	if triples.is_empty():
+		return
+	for k in range(0, triples.size(), 3):
+		var i := triples[k]
+		var x := i % world.width
+		var y := i / world.width
+		_ground.set_pixel(x, y, Color(triples[k + 1] / 255.0, 0, 0))
+		var c := triples[k + 2]
+		_territory.set_pixel(x, y, Color8((c >> 24) & 255, (c >> 16) & 255, (c >> 8) & 255, c & 255))
+	_ground_tex.update(_ground)
+	_territory_tex.update(_territory)
+
+
+## Shows or hides village borders.
+func set_borders_visible(on: bool) -> void:
+	_material.set_shader_parameter("show_territory", on)
 
 
 ## How wintry the map looks: 0 = no frost, 1 = midwinter (frost on the cold half of the world).

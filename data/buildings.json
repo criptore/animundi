@@ -1,0 +1,24 @@
+{
+	"_about": "Village buildings, read by sim/Villages.cs (docs/VILLAGES.md). The building plan follows WorldBox's rules: once a month a village may start one building or one upgrade, the first in this list it can make. homes: people who can live in it. cost: goods paid when the work starts (wood, stone, metal, gold). build: seconds of one builder's work. pop: people the village needs first. requires: buildings it must already have. limit: how many a village may have (0 = no limit), plus one for every `per` people when `per` is set. place: center (the bonfire), cluster (next to other buildings), apart (away from the others), border (at the edge of the territory), shore (next to water), mine (near hills, mountains or rock), near (next to the building named by `near`). upgrade: the building it is made from (built in place, homes and sprite change). material: wood burns, stone does not. job: the job it brings.",
+	"buildings": [
+		{ "id": "bonfire", "name": "Bonfire", "homes": 3, "cost": {}, "build": 0, "pop": 0, "limit": 1, "place": "center", "material": "stone" },
+		{ "id": "hut", "name": "Hut", "homes": 4, "cost": { "wood": 6 }, "build": 8, "pop": 0, "limit": 0, "place": "cluster", "material": "wood" },
+		{ "id": "stockpile", "name": "Stockpile", "homes": 0, "cost": { "wood": 10 }, "build": 8, "pop": 10, "limit": 1, "place": "cluster", "material": "wood" },
+		{ "id": "well", "name": "Well", "homes": 3, "cost": { "wood": 6 }, "build": 6, "pop": 8, "limit": 1, "per": 40, "place": "cluster", "material": "stone" },
+		{ "id": "windmill", "name": "Windmill", "homes": 0, "cost": { "wood": 14 }, "build": 12, "pop": 14, "limit": 1, "per": 35, "place": "apart", "material": "wood", "job": "farmer" },
+		{ "id": "mine", "name": "Mine", "homes": 0, "cost": { "wood": 12 }, "build": 10, "pop": 16, "limit": 1, "place": "mine", "material": "wood", "job": "miner" },
+		{ "id": "dock", "name": "Dock", "homes": 0, "cost": { "wood": 12 }, "build": 10, "pop": 18, "limit": 1, "place": "shore", "material": "wood", "job": "fisher" },
+		{ "id": "house", "name": "House", "homes": 6, "cost": { "wood": 10 }, "build": 10, "pop": 18, "limit": 0, "place": "cluster", "material": "wood", "upgrade": "hut" },
+		{ "id": "town_hall", "name": "Town hall", "homes": 6, "cost": { "wood": 20, "stone": 15 }, "build": 20, "pop": 22, "requires": ["mine"], "limit": 1, "place": "cluster", "material": "stone" },
+		{ "id": "stone_house", "name": "Stone house", "homes": 8, "cost": { "wood": 4, "stone": 10 }, "build": 12, "pop": 28, "requires": ["town_hall"], "limit": 0, "place": "cluster", "material": "stone", "upgrade": "house" },
+		{ "id": "barracks", "name": "Barracks", "homes": 2, "cost": { "wood": 20, "stone": 15 }, "build": 18, "pop": 30, "requires": ["town_hall"], "limit": 1, "place": "apart", "material": "stone" },
+		{ "id": "watch_tower", "name": "Watch tower", "homes": 0, "cost": { "wood": 6, "stone": 12 }, "build": 12, "pop": 32, "requires": ["town_hall"], "limit": 1, "per": 25, "place": "border", "material": "stone" },
+		{ "id": "market", "name": "Market", "homes": 0, "cost": { "wood": 25, "gold": 3 }, "build": 15, "pop": 40, "requires": ["town_hall", "stockpile"], "limit": 1, "place": "cluster", "material": "wood" },
+		{ "id": "temple", "name": "Temple", "homes": 4, "cost": { "stone": 30, "gold": 5 }, "build": 25, "pop": 45, "requires": ["town_hall"], "limit": 1, "place": "cluster", "material": "stone" },
+		{ "id": "big_house", "name": "Big house", "homes": 10, "cost": { "stone": 15, "gold": 2 }, "build": 15, "pop": 50, "requires": ["town_hall"], "limit": 0, "place": "cluster", "material": "stone", "upgrade": "stone_house" },
+		{ "id": "library", "name": "Library", "homes": 2, "cost": { "wood": 20, "stone": 20 }, "build": 22, "pop": 55, "requires": ["temple"], "limit": 1, "place": "cluster", "material": "wood" },
+		{ "id": "statue", "name": "Statue", "homes": 0, "cost": { "stone": 30, "gold": 10 }, "build": 20, "pop": 65, "requires": ["temple"], "limit": 1, "place": "cluster", "material": "stone" },
+		{ "id": "dummy", "name": "Training dummy", "homes": 0, "cost": { "wood": 2 }, "build": 3, "pop": 30, "requires": ["barracks"], "limit": 3, "place": "near", "near": "barracks", "material": "wood" },
+		{ "id": "ruin", "name": "Ruin", "homes": 0, "cost": {}, "build": 0, "pop": 1000000, "limit": 0, "place": "cluster", "material": "stone" }
+	]
+}

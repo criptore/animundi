@@ -5,11 +5,16 @@ signal generate_requested
 signal layer_selected(layer: String)
 ## The player picked a speed of time (0 = pause).
 signal speed_selected(scale: float)
+## The player started the world with these peoples (from the setup panel).
+signal start_requested(races: PackedStringArray, per_village: int)
+## The player asked to run time to `year` in about `seconds` of real time (0 = as fast as possible).
+signal go_to_year_requested(year: int, seconds: float)
 ## The player asked for more animals (stress test of the simulation).
 signal spawn_requested(count: int)
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
+const SetupPanel = preload("res://scripts/ui/setup_panel.gd")
 
 var settings: WorldSettings
 
@@ -28,11 +33,17 @@ var _time_label: Label
 var _events_label: Label
 var _population_label: Label
 var _events: PackedStringArray = []
+var _villages_label: Label
+var _setup: PanelContainer
+var _root: Control
+## Village names drawn over the map.
+var _name_labels: Array[Label] = []
 
 ## Event lines kept on screen.
 const EVENTS_SHOWN := 6
 ## Speeds of time offered (0 = pause).
-const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0]
+## Speeds of time; above ×10 is the ultra-fast mode (coarse steps, to watch centuries go by).
+const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 
 var _speed_buttons := []
 var _speed := 1.0
@@ -44,6 +55,7 @@ func _ready() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	_root = root
 
 	# Top bar: world settings.
 	var top := PanelContainer.new()
@@ -114,7 +126,7 @@ func _ready() -> void:
 	spawn.tooltip_text = "Spawn 1000 wandering animals: a stress test of the C# simulation"
 	spawn.pressed.connect(func(): spawn_requested.emit(1000))
 	layers.add_child(spawn)
-	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nR: random seed\nF: fire under the mouse (test)")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nHover a creature: who it is\nR: new world\nF: fire under the mouse (test)")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 
@@ -132,19 +144,50 @@ func _ready() -> void:
 	var speed_group := ButtonGroup.new()
 	for v in SPEEDS:
 		var b := Button.new()
-		b.text = "Pause" if v == 0.0 else "×%d" % v
+		b.text = "Pause" if v == 0.0 else ("Ultra" if v > 10.0 else "×%d" % v)
 		b.toggle_mode = true
 		b.button_group = speed_group
 		b.button_pressed = v == 1.0
 		b.focus_mode = Control.FOCUS_NONE  # Space must not press a focused button
-		b.tooltip_text = "Space: pause / resume · , and . : slower / faster"
+		b.tooltip_text = "Space: pause / resume · , and . : slower / faster" + ("\nUltra: ×100, in coarser steps (a century in a minute)" if v > 10.0 else "")
 		b.pressed.connect(func(): _set_speed(v))
 		speeds.add_child(b)
 		_speed_buttons.append(b)
 	life.add_child(speeds)
+	# "Go to year": pick the year to reach and how long it may take, time runs there and pauses.
+	var go := HBoxContainer.new()
+	go.add_child(_label("Go to year"))
+	var year_box := SpinBox.new()
+	year_box.min_value = 2
+	year_box.max_value = 1000000
+	year_box.value = 10000
+	year_box.tooltip_text = "The year to reach; time pauses there"
+	go.add_child(year_box)
+	go.add_child(_label("in"))
+	var minutes_box := SpinBox.new()
+	minutes_box.min_value = 0
+	minutes_box.max_value = 600
+	minutes_box.step = 0.5
+	minutes_box.value = 10
+	minutes_box.suffix = "min"
+	minutes_box.tooltip_text = "Real time it should take (0 = as fast as the computer can)"
+	go.add_child(minutes_box)
+	var go_button := Button.new()
+	go_button.text = "Go"
+	go_button.focus_mode = Control.FOCUS_NONE
+	go_button.pressed.connect(func():
+		for b in _speed_buttons:
+			b.button_pressed = false
+		go_to_year_requested.emit(int(year_box.value), minutes_box.value * 60.0))
+	go.add_child(go_button)
+	life.add_child(go)
 	_population_label = _label("")
 	_population_label.add_theme_font_size_override("font_size", 12)
 	life.add_child(_population_label)
+	life.add_child(_label("Villages"))
+	_villages_label = _label("")
+	_villages_label.add_theme_font_size_override("font_size", 12)
+	life.add_child(_villages_label)
 	life.add_child(_label("Events"))
 	_events_label = _label("")
 	_events_label.add_theme_font_size_override("font_size", 12)
@@ -236,6 +279,53 @@ func set_populations(table: Dictionary) -> void:
 	_population_label.custom_minimum_size.x = 290
 
 
+## Shows the world setup (choosing the peoples) over a new world.
+func show_setup() -> void:
+	if _setup == null:
+		_setup = SetupPanel.new()
+		_setup.start_requested.connect(func(races, n):
+			_setup.visible = false
+			start_requested.emit(races, n))
+		_root.add_child(_setup)
+	_setup.visible = true
+
+
+func setup_visible() -> bool:
+	return _setup != null and _setup.visible
+
+
+## One line per village: name, people, population and homes, stores, what it builds.
+func set_villages(villages: Array) -> void:
+	var lines := PackedStringArray()
+	for v in villages:
+		var line := "%s (%s) %d/%d · food %d · wood %d · stone %d" % [v.name, v.people, v.population, v.homes, v.food, v.wood, v.stone]
+		if v.metal > 0 or v.gold > 0:
+			line += " · metal %d · gold %d" % [v.metal, v.gold]
+		if v.building != "":
+			line += " · building a %s" % v.building
+		lines.append(line)
+	_villages_label.text = "\n".join(lines) if lines.size() > 0 else "none yet"
+
+
+## Village names over the map: `labels` is [[name, screen position], ...].
+func set_map_labels(labels: Array) -> void:
+	while _name_labels.size() < labels.size():
+		var l := Label.new()
+		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		l.add_theme_constant_override("outline_size", 4)
+		l.add_theme_font_size_override("font_size", 14)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_root.add_child(l)
+		_root.move_child(l, 0)
+		_name_labels.append(l)
+	for k in _name_labels.size():
+		var l := _name_labels[k]
+		l.visible = k < labels.size()
+		if l.visible:
+			l.text = labels[k][0]
+			l.position = labels[k][1] - Vector2(l.size.x / 2.0, 34)
+
+
 func set_sprite_count(n: int) -> void:
 	_sprite_count = n
 	_refresh_stats()
@@ -264,6 +354,16 @@ func _set_speed(v: float) -> void:
 	if k >= 0:
 		_speed_buttons[k].button_pressed = true
 	speed_selected.emit(v)
+
+
+## Shows the speed buttons as `v` without changing the speed (after "go to year" ends).
+func show_speed(v: float) -> void:
+	if v == 0.0 and _speed != 0.0:
+		_speed_before_pause = _speed
+	_speed = v
+	var k := SPEEDS.find(v)
+	if k >= 0:
+		_speed_buttons[k].button_pressed = true
 
 
 func clear_events() -> void:

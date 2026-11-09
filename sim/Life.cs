@@ -14,7 +14,7 @@ namespace Animundi.Sim;
 public partial class Simulation
 {
 	/// <summary>What a unit is doing.</summary>
-	public enum Task : byte { Wander, Graze, Drink, Hunt, Rest }
+	public enum Task : byte { Wander, Graze, Drink, Hunt, Rest, Work, Deliver, Feast, Home }
 
 	/// <summary>Why a unit died (for statistics and the event log).</summary>
 	public enum Death { OldAge, Hunger, Thirst, Eaten, Fire, Other }
@@ -53,6 +53,9 @@ public partial class Simulation
 	private bool[] _established = Array.Empty<bool>();
 	/// <summary>Deaths by cause since the world started.</summary>
 	public readonly int[] Deaths = new int[Enum.GetValues<Death>().Length];
+	/// <summary>Deaths of people (not animals) by cause, and their births.</summary>
+	public readonly int[] PeopleDeaths = new int[Enum.GetValues<Death>().Length];
+	public int PeopleBirths;
 	public int Births;
 
 	// Per biome: species born there and cumulative weights, and the land tiles where something
@@ -71,6 +74,8 @@ public partial class Simulation
 	{
 		Population = new int[Assets.Species.Count];
 		Array.Clear(Deaths);
+		Array.Clear(PeopleDeaths);
+		PeopleBirths = 0;
 		Births = 0;
 		_remains.Clear();
 		_spawnTables = new List<(int, float)>[_biomeNames.Length];
@@ -122,7 +127,7 @@ public partial class Simulation
 	{
 		int i = Units.Spawn(species, x, y);
 		var sp = Assets.Species[species];
-		Units.Age[i] = newborn ? 0f : sp.Lifespan * (Maturity + (float)_rng.NextDouble() * 0.5f);
+		Units.Age[i] = newborn ? 0f : AdultAge(sp) + sp.Lifespan * (float)_rng.NextDouble() * 0.5f;
 		Units.Hunger[i] = newborn ? 0f : (float)_rng.NextDouble() * 0.3f;
 		Units.Thirst[i] = newborn ? 0f : (float)_rng.NextDouble() * 0.3f;
 		Units.BreedWait[i] = YearSeconds * (0.2f + (float)_rng.NextDouble() * 0.5f);
@@ -149,6 +154,11 @@ public partial class Simulation
 		if (!Units.Alive[i])
 			return;
 		int s = Units.Species[i];
+		if (Assets.Species[s].IsPeople)
+		{
+			PersonDied(i);
+			PeopleDeaths[(int)cause]++;
+		}
 		// The eaten leave nothing; the others lie where they fell for a while.
 		if (cause != Death.Eaten && _remains.Count < 4000)
 		{
@@ -156,7 +166,7 @@ public partial class Simulation
 			_remains.Add(new Remains
 			{
 				x = Units.X[i], y = Units.Y[i], species = s, left = Units.FacingLeft[i], time = RemainsSeconds,
-				scale = 0.6f + 0.4f * Math.Clamp(Units.Age[i] / (sp.Lifespan * Maturity), 0f, 1f),
+				scale = 0.6f + 0.4f * Math.Clamp(Units.Age[i] / AdultAge(sp), 0f, 1f),
 			});
 		}
 		Units.Kill(i);
@@ -169,7 +179,11 @@ public partial class Simulation
 		}
 	}
 
-	public bool IsAdult(int i) => Units.Age[i] >= Assets.Species[Units.Species[i]].Lifespan * Maturity;
+	public bool IsAdult(int i) => Units.Age[i] >= AdultAge(Assets.Species[Units.Species[i]]);
+
+	/// <summary>Age (years) at which a creature is grown: a share of its lifespan, but never more
+	/// than 4 years for peoples: a village's children grow up to work within a few minutes, as in WorldBox.</summary>
+	public static float AdultAge(SpeciesRecord sp) => sp.IsPeople ? Math.Min(sp.Lifespan * Maturity, 4f) : sp.Lifespan * Maturity;
 
 	// ------------------------------------------------------------------ thinking (1 / s)
 
@@ -195,7 +209,8 @@ public partial class Simulation
 
 			if (hunger && sp.Eats)
 			{
-				Units.Hunger[i] = Math.Min(1f, Units.Hunger[i] + dt / HungerSeconds);
+				// People live off their village's stores: they get hungry more slowly than animals.
+				Units.Hunger[i] = Math.Min(1f, Units.Hunger[i] + dt / (sp.IsPeople ? HungerSeconds * 1.6f : HungerSeconds));
 				Units.Thirst[i] = Math.Min(1f, Units.Thirst[i] + dt / ThirstSeconds);
 				if (Units.Hunger[i] >= 1f || Units.Thirst[i] >= 1f)
 				{
@@ -208,6 +223,11 @@ public partial class Simulation
 				}
 				else
 					Units.Suffering[i] = 0f;
+			}
+			if (sp.IsPeople)
+			{
+				ThinkPerson(i, sp, dt);
+				continue;
 			}
 
 			var task = (Task)Units.Task[i];
@@ -386,8 +406,9 @@ public partial class Simulation
 			if (j == i || !Units.Alive[j] || Units.Species[j] == Units.Species[i])
 				continue;
 			var prey = Assets.Species[Units.Species[j]];
-			// Only living flesh of its size or smaller; never undead or golems.
-			if (prey.Size > sp.Size || !prey.Eats)
+			// Only living flesh of its size or smaller; never undead or golems. People hunt animals,
+			// never other people (war comes with kingdoms).
+			if (prey.Size > sp.Size + (sp.IsPeople ? 2 : 0) || !prey.Eats || (sp.IsPeople && prey.IsPeople))
 				continue;
 			float dx = Units.X[j] - Units.X[i], dy = Units.Y[j] - Units.Y[i];
 			float d = dx * dx + dy * dy;
@@ -424,7 +445,28 @@ public partial class Simulation
 		}
 		if (d2 < 0.35f * 0.35f)
 		{
+			var hunter = Assets.Species[Units.Species[i]];
+			// People fight back: warriors and the brave often win, and the beast dies instead.
+			if (Assets.Species[Units.Species[j]].IsPeople)
+			{
+				if (_rng.NextDouble() < DefendChance(j))
+				{
+					KillUnit(i, Death.Other);
+					return;
+				}
+			}
 			KillUnit(j, Death.Eaten);
+			Units.Prey[i] = -1;
+			if (hunter.IsPeople)
+			{
+				// The hunter brings the meat home.
+				Units.Carry[i] = (byte)Goods.Food;
+				Units.CarryAmount[i] = 6f;
+				Units.Task[i] = (byte)Task.Wander;
+				Units.TargetX[i] = Units.X[i];
+				Units.TargetY[i] = Units.Y[i];
+				return;
+			}
 			Units.Hunger[i] = 0f;
 			Units.Suffering[i] = 0f;
 			Units.Prey[i] = -1;

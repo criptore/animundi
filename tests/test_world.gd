@@ -48,6 +48,8 @@ func _initialize() -> void:
 	test_life()
 	test_scripts_load()
 	test_nature()
+	test_peoples()
+	test_villages()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -671,7 +673,136 @@ func test_nature() -> void:
 func test_scripts_load() -> void:
 	var ok := true
 	for path in ["res://scripts/ui/hud.gd", "res://scripts/main.gd", "res://scripts/ui/map_camera.gd",
-			"res://scripts/render2d/world_map.gd"]:
+			"res://scripts/render2d/world_map.gd", "res://scripts/ui/setup_panel.gd"]:
 		var script: GDScript = load(path)
 		ok = ok and script != null and script.can_instantiate()
 	check(ok, "the HUD, main scene and map scripts compile")
+
+
+func test_villages() -> void:
+	var made := make_sim("villages", 192)
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.StartPeoples(PackedStringArray(["humans", "elves", "orcs"]), 14)
+	var start: Array = sim.VillageTable()
+	check(start.size() == 3 and start[0].zones == 9 and start[0].homes == 3,
+			"a new village owns 3x3 zones and its bonfire is home to 3 (%d zones, %d homes)" % [start[0].zones, start[0].homes])
+	sim.RunSteps(30 * 60 * 12)  # 12 years
+
+	# They grow (homes, territory) and build what WorldBox villages build.
+	var kinds := {}
+	var inside := true
+	for b in sim.BuildingTable():
+		kinds[b.id] = kinds.get(b.id, 0) + 1
+		inside = inside and b.owner_ok
+	var grown := false
+	var homes_ok := true
+	for v in sim.VillageTable():
+		grown = grown or (v.zones > 9 and v.population > 14)
+		homes_ok = homes_ok and v.homes >= 3
+	check(grown and homes_ok, "villages grow: more people and more land; everyone has homes to go to")
+	var made_kinds := 0
+	for id in ["hut", "house", "stockpile", "well", "windmill", "mine", "dock", "town_hall"]:
+		if kinds.has(id):
+			made_kinds += 1
+	check(made_kinds >= 6, "villages build huts, houses, stockpiles, wells, windmills, mines, docks, town halls (%s)" % [kinds])
+	check(inside, "every building stands on its village's land")
+
+	# Fields, roads, and the jobs that go with them.
+	var fields := 0
+	var roads := 0
+	var w: WorldData = made[0]
+	for y in w.height:
+		for x in w.width:
+			var g: int = sim.GroundAt(x, y)
+			fields += 1 if g == 2 else 0
+			roads += 1 if g == 1 else 0
+	var jobs := ""
+	for v in sim.VillageTable():
+		jobs += v.jobs + ", "
+	check(fields > 0 and roads > 0, "windmills get fields, buildings get roads (%d field tiles, %d road tiles)" % [fields, roads])
+	check("farmer" in jobs and "builder" in jobs or "farmer" in jobs and "miner" in jobs, "farmers and miners at work (%s)" % jobs)
+	var stores := 0.0
+	for v in sim.VillageTable():
+		stores += v.stone + v.metal + v.gold
+	check(stores > 0.0, "mines bring stone, metal or gold (%d)" % stores)
+	check(sim.TakeOverlayChanges().size() % 3 == 0, "the map gets the villages' land as triples")
+
+	# Wooden buildings burn; firemen put them out or they fall to ruins.
+	var hut: Dictionary = {}
+	for b in sim.BuildingTable():
+		if b.id == "hut" or b.id == "house":
+			hut = b
+			break
+	if not hut.is_empty():
+		check(sim.IgniteBuilding(hut.x, hut.y), "a wooden house can catch fire")
+		sim.RunSteps(30 * 20)
+		var after := ""
+		for b in sim.BuildingTable():
+			if b.x == hut.x and b.y == hut.y:
+				after = b.id if not b.burning else "burning"
+		check(after != "burning", "a burning house is put out or burns down (now: %s, %d put out, %d burned)" % [after, sim.FiresPutOut, sim.BuildingsBurned])
+
+	# Ultra-fast mode: coarse steps still run whole years, on land.
+	var year: int = sim.Year()
+	sim.RunYears(3, 6)
+	check(sim.Year() == year + 3 and sim.CountOnWater() == 0 and sim.VillageCount() > 0,
+			"coarse steps run 3 years in a go (year %d → %d), no one on water" % [year, sim.Year()])
+	# "Go to year": time runs to the year asked, then pauses.
+	check(sim.GoToYear(sim.Year() + 2, 0.0), "time can be sent to a year ahead")
+	for k in 400:
+		if sim.TargetYear == 0:
+			break
+		sim._Process(0.05)
+	check(sim.TargetYear == 0 and sim.Year() == year + 5 and sim.GetTimeScale() == 0.0,
+			"the year asked is reached, then time pauses (year %d)" % sim.Year())
+	sim.queue_free()
+
+
+func test_peoples() -> void:
+	var made := make_sim("peoples", 192)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	var founded: int = sim.StartPeoples(PackedStringArray(["humans", "elves", "orcs"]), 12)
+	check(founded == 3 and sim.VillageCount() == 3 and sim.PeopleCount() == 36,
+			"three peoples found a village each, 12 people per village (%d villages, %d people)" % [founded, sim.PeopleCount()])
+
+	# Each people speaks its own generated language.
+	var elves: PackedStringArray = sim.SampleNames("elves", 20)
+	var orcs: PackedStringArray = sim.SampleNames("orcs", 20)
+	var shared := 0
+	var tidy := true
+	var regex := RegEx.create_from_string("[aeiouy]{3}|(.)\\1\\1")
+	for n in elves:
+		if n in orcs:
+			shared += 1
+		tidy = tidy and n.length() > 0 and n.length() <= 9 and regex.search(n.to_lower()) == null
+	check(shared < 3 and tidy, "elves and orcs have different languages; names are short and smooth (%s / %s)" % [elves.slice(0, 4), orcs.slice(0, 4)])
+
+	# Races vary from one world to the next.
+	var other := make_sim("peoples-2", 128)
+	other[1].StartPeoples(PackedStringArray(["humans", "elves"]), 8)
+	check(sim.RaceOf("humans") != other[1].RaceOf("humans"), "the same people differs from world to world")
+	other[1].queue_free()
+
+	# Villages live: they gather food and wood, build houses, and families have children.
+	sim.RunSteps(30 * 60 * 3)  # 3 years
+	var houses := 0
+	for v in sim.VillageTable():
+		houses += v.houses
+	var stats: Dictionary = sim.LifeStats()
+	check(houses >= 2, "villages build houses (%d in 3 years)" % houses)
+	check(stats["people_births"] > 0, "families have children (%d births)" % stats["people_births"])
+	var family := false
+	var people_ok := true
+	for i in 4000:
+		if not sim.UnitAlive(i) or not sim.UnitIsPeople(i):
+			continue
+		if sim.UnitMother(i) >= 0 and sim.UnitFather(i) >= 0:
+			family = true
+		people_ok = people_ok and sim.UnitVillage(i) >= 0 and sim.UnitName(i) != ""
+	check(family and people_ok, "children have a mother and a father; everyone has a name and a village")
+	check(sim.CountOnWater() == 0, "no one walks on water")
+	check(sim.UnitInfo(sim.UnitAt(w.width / 2.0, w.height / 2.0, 500.0)) != "", "the HUD can describe a creature")
+	sim.queue_free()
