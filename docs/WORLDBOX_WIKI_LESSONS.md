@@ -87,7 +87,8 @@ Animundi takes the **rules**, never the art:
 
 | WorldBox mechanism | Animundi version | Milestone |
 |---|---|---|
-| Biome seeds, shovels, printers | Biome brush, terrain levels up/down, stamps and the player's own presets | 0.16 |
+| Biome seeds, shovels, printers | Biome brush, terrain levels up/down, stamps and the player's own presets | 0.9 |
+| Fire on tiles (burn chance and rate per tile type), sparks as particles | Fire on tiles with a burn chance and time per biome (done, 0.2); sparks for the fire power | 0.2 / 0.9 |
 | Living biomes that spread | Flora spreads, burns and regrows; biomes overgrow each other by world law | 0.2 |
 | Biome gives starting traits and fauna | Generated species and peoples take traits from their home biome | 0.2–0.3 |
 | Neurons (inspectable utility AI) | Utility AI for inhabitants, shown and switchable in the unit inspector | 0.3 |

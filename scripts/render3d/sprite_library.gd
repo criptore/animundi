@@ -14,6 +14,8 @@ const SCALE := {
 	"races": 0.028,
 	"animals": 0.022,
 	"monsters": 0.03,
+	# Drawn at display size by art/creatures.py: one sprite pixel = one world pixel (1/8 tile).
+	"creatures": 0.125,
 }
 ## Size overrides for single sprites (multiplies the group scale).
 const SIZE := {

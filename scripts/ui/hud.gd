@@ -3,6 +3,8 @@ extends CanvasLayer
 
 signal generate_requested
 signal layer_selected(layer: String)
+## The player picked a speed of time (0 = pause).
+signal speed_selected(scale: float)
 ## The player asked for more animals (stress test of the simulation).
 signal spawn_requested(count: int)
 
@@ -22,6 +24,19 @@ var _layer_buttons := {}
 var _world_stats := ""
 var _sprite_count := 0
 var _sim_stats := ""
+var _time_label: Label
+var _events_label: Label
+var _population_label: Label
+var _events: PackedStringArray = []
+
+## Event lines kept on screen.
+const EVENTS_SHOWN := 6
+## Speeds of time offered (0 = pause).
+const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0]
+
+var _speed_buttons := []
+var _speed := 1.0
+var _speed_before_pause := 1.0
 
 
 func _ready() -> void:
@@ -99,9 +114,43 @@ func _ready() -> void:
 	spawn.tooltip_text = "Spawn 1000 wandering animals: a stress test of the C# simulation"
 	spawn.pressed.connect(func(): spawn_requested.emit(1000))
 	layers.add_child(spawn)
-	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nR: random seed")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nR: random seed\nF: fire under the mouse (test)")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
+
+	# Left: the time of year, the world's latest events and its living creatures.
+	var left := PanelContainer.new()
+	left.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	left.custom_minimum_size.x = 300
+	root.add_child(left)
+	var life := VBoxContainer.new()
+	left.add_child(life)
+	_time_label = _label("")
+	_time_label.add_theme_font_size_override("font_size", 18)
+	life.add_child(_time_label)
+	var speeds := HBoxContainer.new()
+	var speed_group := ButtonGroup.new()
+	for v in SPEEDS:
+		var b := Button.new()
+		b.text = "Pause" if v == 0.0 else "×%d" % v
+		b.toggle_mode = true
+		b.button_group = speed_group
+		b.button_pressed = v == 1.0
+		b.focus_mode = Control.FOCUS_NONE  # Space must not press a focused button
+		b.tooltip_text = "Space: pause / resume · , and . : slower / faster"
+		b.pressed.connect(func(): _set_speed(v))
+		speeds.add_child(b)
+		_speed_buttons.append(b)
+	life.add_child(speeds)
+	_population_label = _label("")
+	_population_label.add_theme_font_size_override("font_size", 12)
+	life.add_child(_population_label)
+	life.add_child(_label("Events"))
+	_events_label = _label("")
+	_events_label.add_theme_font_size_override("font_size", 12)
+	_events_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_events_label.custom_minimum_size.x = 290
+	life.add_child(_events_label)
 
 	# Bottom: hovered tile, generation stats, controls help.
 	var bottom := PanelContainer.new()
@@ -127,6 +176,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		randomize_seed()
 	elif key.keycode == KEY_U:
 		spawn_requested.emit(1000)
+	elif key.keycode == KEY_SPACE:
+		_set_speed(_speed_before_pause if _speed == 0.0 else 0.0)
+	elif key.keycode == KEY_PERIOD or key.keycode == KEY_COMMA:
+		var k := SPEEDS.find(_speed)
+		k = clampi(k + (1 if key.keycode == KEY_PERIOD else -1), 1, SPEEDS.size() - 1)
+		_set_speed(SPEEDS[k])
 	elif key.keycode >= KEY_1 and key.keycode < KEY_1 + MapRenderer.LAYERS.size():
 		var layer: String = MapRenderer.LAYERS[key.keycode - KEY_1]
 		_layer_buttons[layer].button_pressed = true
@@ -156,6 +211,31 @@ func set_sim_stats(units: int, step_ms: float, fps: float) -> void:
 	_refresh_stats()
 
 
+## "Year 3 · Winter".
+func set_time(text: String) -> void:
+	_time_label.text = text
+
+
+## A line in the event log (newest first).
+func add_event(text: String) -> void:
+	_events.insert(0, text)
+	if _events.size() > EVENTS_SHOWN:
+		_events.resize(EVENTS_SHOWN)
+	_events_label.text = "\n".join(_events)
+
+
+## Living creatures by species name, the most numerous first.
+func set_populations(table: Dictionary) -> void:
+	var names := table.keys()
+	names.sort_custom(func(a, b): return table[a] > table[b])
+	var parts := PackedStringArray()
+	for n in names.slice(0, 8):
+		parts.append("%s %d" % [n, table[n]])
+	_population_label.text = "  ".join(parts)
+	_population_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_population_label.custom_minimum_size.x = 290
+
+
 func set_sprite_count(n: int) -> void:
 	_sprite_count = n
 	_refresh_stats()
@@ -173,6 +253,23 @@ func _request() -> void:
 	settings.water_ratio = _water.value / 100.0
 	settings.temperature_offset = _climate.value / 100.0
 	generate_requested.emit()
+
+
+## Changes the speed of time and shows it on the buttons.
+func _set_speed(v: float) -> void:
+	if v == 0.0 and _speed != 0.0:
+		_speed_before_pause = _speed
+	_speed = v
+	var k := SPEEDS.find(v)
+	if k >= 0:
+		_speed_buttons[k].button_pressed = true
+	speed_selected.emit(v)
+
+
+func clear_events() -> void:
+	_events.clear()
+	if _events_label != null:
+		_events_label.text = ""
 
 
 func _label(text: String) -> Label:

@@ -1,0 +1,110 @@
+{
+	"_about": "Biome properties as data, read by sim/AssetLibrary.cs (names from scripts/world/biomes.gd). fertility: how much grass grows (0..1), which grazers eat. burn_chance: per second, the chance that a burning neighbour sets a tile of this biome on fire (as WorldBox tiles have a burn chance: grass and savanna burn easily, swamps and snow never). A tile only burns while it has fuel (grass or plants). burn_time: seconds a tile burns before turning to ash. With 4 neighbours, a fire keeps going where burn_chance x burn_time is above about 0.3: forests burn through, grassland burns in patches.",
+	"biomes": {
+		"Deep water": {
+			"fertility": 0,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Water": {
+			"fertility": 0,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Ice": {
+			"fertility": 0,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Beach": {
+			"fertility": 0.15,
+			"burn_chance": 0.02,
+			"burn_time": 2
+		},
+		"Desert": {
+			"fertility": 0.1,
+			"burn_chance": 0.03,
+			"burn_time": 2
+		},
+		"Savanna": {
+			"fertility": 0.6,
+			"burn_chance": 0.18,
+			"burn_time": 2
+		},
+		"Grassland": {
+			"fertility": 1,
+			"burn_chance": 0.12,
+			"burn_time": 2
+		},
+		"Flower meadow": {
+			"fertility": 1,
+			"burn_chance": 0.12,
+			"burn_time": 2
+		},
+		"Forest": {
+			"fertility": 0.7,
+			"burn_chance": 0.3,
+			"burn_time": 4
+		},
+		"Jungle": {
+			"fertility": 0.8,
+			"burn_chance": 0.12,
+			"burn_time": 4
+		},
+		"Swamp": {
+			"fertility": 0.7,
+			"burn_chance": 0,
+			"burn_time": 4
+		},
+		"Taiga": {
+			"fertility": 0.5,
+			"burn_chance": 0.3,
+			"burn_time": 4
+		},
+		"Tundra": {
+			"fertility": 0.35,
+			"burn_chance": 0.06,
+			"burn_time": 2
+		},
+		"Snow": {
+			"fertility": 0.05,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Hills": {
+			"fertility": 0.8,
+			"burn_chance": 0.12,
+			"burn_time": 2
+		},
+		"Mountain": {
+			"fertility": 0.1,
+			"burn_chance": 0.02,
+			"burn_time": 2
+		},
+		"Peak": {
+			"fertility": 0,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Volcanic rock": {
+			"fertility": 0,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Lava": {
+			"fertility": 0,
+			"burn_chance": 0,
+			"burn_time": 2
+		},
+		"Mushroom land": {
+			"fertility": 0.6,
+			"burn_chance": 0.1,
+			"burn_time": 2
+		},
+		"Cursed land": {
+			"fertility": 0.2,
+			"burn_chance": 0.25,
+			"burn_time": 4
+		}
+	}
+}

@@ -9,6 +9,7 @@ extends SceneTree
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const WorldGenerator = preload("res://scripts/world/world_generator.gd")
 const Biomes = preload("res://scripts/world/biomes.gd")
+const Flora = preload("res://scripts/world/flora.gd")
 
 
 func _initialize() -> void:
@@ -22,13 +23,18 @@ func _initialize() -> void:
 	var sim: Node2D = load("res://sim/Simulation.cs").new()
 	root.add_child(sim)
 	sim.Start(world, PackedStringArray(Biomes.NAMES))
+	var flora := Flora.place(world)
+	sim.LoadPlants(flora.id, flora.pos, flora.flip, flora.scale)
+	# Measure the creatures asked for, not births and deaths along the way.
+	for law in ["animal_spawn", "hunger", "old_age", "natural_disasters"]:
+		sim.SetLaw(law, false)
 	var placed: int = sim.SpawnNatural(units)
 	sim.TakeStepMs()
 	sim.RunSteps(steps)
 	var step_ms: float = sim.TakeStepMs()
 	sim.DrawFrames(60)
 	var draw_ms: float = sim.TakeDrawMs()
-	print("units %d on a %d² world: %.3f ms per step, %.3f ms to draw a frame, %d on water" % [
-		placed, size, step_ms, draw_ms, sim.CountOnWater()])
+	print("units %d and %d plants on a %d² world: %.3f ms per step, %.3f ms to draw a frame, %d on water" % [
+		placed, sim.PlantCount(), size, step_ms, draw_ms, sim.CountOnWater()])
 	print("budget at 60 fps: %.1f%% of 16.7 ms" % [100.0 * (step_ms * 2.0 + draw_ms) / 16.7])
 	quit()

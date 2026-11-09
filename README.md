@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core (in progress)
+## Status: 0.15 2D core and 0.2 Life
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -14,13 +14,32 @@ The world is a **flat 2D map drawn as one texture, one texel per tile**, scaled 
 
 ![Close up](docs/images/world_0.15_close.png)
 
-Every world is generated from a seed with **tectonic plates**: continents grow from clusters of plates, mountain chains rise where plates collide, island arcs form where ocean plates meet, and warped noise gives ragged coasts (see [docs/MAP_GENERATION.md](docs/MAP_GENERATION.md)). Then come climate (latitude, altitude, winds and rain shadows), rivers and lakes, five terrain levels, and natural biomes in large regions. Special biomes (volcanoes, mushroom lands, cursed lands) are never generated at random: they will be placed by the player with the terrain tools (0.16).
+Every world is generated from a seed with **tectonic plates**: continents grow from clusters of plates, mountain chains rise where plates collide, island arcs form where ocean plates meet, and warped noise gives ragged coasts (see [docs/MAP_GENERATION.md](docs/MAP_GENERATION.md)). Then come climate (latitude, altitude, winds and rain shadows), rivers and lakes, five terrain levels, and natural biomes in large regions. Special biomes (volcanoes, mushroom lands, cursed lands) are never generated at random: the player will place them with the terrain tools, which come with the other god powers once the world lives on its own (see the order of work in [docs/ROADMAP.md](docs/ROADMAP.md)).
 
 Plants (trees, bushes, rocks, cacti, mushrooms, flowers) are scattered over the map by biome from the seed, and **drawn in batches**: every sprite is packed into one atlas texture at start, and all of them go into a few MultiMeshes, one per strip of 16 tile rows, sorted by the height of their feet so nearer sprites cover the ones behind. A 512 world draws its ~22,000 plants in a few dozen MultiMeshes instead of 22,000 draws. Each sprite has a small drawn shadow (no real-time lighting) and tall ones sway in the wind. Zoomed far out, every sprite becomes a crisp dot of its average colour and shadows and flowers are hidden. Water moves: a slow swell of light, twinkling glints and foam coming and going on the shores.
 
-The simulation runs in **C#** (`sim/`), built like WorldBox's: one world object, one manager per kind of entity (units for now), zones of 8×8 tiles for spatial queries, and a scheduler running each system at its own rate in batches (walking every step, decisions once a second over 10 batches, world processes over slices of the map). Content is data (`data/species.json`, `data/plants.json`). Animals are born only in the biomes their species lives in (monsters only in special biomes, which the player creates), wander and hop as they walk; their sprites go straight into one MultiMesh buffer each frame, sorted by height. 5,000 animals cost about 0.25 ms per simulation step and 2 ms per frame to draw on the CPU.
+The simulation runs in **C#** (`sim/`), built like WorldBox's: one world object, one manager per kind of entity (creatures and plants for now), zones of 8×8 tiles for spatial queries, and a scheduler running each system at its own rate in batches (walking every step, decisions once a second over 10 batches, nature over slices of the map). Content is data (`data/species.json`, `data/plants.json`).
 
-Next: 0.16 terrain tools, then 0.2 Life. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+## 0.2 Life
+
+The world is alive:
+- **Time**: pause, or speed up to ×10 to watch years go by. **Seasons**: a year lasts a minute. Plants grow fast in spring and stop in midwinter, and frost creeps over the map from the poles.
+- **Plants grow, spread, burn and grow back.** Saplings grow up, grown plants seed their surroundings up to their biome's density, and bare ground is recolonised. Fire lives on tiles, as in WorldBox: each biome has a burn chance and a burn time (`data/biomes.json`), so forests burn through, grassland burns in patches and swamps never burn. Lightning starts wildfires (and **F** under the mouse, as a test tool). They leave ash on the ground, and plants grow back about a year later.
+- **Animals have needs.** They graze a layer of grass that regrows, walk to water to drink, rest, and breed when fed and a mate is near. They die of old age, hunger, thirst, predators or fire.
+- **Food chains**: wolves, foxes and bears hunt prey of their size or smaller. Each species' habitat feeds only so many, and nature brings scarce species back over time. Migrating species head for the equator in winter. Extinctions show in the events panel, with the time of year and the population of each species.
+- **Rules of nature are switches** (world laws: animal spawn, hunger, old age, natural disasters, tree growth), ready for the laws menu.
+
+![A forest fire](docs/images/fire_0.2.png)
+
+5,000 animals and 5,000 plants cost about 0.4 ms per simulation step and 2.4 ms per frame to draw on the CPU. `tools/life_check.gd` runs a world for years and prints the populations.
+
+Every living being is **redrawn in pixel art at display size** (`art/creatures.py`), in the spirit of WorldBox: animals, monsters and the 12 peoples in their 4 roles, about a tile tall, with six poses each (idle, two walking steps, attack, swim, death). Creatures walk in steps, strike their prey, and leave remains where they die.
+
+![Creatures in a meadow](docs/images/creatures_ingame.png)
+
+All poses: [docs/images/creatures.png](docs/images/creatures.png).
+
+Next: 0.3 Peoples (choose at least two peoples and watch them live). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -52,6 +71,8 @@ Controls:
 | Pan | drag with any mouse button (or click and drag on a trackpad), trackpad two-finger scroll, WASD, arrow keys |
 | New random world | R or the **Random** button |
 | Add 1000 wandering animals (stress test) | U or the **+1000 animals** button |
+| Pause / resume, slower / faster time | Space, comma / period, or the ×1 ×2 ×5 ×10 buttons |
+| Set fire under the mouse (test tool) | F |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Tile info | hover the map (bottom bar) |
 
@@ -67,15 +88,15 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
-| `sim/` | C# simulation core: world tiles, unit manager, zones, scheduler, data records, drawing of units |
-| `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `plants.json` (plants per biome) |
+| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
+| `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
 | `assets/tiles/` | terrain atlas used by the game |
-| `assets/sprites/` | game sprites (trees, plants, peoples, races, animals, monsters), cut by `art/extract_sprites.py` |
+| `assets/sprites/` | game sprites: `creatures/` drawn by `art/creatures.py`; trees and plants cut by `art/extract_sprites.py` (the old cut peoples, races, animals and monsters are only used by the 3D asset sheet tool) |
 | `art/` | reference sheets (`reference/`), sprite extraction script, old 8×8 sprite generator (not imported by Godot) |
 | `tests/` | headless tests |
-| `tools/` | headless preview renderer, screenshot, asset sheet and performance check tools |
+| `tools/` | headless preview renderer, screenshot, asset sheet, life check and performance check tools |
 | `docs/` | game design and research |
 
 ## Tests and tools
@@ -90,6 +111,12 @@ dotnet build
 
 ```bash
 godot --headless --path . --script res://tests/test_world.gd
+```
+
+Living world over the years (populations, deaths by cause, plants):
+
+```bash
+godot --headless --path . --script res://tools/life_check.gd -- 10 animundi 256
 ```
 
 Performance check of the simulation (5,000 animals by default; prints the cost of a step and of drawing a frame):
@@ -112,6 +139,12 @@ To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, Nu
 
 ```bash
 python3 art/extract_sprites.py
+```
+
+The sprites of every living being (animals, monsters, peoples and their poses) and their preview sheet are drawn by:
+
+```bash
+python3 art/creatures.py
 ```
 
 The old 8×8 sprites and the 2D terrain atlas used by the preview tool are generated by:

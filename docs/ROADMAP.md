@@ -1,5 +1,7 @@
 # Animundi — Roadmap to 1.0
 
+**Order of work: the simulation first, the player's powers last.** Before any god power, the world must live on its own: start a world with at least two peoples, speed up time, and watch them live their lives among animals, plants, seasons and disasters. Then the AI minds make every game different: peoples that build ever more advanced cities, invent new things, take different directions, think differently and use different powers. Only once all that works well do the player's powers come (0.9), to influence the world at will.
+
 Milestones from [GAME_DESIGN.md § 23](GAME_DESIGN.md#23-milestones). Tick items as they land. Design lessons from WorldBox's wiki that shaped several items: [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md).
 
 Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven content, batched simulation in C#; see [WORLDBOX_ANALYSIS.md](WORLDBOX_ANALYSIS.md)), **different where it matters**: local AI minds that invent objects, buildings and ways of life, and make them evolve. The AI arrives at 0.5, as soon as there are settlements to invent for.
@@ -23,23 +25,27 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Data-driven assets: species and plants as data records (`data/`); buildings, items and powers join as they are made
 - [x] Performance check (`tools/perf_check.gd`): 5,000 wandering animals cost ~0.25 ms per step and ~2 ms per frame of drawing on the CPU (20,000: ~0.8 ms and ~5 ms); GPU frame rate still to confirm on a real mid-range PC
 
-## 0.16 Terrain tools
-Special biomes are never generated at random: the player places them.
-- [ ] Biome brush: paint mushroom land, cursed land, volcanic rock, lava (and the natural biomes), with a brush size
-- [ ] Stamps: ready-made presets (volcanoes of several sizes, later islands, craters, oases) pasted on the map where the player clicks; levels around them are fixed so the terrain stays valid
-- [ ] The player's own presets: select an area of the map and save it as a stamp, reuse it in any world
-- [ ] Plants and the map texture update only where the terrain changed
-
 ## 0.2 Life
-- [ ] Living flora: forests grow, spread, burn and regrow
+- [x] Living flora (C#): saplings grow, adult plants seed their neighbourhood up to their biome's density, bare ground is recolonised
+- [x] Fire on tiles, as in WorldBox: each biome has a burn chance and burn time (`data/biomes.json`), a burning tile lights its neighbours while they have fuel (grass or plants), sets its plants alight and kills what stands in it, then turns to ash that fades over most of a year; forests burn through, grassland in patches, swamps never; rocks don't burn
 - [x] Natural spawning as data: each species lists the biomes it is born in, with weights; monsters only in special biomes; a fresh world has animals, never monsters
-- [ ] Animals born over time by biome (world law "animal spawn"), and creatures that only the player, events or deaths bring (zombies, golems, dragons…)
-- [ ] Animals that move, with needs (hunger, thirst, rest, reproduction)
-- [ ] Food chains: herbivores and predators, populations that rise and crash
-- [ ] Seasonal migrations, extinctions
-- [ ] Simple sprite animations: real walk cycles (2–3 frames) and attack, replacing the two-frame hop; colour masks for kingdom colours and biome skins (WorldBox-style phenotypes)
+- [x] Animals born over time by biome (world law "animal spawn"), only while their species is scarce; creatures with no natural biome only come from the player (events and deaths that bring zombies, skeletons… come with 0.7)
+- [x] Animals with needs: hunger (grazing a grass layer that regrows), thirst (walking to the nearest water), rest, breeding with a mate nearby; death by old age, hunger, thirst, predators or fire
+- [x] Food chains: herbivores graze, carnivores and omnivores hunt prey of their size or smaller; each species' habitat feeds a limited number (births slow down as it fills); fires and winters thin populations
+- [x] Seasons (a year is 60 s): growth fast in spring and stopped in midwinter, frost spreading from the poles on the map; migrating species head for the equator in winter; extinctions logged in the events panel
+- [x] World laws as switches in the simulation (animal spawn, hunger, old age, natural disasters, tree growth); a menu for them comes with 0.9
+- [x] Events panel (extinctions, lightning fires), time of year and population per species in the HUD; F sets fire under the mouse (test tool, not a power)
+- [x] Time controls: pause, ×1, ×2, ×5, ×10 (buttons, Space, comma and period)
+- [x] Sprite animations: two walking steps, a strike when a hunter reaches its prey, remains lying where a creature died (5 s); young creatures drawn smaller
+- [ ] Colour masks for kingdom colours and biome skins (WorldBox-style phenotypes); dedicated child sprites; swimming once creatures can swim
+- [x] **Redrawn sprites of every living being** (`art/creatures.py`, sheet in [images/creatures.png](images/creatures.png)): 12 animals, 9 monsters and the 12 peoples in their 4 roles, original pixel art in the spirit of WorldBox (see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3):
+  - drawn at display size, one sprite pixel per world pixel: about a tile tall (animals 6–13 px wide, people 7×9), a dragon three tiles long
+  - a text template and palette per creature, automatic shading (lit top edge, soft darker outline)
+  - six poses each, made from the template: idle, two walking steps (the legs swing), attack (lunge), swim, death (lying down)
+  - peoples assembled from parts: a body per race (ears, horns, beard, tusks, crest, tail, fins, foliage, wings, sockets) and an outfit per role (villager's sack, warrior's helmet and sword, chief's crown and cape, shaman's hood and staff)
 
 ## 0.3 Peoples
+- [ ] World setup before starting: choose the peoples that live in the world (at least two), then watch them at any speed
 - [ ] The 12 races placed in their preferred biomes at world start
 - [ ] Per-world race variation (colours, stats, temperament)
 - [ ] Language generator for names (people, cities, rivers, gods)
@@ -84,6 +90,12 @@ Special biomes are never generated at random: the player places them.
 - [ ] Moods of the world: eras of a few decades (bright, dark, rainy, cold, magical…) that change weather, growth and monsters, steerable by the player
 
 ## 0.9 God powers and interface
+Nothing here before the world lives on its own (see the order of work above). Special biomes and volcanoes are never generated at random: the player places them with these tools.
+- [ ] Biome brush: paint mushroom land, cursed land, volcanic rock, lava (and the natural biomes), with a brush size
+- [ ] Stamps: ready-made presets (volcanoes of several sizes, later islands, craters, oases) pasted on the map where the player clicks; levels around them are fixed so the terrain stays valid
+- [ ] The player's own presets: select an area of the map and save it as a stamp, reuse it in any world
+- [ ] Plants and the map texture update only where the terrain changed
+- [ ] Fire power drops sparks (particles) that set alight the tiles they land on, as in WorldBox; the F key is only a test tool until then
 - [ ] Every power: terrain, spawning, weather, disasters, miracles, curses, destruction, faith mode, avatar, gestures, world laws, storyteller
 - [ ] Inspector cards: unit, city, kingdom, species, spirit, invention (with its script and lineage)
 - [ ] Map layers (kingdoms, cultures, languages, religions, clans, families, species, alliances, armies), war lines, plot and task icons, unit arrows, and statistics

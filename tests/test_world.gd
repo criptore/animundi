@@ -17,6 +17,7 @@ const MapCamera = preload("res://scripts/ui/map_camera.gd")
 const Flora = preload("res://scripts/world/flora.gd")
 const SpriteAtlas = preload("res://scripts/render2d/sprite_atlas.gd")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
+const Races = preload("res://scripts/world/races.gd")
 const SpriteBatch = preload("res://scripts/render2d/sprite_batch.gd")
 
 var _failures := 0
@@ -41,8 +42,12 @@ func _initialize() -> void:
 	test_flora()
 	test_sprite_atlas()
 	test_sprite_batch()
+	test_creature_sprites()
 	test_species_data()
 	test_simulation()
+	test_life()
+	test_scripts_load()
+	test_nature()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -266,7 +271,7 @@ func test_flora() -> void:
 			ok = false
 	check(ok, "every plant's sprite stands over land, never over water")
 	var mushroom := SpriteLibrary.world_size("plants/Red_mushroom")
-	var villager := SpriteLibrary.world_size("peoples/Elves_Villager")
+	var villager := SpriteLibrary.world_size("creatures/elves_villager_idle")
 	check(mushroom.y < villager.y * 0.6, "mushrooms are smaller than the peoples")
 
 	# Changing a tile only changes the plants on and right around it.
@@ -329,7 +334,7 @@ func test_sprite_batch() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for k in 3000:
-		ids.append(["trees/Oak", "plants/Bush", "animals/Cow", "nope/Missing"][k % 4])
+		ids.append(["trees/Oak", "plants/Bush", "creatures/cow_idle", "nope/Missing"][k % 4])
 		pos.append(Vector2(rng.randf_range(0, 2048), rng.randf_range(0, 2048)))
 		flips.append(k % 2)
 		scales.append(1.0)
@@ -407,19 +412,45 @@ func test_trackpad() -> void:
 	cam.free()
 
 
+const MONSTERS := ["skeleton", "zombie", "ghost", "spider", "slime", "demon", "golem", "yeti", "dragon"]
+
+
+func test_creature_sprites() -> void:
+	# Drawn at display size: about a tile tall (8 world pixels), never scaled from large art.
+	var ok := true
+	var sizes := []
+	for id in ["creatures/cow_idle", "creatures/wolf_idle", "creatures/humans_villager_idle", "creatures/dwarves_warrior_idle"]:
+		var size := SpriteLibrary.world_size(id) * WorldMap.TILE
+		sizes.append(size)
+		ok = ok and size.y >= 5.0 and size.y <= 12.0
+	check(ok, "creatures are about one tile tall %s" % [sizes])
+	var walk_differs: bool = SpriteLibrary.texture("creatures/cow_walk1").get_image().get_data() \
+			!= SpriteLibrary.texture("creatures/cow_idle").get_image().get_data()
+	var dead := SpriteLibrary.texture("creatures/humans_villager_death")
+	check(walk_differs and dead.get_width() > dead.get_height(), "creatures have walking frames and lie down when dead")
+	var people := 0
+	for race in Races.RACES:
+		for role in Races.ROLES:
+			if SpriteLibrary.exists("creatures/%s_%s_idle" % [race.to_lower(), role.to_lower()]):
+				people += 1
+	check(people == 48, "every people has a sprite for each of its 4 roles (%d)" % people)
+
+
 func test_species_data() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/species.json"))
 	var atlas := SpriteAtlas.shared()
 	var ok: bool = data.species.size() >= 5
 	var natural_monsters := []
 	for sp in data.species:
-		ok = ok and atlas.has(sp.sprite) and sp.speed > 0.0
+		for pose in ["idle", "walk1", "walk2", "attack", "swim", "death"]:
+			ok = ok and atlas.has("%s_%s" % [sp.sprite, pose])
+		ok = ok and sp.speed > 0.0
 		for b in sp.natural:
 			ok = ok and Biomes.NAMES.has(b)
 			# Monsters may only be born in special biomes, which only the player creates.
-			if sp.sprite.begins_with("monsters/") and not b in ["Mushroom land", "Cursed land", "Volcanic rock", "Lava"]:
+			if sp.id in MONSTERS and not b in ["Mushroom land", "Cursed land", "Volcanic rock", "Lava"]:
 				natural_monsters.append(sp.id)
-	check(ok, "every species record has a known sprite, known biomes and a speed (%d species)" % data.species.size())
+	check(ok, "every species record has all its poses in the atlas, known biomes and a speed (%d species)" % data.species.size())
 	check(natural_monsters.is_empty(), "monsters are only born in special biomes %s" % [natural_monsters])
 
 
@@ -466,3 +497,181 @@ func test_simulation() -> void:
 	check(partial < 128 and sim.RowsVisited("test") >= 128,
 			"world processes work through the map in slices (%d rows, then %d)" % [partial, sim.RowsVisited("test")])
 	sim.queue_free()
+
+
+## A living world (plants and the simulation) for the 0.2 tests.
+func make_sim(seed_text: String, size := 128) -> Array:
+	var w := make(seed_text, size)
+	var sim: Node2D = load("res://sim/Simulation.cs").new()
+	root.add_child(sim)
+	sim.Start(w, PackedStringArray(Biomes.NAMES))
+	var flora := Flora.place(w)
+	sim.LoadPlants(flora.id, flora.pos, flora.flip, flora.scale)
+	return [w, sim]
+
+
+## First land tile of biome `b` whose 5x5 neighbourhood is land and has no water nearby (or, with
+## `near_water`, a land tile right next to water).
+func find_tile(w: WorldData, b: int, near_water := false) -> Vector2i:
+	for y in range(3, w.height - 3):
+		for x in range(3, w.width - 3):
+			var i := w.index(x, y)
+			if w.is_water(i) or (b >= 0 and w.biome[i] != b):
+				continue
+			var water := 0
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					if w.is_water(w.index(x + dx, y + dy)):
+						water += 1
+			if (near_water and w.is_water(w.index(x + 1, y))) or (not near_water and water == 0):
+				return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+
+func test_life() -> void:
+	var made := make_sim("life")
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	for law in ["animal_spawn", "natural_disasters", "old_age"]:
+		sim.SetLaw(law, false)
+
+	# Grazing: a hungry cow on fresh grass eats it.
+	var g := find_tile(w, Biomes.GRASSLAND)
+	var cow: int = sim.SpawnAt("cow", g.x + 0.5, g.y + 0.5, false)
+	sim.SetNeeds(cow, 0.9, 0.0)
+	var grass_before: float = sim.GrassAt(g.x, g.y)
+	sim.RunSteps(90)
+	check(sim.UnitHunger(cow) < 0.6 and sim.GrassAt(g.x, g.y) < grass_before,
+			"a hungry grazer eats the grass of its tile (hunger %.2f, grass %.2f -> %.2f)" % [
+			sim.UnitHunger(cow), grass_before, sim.GrassAt(g.x, g.y)])
+
+	# Drinking: a thirsty animal by the water drinks.
+	var shore := find_tile(w, -1, true)
+	var deer: int = sim.SpawnAt("deer", shore.x + 0.5, shore.y + 0.5, false)
+	sim.SetNeeds(deer, 0.0, 0.9)
+	sim.RunSteps(90)
+	check(sim.UnitThirst(deer) < 0.2, "a thirsty animal by the water drinks (thirst %.2f)" % sim.UnitThirst(deer))
+
+	# Hunting: a hungry wolf catches the rabbit next to it.
+	var f := find_tile(w, Biomes.GRASSLAND)
+	var rabbit: int = sim.SpawnAt("rabbit", f.x + 0.5, f.y + 0.5, false)
+	var wolf: int = sim.SpawnAt("wolf", f.x + 1.5, f.y + 0.5, false)
+	sim.SetNeeds(wolf, 0.9, 0.0)
+	sim.SetNeeds(rabbit, 0.0, 0.0)
+	sim.RunSteps(30 * 15)
+	check(not sim.UnitAlive(rabbit) and sim.LifeStats()["Eaten"] >= 1 and sim.UnitHunger(wolf) < 0.5,
+			"a hungry predator hunts and eats smaller prey")
+
+	# Hunters only take prey of their size or smaller: a fox never catches a bear.
+	var b := find_tile(w, Biomes.FOREST)
+	if b.x < 0:
+		b = g
+	var bear: int = sim.SpawnAt("bear", b.x + 0.5, b.y + 0.5, false)
+	var fox: int = sim.SpawnAt("fox", b.x + 1.0, b.y + 0.5, false)
+	sim.SetNeeds(fox, 0.9, 0.0)
+	sim.SetNeeds(bear, 0.0, 0.0)
+	sim.RunSteps(30 * 5)
+	check(sim.UnitAlive(bear), "a small hunter does not catch a big animal")
+	sim.queue_free()
+
+	# Years later: births happen, populations stay within what their habitat feeds, and nature
+	# never brings monsters.
+	made = make_sim("years")
+	sim = made[1]
+	sim.SpawnNatural(120)
+	sim.RunSteps(30 * 60 * 4)  # 4 years
+	var stats: Dictionary = sim.LifeStats()
+	check(stats["births"] > 0 and sim.UnitCount() > 0, "animals breed (%d births in 4 years)" % stats["births"])
+	var within := true
+	for id in ["rabbit", "sheep", "wolf", "bear", "cow"]:
+		within = within and sim.PopulationOf(id) <= sim.CapacityOf(id) + 8
+	check(within, "populations stay within what their habitat can feed")
+	check(sim.CountUnnatural() == 0 and sim.CountOnWater() == 0, "nature brings no monsters, and no one walks on water")
+	check(stats["OldAge"] + stats["Hunger"] + stats["Thirst"] + stats["Eaten"] > 0,
+			"creatures die (old age, hunger, thirst, predators): %s" % [stats])
+	sim.queue_free()
+
+
+func test_nature() -> void:
+	var made := make_sim("nature")
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+
+	# Time can be paused and sped up: the same simulation, more steps per frame.
+	var t0: float = sim.SimTime()
+	sim.SetTimeScale(0.0)
+	for k in 10:
+		sim._process(0.1)
+	var paused: float = sim.SimTime() - t0
+	sim.SetTimeScale(5.0)
+	for k in 10:
+		sim._process(0.1)
+	var fast: float = sim.SimTime() - t0
+	sim.SetTimeScale(1.0)
+	check(paused == 0.0 and absf(fast - 5.0) < 0.1, "time pauses and runs five times faster at ×5 (%.2f s in 1 s)" % fast)
+
+	# Seasons turn through the year.
+	var seasons := {}
+	var coldest := 0.0
+	for k in 8:
+		seasons[sim.SeasonName()] = true
+		coldest = maxf(coldest, sim.Coldness())
+		sim.RunSteps(30 * 8)  # 8 s
+	check(seasons.size() == 4 and coldest > 0.9 and sim.Year() == 2,
+			"a year has four seasons and a cold winter (%s)" % [seasons.keys()])
+
+	# Fire: a forest set alight burns down and leaves ash; rocks never burn.
+	var forest := find_tile(w, Biomes.FOREST)
+	var lit: int = sim.Ignite(forest.x + 0.5, forest.y + 0.5, 3.0)
+	sim.RunSteps(30 * 6)
+	var after_fire: int = sim.PlantCount()
+	var ash := 0
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			if w.in_bounds(forest.x + dx, forest.y + dy):
+				ash = maxi(ash, sim.ScorchAt(forest.x + dx, forest.y + dy))
+	var burned: int = sim.LifeStats()["plants_burned"]
+	check(lit > 0 and burned > 0 and ash > 0,
+			"fire spreads through the forest and leaves ash (%d lit, %d burned down)" % [lit, burned])
+	var changes: PackedInt32Array = sim.TakeScorchChanges()
+	check(changes.size() > 0 and changes.size() % 2 == 0, "the map is told where the ground burned")
+	# Fire runs through grass too (it lives on tiles), but never into a swamp.
+	var meadow := find_tile(w, Biomes.SAVANNA)
+	if meadow.x < 0:
+		meadow = find_tile(w, Biomes.GRASSLAND)
+	sim.Ignite(meadow.x + 0.5, meadow.y + 0.5, 1.5)
+	var spread := false
+	for k in 30:
+		sim.RunSteps(3)
+		for dy in range(-3, 4):
+			for dx in range(-3, 4):
+				if maxi(absi(dx), absi(dy)) >= 2 and (sim.TileOnFire(meadow.x + dx, meadow.y + dy) or sim.ScorchAt(meadow.x + dx, meadow.y + dy) > 0):
+					spread = true
+	check(spread, "fire spreads from tile to tile through grass")
+	var swamp := find_tile(w, Biomes.SWAMP)
+	if swamp.x >= 0:
+		check(sim.Ignite(swamp.x + 0.5, swamp.y + 0.5, 1.0) == 0, "swamps never burn")
+	check(not sim.IsFlammable("plants/Rock") and not sim.IsFlammable("plants/Boulder") and sim.IsFlammable("trees/Oak"),
+			"rocks and boulders don't catch fire, trees do")
+
+	# A year later the ash is gone and plants grow back.
+	sim.RunSteps(30 * 60)
+	var ash_left := 0
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			if w.in_bounds(forest.x + dx, forest.y + dy):
+				ash_left = maxi(ash_left, sim.ScorchAt(forest.x + dx, forest.y + dy))
+	check(ash_left == 0 and sim.PlantCount() > after_fire,
+			"a year later the ash has faded and plants have grown back (%d plants)" % sim.PlantCount())
+	sim.queue_free()
+
+
+## Every game script compiles (the tests above don't load the HUD or the main scene).
+func test_scripts_load() -> void:
+	var ok := true
+	for path in ["res://scripts/ui/hud.gd", "res://scripts/main.gd", "res://scripts/ui/map_camera.gd",
+			"res://scripts/render2d/world_map.gd"]:
+		var script: GDScript = load(path)
+		ok = ok and script != null and script.can_instantiate()
+	check(ok, "the HUD, main scene and map scripts compile")

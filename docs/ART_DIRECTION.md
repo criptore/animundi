@@ -8,7 +8,8 @@ The world is shown **from above, flat, in 2D pixel art**, the way WorldBox does 
 |---|---|
 | Map | **One texture, one pixel per tile**, scaled up with sharp pixels. Biome colour with slight per-tile variation; height told by colour (the five levels: deep sea, shallow water, plain/beach, hill, mountain) and a one-pixel darker edge where the ground steps down; a light pixel pattern (grass, sand, snow, rock) appears when zoomed in. **Flowers are single pixels of colour** on grass (many on flower meadows), as in WorldBox |
 | Water | Depth colours from the water sheet, cheap animated glints and shore foam |
-| Sprites | The 2D sprites cut from the reference sheets, **drawn in batches** (thousands per draw call), sorted by screen height, each with a small drawn shadow. Sizes close to WorldBox's (measured on its wiki, see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3): a creature about one tile tall, a tree about two. Walking creatures hop on two frames until real walk cycles arrive |
+| Creatures | **Drawn at display size** by `art/creatures.py` (one sprite pixel = one world pixel, about a tile tall), small side views with automatic shading and six poses (idle, two walking steps, attack, swim, death). Same pixel size as the ground patterns |
+| Sprites | Plants: the 2D sprites cut from the reference sheets, **drawn in batches** (thousands per draw call), sorted by screen height, each with a small drawn shadow. Sizes close to WorldBox's (measured on its wiki, see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3): a creature about one tile tall, a tree about two. Walking creatures hop on two frames until real walk cycles arrive |
 | Zoom | Zoomed out: units become dots in their kingdom or species colour, small plants are hidden. Zoomed in: full sprites and patterns |
 | Effects | Cheap only: wind sway, water, fire, smoke, magic and weather particles in pixels. **No real-time lighting or shadows** |
 

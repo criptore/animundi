@@ -24,6 +24,22 @@ public sealed class UnitManager
 	/// <summary>1 when the unit last walked left (its sprite is mirrored).</summary>
 	public bool[] FacingLeft = Array.Empty<bool>();
 
+	// Life (0.2). Needs go from 0 (satisfied) to 1 (desperate).
+	/// <summary>Age in years.</summary>
+	public float[] Age = Array.Empty<float>();
+	public float[] Hunger = Array.Empty<float>();
+	public float[] Thirst = Array.Empty<float>();
+	/// <summary>1 = rested, 0 = exhausted.</summary>
+	public float[] Energy = Array.Empty<float>();
+	/// <summary>Seconds before the unit can breed again.</summary>
+	public float[] BreedWait = Array.Empty<float>();
+	/// <summary>Seconds spent starving or dying of thirst (dies past a limit).</summary>
+	public float[] Suffering = Array.Empty<float>();
+	/// <summary>What the unit is doing: one of the Simulation.Task values.</summary>
+	public byte[] Task = Array.Empty<byte>();
+	/// <summary>Unit being hunted, or -1.</summary>
+	public int[] Prey = Array.Empty<int>();
+
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
 
@@ -44,6 +60,14 @@ public sealed class UnitManager
 		Species[i] = species;
 		Wait[i] = 0f;
 		FacingLeft[i] = false;
+		Age[i] = 0f;
+		Hunger[i] = 0f;
+		Thirst[i] = 0f;
+		Energy[i] = 1f;
+		BreedWait[i] = 0f;
+		Suffering[i] = 0f;
+		Task[i] = 0;
+		Prey[i] = -1;
 		Count++;
 		return i;
 	}
@@ -75,6 +99,14 @@ public sealed class UnitManager
 		Array.Resize(ref Species, size);
 		Array.Resize(ref Wait, size);
 		Array.Resize(ref FacingLeft, size);
+		Array.Resize(ref Age, size);
+		Array.Resize(ref Hunger, size);
+		Array.Resize(ref Thirst, size);
+		Array.Resize(ref Energy, size);
+		Array.Resize(ref BreedWait, size);
+		Array.Resize(ref Suffering, size);
+		Array.Resize(ref Task, size);
+		Array.Resize(ref Prey, size);
 		Array.Resize(ref _free, size);
 	}
 }

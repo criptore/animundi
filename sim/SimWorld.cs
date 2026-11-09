@@ -41,6 +41,49 @@ public sealed class SimWorld
 
 	public bool IsLand(int x, int y) => InBounds(x, y) && Water[Index(x, y)] == WaterLand;
 
+	/// <summary>For each land tile, the nearest water tile (sea, lake or river) within
+	/// `maxDistance` steps, or -1 (breadth-first from every water tile).</summary>
+	public int[] NearestWater(int maxDistance)
+	{
+		int n = Width * Height;
+		var nearest = new int[n];
+		var dist = new int[n];
+		var queue = new int[n];
+		int head = 0, tail = 0;
+		for (int i = 0; i < n; i++)
+		{
+			nearest[i] = -1;
+			dist[i] = int.MaxValue;
+			if (Water[i] != WaterLand)
+			{
+				nearest[i] = i;
+				dist[i] = 0;
+				queue[tail++] = i;
+			}
+		}
+		while (head < tail)
+		{
+			int i = queue[head++];
+			if (dist[i] >= maxDistance)
+				continue;
+			int x = i % Width, y = i / Width;
+			for (int k = 0; k < 4; k++)
+			{
+				int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0);
+				int ny = y + (k == 2 ? 1 : k == 3 ? -1 : 0);
+				if (!InBounds(nx, ny))
+					continue;
+				int j = ny * Width + nx;
+				if (dist[j] != int.MaxValue)
+					continue;
+				dist[j] = dist[i] + 1;
+				nearest[j] = nearest[i];
+				queue[tail++] = j;
+			}
+		}
+		return nearest;
+	}
+
 	/// <summary>Whether the point (in tiles) stands on land.</summary>
 	public bool IsLandAt(float x, float y) => IsLand((int)Mathf.Floor(x), (int)Mathf.Floor(y));
 }

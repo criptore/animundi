@@ -6,8 +6,10 @@ extends RefCounted
 
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
 
-const GROUPS := ["trees", "plants", "peoples", "races", "animals", "monsters"]
+const GROUPS := ["trees", "plants", "creatures"]
 const WIDTH := 1024
+## Frames of the flame drawn over burning plants (made here, in pixel art: see fire_frame).
+const FIRE_FRAMES := 3
 const PAD := 4
 
 var texture: ImageTexture
@@ -37,6 +39,8 @@ func _init() -> void:
 				img.decompress()
 			img.convert(Image.FORMAT_RGBA8)
 			images[id] = img
+	for k in FIRE_FRAMES:
+		images["effects/Fire_%d" % k] = fire_frame(k)
 	var ids := images.keys()
 	ids.sort_custom(func(a, b): return images[a].get_height() > images[b].get_height())
 
@@ -81,3 +85,35 @@ static func _average(img: Image) -> Color:
 				sum += c
 				n += 1
 	return Color(sum.r / n, sum.g / n, sum.b / n) if n > 0 else Color.BLACK
+
+
+## One frame of a small pixel-art flame, 12x16: tongues of fire of uneven heights, highest in
+## the middle, with a dark red rim, an orange body and a yellow heart low in the middle. Each frame
+## draws different tongues, so cycling through them flickers.
+static func fire_frame(k: int) -> Image:
+	var w := 12
+	var h := 16
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7919 + k * 104729
+	var rim := Color("#9a2410")
+	var body := Color("#f0621e")
+	var heart := Color("#ffd84a")
+	# Height of each column: a hump, cut into ragged tongues.
+	var tops: Array[int] = []
+	for x in w:
+		var dx := absf(x + 0.5 - w / 2.0) / (w / 2.0)
+		var hump := (1.0 - dx * dx) * h
+		tops.append(int(hump * rng.randf_range(0.45, 1.0)))
+	for x in w:
+		var top: int = tops[x]
+		for t in top:
+			var y := h - 1 - t
+			var c := body
+			var edge: bool = t >= top - 1 or (x > 0 and t >= tops[x - 1]) or (x < w - 1 and t >= tops[x + 1])
+			if edge:
+				c = rim
+			elif t < top * 0.55 and absf(x + 0.5 - w / 2.0) < 3.0:
+				c = heart
+			img.set_pixel(x, y, c)
+	return img

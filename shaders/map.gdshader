@@ -11,10 +11,12 @@ shader_type canvas_item;
 
 // Size of the map in tiles.
 uniform vec2 map_size = vec2(256.0);
-// R = level / 4, G = pattern / 8, B = 1 for water.
+// R = level / 4, G = pattern / 8, B = 1 for water, A = ash left by fire.
 uniform sampler2D data : filter_nearest;
 // Patterns only on the biome layer; data layers show flat colours (edges stay, to read relief).
 uniform bool show_patterns = true;
+// Winter: frost whitens the land towards the poles (0 = none, 1 = midwinter).
+uniform float frost = 0.0;
 
 const float SUB = 8.0;
 // Pattern ids (same order as WorldMap.Pattern).
@@ -133,6 +135,22 @@ void fragment() {
 				|| (tile_data(cell + ivec2(1, 0)).b < 0.5 && sub.x == 7);
 		if (shore && hash(vec2(cell) * 8.0 + vec2(sub)) < 0.35 + 0.5 * wave) {
 			col = mix(col, vec3(0.92, 0.97, 1.0), 0.55 * detail);
+		}
+	}
+
+	if (!water && show_patterns) {
+		// Ash: burned ground turns dark grey, with lighter cinders, and fades as it heals.
+		float ash = d.a;
+		if (ash > 0.0) {
+			vec3 burnt = vec3(0.17, 0.15, 0.14) + (hash(vec2(cell) * 8.0 + vec2(sub) + 7.0) > 0.85 ? 0.12 : 0.0) * detail;
+			col = mix(col, burnt, clamp(ash * 1.2, 0.0, 0.9));
+		}
+		// Frost in winter: from the poles towards the middle, speckled up close.
+		float lat = abs((float(cell.y) + 0.5) / map_size.y - 0.5) * 2.0;
+		float cover = frost * smoothstep(0.3, 0.75, lat + (hash(vec2(cell)) - 0.5) * 0.1);
+		if (cover > 0.0) {
+			float speck = hash(vec2(cell) * 8.0 + vec2(sub) + 3.0);
+			col = mix(col, vec3(0.93, 0.96, 1.0), clamp(cover * (0.75 + 0.25 * speck), 0.0, 0.85));
 		}
 	}
 
