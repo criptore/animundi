@@ -17,6 +17,8 @@ var _climate: SpinBox
 var _hover_label: Label
 var _stats_label: Label
 var _layer_buttons := {}
+var _world_stats := ""
+var _sprite_count := 0
 
 
 func _ready() -> void:
@@ -89,7 +91,7 @@ func _ready() -> void:
 		b.pressed.connect(func(): layer_selected.emit(layer))
 		layers.add_child(b)
 		_layer_buttons[layer] = b
-	var help := _label("\nWheel: zoom\nRight drag / WASD: pan\nR: random seed")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nR: random seed")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 
@@ -132,7 +134,18 @@ func set_stats(world) -> void:
 	var total := 0.0
 	for ms in world.stage_ms.values():
 		total += ms
-	_stats_label.text = "Seed %d · %dx%d · generated in %.0f ms" % [world.seed_value, world.width, world.height, total]
+	_world_stats = "Seed %d · %dx%d · generated in %.0f ms" % [world.seed_value, world.width, world.height, total]
+	_refresh_stats()
+
+
+func set_sprite_count(n: int) -> void:
+	_sprite_count = n
+	_refresh_stats()
+
+
+func _refresh_stats() -> void:
+	if _stats_label != null:
+		_stats_label.text = "%s · %d sprites" % [_world_stats, _sprite_count]
 
 
 func _request() -> void:

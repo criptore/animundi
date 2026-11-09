@@ -1,7 +1,7 @@
 // The world map: one texel per tile (TEXTURE holds the tile colours, `data` the level, pattern and
 // water flag of each tile), drawn on a sprite where a tile is TILE world pixels wide.
 //
-// Up close, each tile is cut into an 8x8 grid of "pattern pixels" (the pixel size of the sprites):
+// Up close, each tile is cut into an 8x8 grid of "pattern pixels" (one world pixel):
 // a light pattern per ground type (grass tufts, sand ripples, snow sparkles, rock cracks, lava
 // specks) and a step edge where a neighbour sits on a lower level (a dark cliff face on the south
 // side, a darker line on east and west, a light rim on the north). Zoomed out, patterns fade away

@@ -14,7 +14,8 @@ const WorldData = preload("res://scripts/world/world_data.gd")
 const Biomes = preload("res://scripts/world/biomes.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 
-## World pixels per tile: one pattern pixel of the shader = one world pixel = one sprite pixel.
+## World pixels per tile: one pattern pixel of the shader = one world pixel. Sprites are drawn
+## finer, about four sprite pixels per world pixel (see sprite_batch.gd).
 const TILE := 8
 
 ## Ground pattern drawn up close (same ids as in shaders/map.gdshader).
