@@ -112,6 +112,7 @@ Animundi is **built like WorldBox** (flat 2D map drawn as one texture, sprites d
 - [docs/GOD_GAMES_RESEARCH.md](docs/GOD_GAMES_RESEARCH.md): what other god games let you do, and what Animundi takes.
 - [docs/ROADMAP.md](docs/ROADMAP.md): the steps to 1.0, ticked as they land.
 - [docs/WORLDBOX_ANALYSIS.md](docs/WORLDBOX_ANALYSIS.md): how WorldBox is built, and what Animundi takes from it.
+- [docs/WORLDBOX_WIKI_LESSONS.md](docs/WORLDBOX_WIKI_LESSONS.md): what makes a good sandbox god game, from a study of the WorldBox wiki, and what it means for Animundi.
 - [docs/MAP_GENERATION.md](docs/MAP_GENERATION.md): how worlds are generated (tectonic plates, climate, biomes) and the other algorithms looked at.
 - [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md): the look of the game (flat 2D pixel art, built like WorldBox) and the history of the 3D prototype.
 
