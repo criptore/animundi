@@ -8,31 +8,39 @@ const Biomes = preload("res://scripts/world/biomes.gd")
 const SeededRng = preload("res://scripts/core/seeded_rng.gd")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
 
-## Per biome: list of [sprite id, chance per tile]. A chance above 1 places several per tile.
-const FLORA := {
-	Biomes.FOREST: [["trees/Oak", 0.34], ["trees/Autumn_oak", 0.03], ["trees/Red_oak", 0.02],
-			["trees/Golden_oak", 0.02], ["trees/Pine", 0.04], ["plants/Bush", 0.08]],
-	Biomes.JUNGLE: [["trees/Jungle_tree", 0.35], ["trees/Palm", 0.08], ["plants/Jungle_bush", 0.2]],
-	Biomes.TAIGA: [["trees/Pine", 0.4], ["trees/Snowy_pine", 0.05]],
-	Biomes.SNOW: [["trees/Snowy_pine", 0.05]],
-	Biomes.TUNDRA: [["trees/Snowy_pine", 0.02], ["plants/Rock", 0.03]],
-	Biomes.GRASSLAND: [["trees/Oak", 0.025], ["plants/Bush", 0.035], ["plants/Grassy_rock", 0.012],
-			["plants/Flowers", 0.06]],
-	Biomes.MEADOW: [["trees/Oak", 0.015], ["plants/Bush", 0.03], ["plants/Flowers", 0.35]],
-	Biomes.HILLS: [["trees/Oak", 0.06], ["trees/Pine", 0.04], ["plants/Grassy_rock", 0.04]],
-	Biomes.SAVANNA: [["trees/Acacia", 0.03], ["plants/Bush", 0.02]],
-	Biomes.DESERT: [["plants/Cactus", 0.02], ["plants/Rock", 0.012]],
-	Biomes.BEACH: [["trees/Palm", 0.035]],
-	Biomes.SWAMP: [["trees/Swamp_tree", 0.16], ["trees/Dead_tree", 0.03], ["plants/Bush", 0.06]],
-	Biomes.MOUNTAIN: [["plants/Rock", 0.05], ["plants/Boulder", 0.025], ["trees/Pine", 0.03]],
-	Biomes.PEAK: [["plants/Boulder", 0.01]],
-	Biomes.VOLCANIC: [["plants/Rock", 0.06], ["trees/Dead_tree", 0.03]],
-	Biomes.MUSHROOM: [["plants/Red_mushroom", 0.12], ["plants/Pink_mushroom", 0.1], ["plants/Purple_mushroom", 0.08]],
-	Biomes.CURSED: [["trees/Dead_tree", 0.2], ["plants/Purple_mushroom", 0.05], ["plants/Rock", 0.03]],
-}
+## Plants as data (data/plants.json): per biome, the plant sprites that grow there and how many
+## per tile on average. Adding a plant to a biome is editing that file, not code.
+const DATA := "res://data/plants.json"
 
-## Low plants that would only be speckles from far away: drawn under the others, hidden when zoomed out.
-const GROUND_COVER := ["plants/Flowers", "plants/Grass"]
+static var _table := {}
+static var _ground_cover := PackedStringArray()
+
+
+## Per biome id: list of [sprite id, chance per tile]. A chance above 1 places several per tile.
+static func table() -> Dictionary:
+	if _table.is_empty():
+		_load()
+	return _table
+
+
+## Low plants that would only be speckles from far away: drawn under the others, hidden when
+## zoomed out.
+static func ground_cover() -> PackedStringArray:
+	if _table.is_empty():
+		_load()
+	return _ground_cover
+
+
+static func _load() -> void:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DATA))
+	for biome_name in data.biomes:
+		var b := Biomes.NAMES.find(biome_name)
+		assert(b >= 0, "Unknown biome in %s: %s" % [DATA, biome_name])
+		var entries := []
+		for e in data.biomes[biome_name]:
+			entries.append([e.sprite, float(e.per_tile)])
+		_table[b] = entries
+	_ground_cover = PackedStringArray(data.ground_cover)
 
 
 ## Every plant of the world: {"id": PackedStringArray, "pos": PackedVector2Array (in tiles, the
@@ -49,13 +57,14 @@ static func place(world: WorldData) -> Dictionary:
 	var flip := PackedByteArray()
 	var scale := PackedFloat32Array()
 	var sizes := {}
+	var flora := table()
 	for y in world.height:
 		for x in world.width:
 			var i := world.index(x, y)
-			if world.is_water(i) or not FLORA.has(world.biome[i]):
+			if world.is_water(i) or not flora.has(world.biome[i]):
 				continue
 			rng.seed = hash(Vector3i(base, x, y))
-			for entry in FLORA[world.biome[i]]:
+			for entry in flora[world.biome[i]]:
 				var id: String = entry[0]
 				var chance: float = entry[1]
 				while chance > 0.0:

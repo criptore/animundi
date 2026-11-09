@@ -15,13 +15,13 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 ## 0.15 2D core
 - [x] Map drawn as one texture (one pixel per tile, scaled up), biome and level colours, step edges, zoom-in patterns; 2D map camera (zoom toward the mouse, pan, stays on the map)
 - [x] Sprites drawn in batches (MultiMesh2D, one atlas, strips of 16 rows), sorted by screen height, drawn shadows; plants placed by biome
-- [ ] Zoom-dependent detail: dots when zoomed out, full sprites when zoomed in
-- [ ] Animated water and wind sway, cheaply
+- [x] Zoom-dependent detail: sprites become dots of their average colour when zoomed out (no shadows), full sprites when zoomed in; flowers hidden from far
+- [x] Animated water (slow swell, twinkling glints, shore foam) and wind sway of tall sprites, all in shaders
 - [x] Natural map generator: tectonic plates, mountain chains on colliding borders, warped coasts, large biome regions; no special biomes at random (see [MAP_GENERATION.md](MAP_GENERATION.md))
 - [x] Plants never overhang water; mushrooms smaller than the peoples
-- [ ] C# simulation core: world object, one manager per kind of entity, zones for spatial queries, batched ticks at different rates, world processes on timers over map slices
-- [ ] Data-driven assets: species, plants, buildings, items, powers as data records
-- [ ] Performance check: 5,000+ moving units at 60 fps on a mid-range PC
+- [x] C# simulation core (`sim/`): world object, one manager per kind of entity (units so far), zones of 8×8 tiles for spatial queries, batched ticks at different rates, world processes on timers over map slices; units drawn from one MultiMesh buffer, sorted by height
+- [x] Data-driven assets: species and plants as data records (`data/`); buildings, items and powers join as they are made
+- [x] Performance check (`tools/perf_check.gd`): 5,000 wandering animals cost ~0.25 ms per step and ~2 ms per frame of drawing on the CPU (20,000: ~0.8 ms and ~5 ms); GPU frame rate still to confirm on a real mid-range PC
 
 ## 0.16 Terrain tools
 Special biomes are never generated at random: the player places them.

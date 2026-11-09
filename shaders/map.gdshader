@@ -6,6 +6,7 @@
 // specks) and a step edge where a neighbour sits on a lower level (a dark cliff face on the south
 // side, a darker line on east and west, a light rim on the north). Zoomed out, patterns fade away
 // and a step shows as a darker tile, so the map reads like WorldBox's: flat colours, hard edges.
+// Water moves: a slow swell of light, twinkling glints and foam that comes and goes on the shore.
 shader_type canvas_item;
 
 // Size of the map in tiles.
@@ -75,9 +76,12 @@ vec3 pattern(int kind, vec3 base, ivec2 cell, ivec2 sub) {
 			if (h > 0.9) return base * 0.75;
 			break;
 		}
-		case WATER:
-			if (h < 0.025) return base * 1.12;
+		case WATER: {
+			// Glints that twinkle in and out.
+			float twinkle = sin(TIME * 2.2 + h2 * 6.2831);
+			if (h < 0.03 && twinkle > 0.4) return base * (1.0 + 0.18 * (twinkle - 0.4) / 0.6);
 			break;
+		}
 	}
 	return base;
 }
@@ -98,6 +102,21 @@ void fragment() {
 	if (show_patterns && detail > 0.0) {
 		int kind = int(round(d.g * 8.0));
 		col = mix(col, pattern(kind, col, cell, sub), detail);
+	}
+
+	if (water && show_patterns) {
+		// Slow swell: broad bands of light drift across the water, visible at every zoom.
+		float swell = sin(dot(t, vec2(0.35, 0.22)) - TIME * 0.6) * 0.5 + 0.5;
+		col *= 0.97 + 0.06 * swell;
+		// Foam along the shore: the pattern pixels next to land come and go like small waves.
+		float wave = sin(TIME * 1.6 + hash(vec2(cell)) * 6.2831) * 0.5 + 0.5;
+		bool shore = (tile_data(cell + ivec2(0, -1)).b < 0.5 && sub.y == 0)
+				|| (tile_data(cell + ivec2(0, 1)).b < 0.5 && sub.y == 7)
+				|| (tile_data(cell + ivec2(-1, 0)).b < 0.5 && sub.x == 0)
+				|| (tile_data(cell + ivec2(1, 0)).b < 0.5 && sub.x == 7);
+		if (shore && hash(vec2(cell) * 8.0 + vec2(sub)) < 0.35 + 0.5 * wave) {
+			col = mix(col, vec3(0.92, 0.97, 1.0), 0.55 * detail);
+		}
 	}
 
 	// Step edges toward lower neighbours. Under water they are softer.

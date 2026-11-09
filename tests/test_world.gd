@@ -1,5 +1,6 @@
-## Headless tests for world generation.
+## Headless tests for world generation, rendering helpers and the C# simulation core.
 ##   godot --headless --path . --script res://tests/test_world.gd
+## Needs the Godot .NET build (the simulation core is C#; build it first with `dotnet build`).
 ## Exits with the number of failed checks (0 = all passed).
 extends SceneTree
 
@@ -40,6 +41,8 @@ func _initialize() -> void:
 	test_flora()
 	test_sprite_atlas()
 	test_sprite_batch()
+	test_species_data()
+	test_simulation()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -308,12 +311,14 @@ func test_sprite_atlas() -> void:
 		for m in range(n + 1, rects.size()):
 			apart = apart and not r.intersects(rects[m])
 	check(inside and apart, "atlas regions fit in the texture and never overlap")
-	var flora := Flora.FLORA.values()
+	var flora := Flora.table().values()
 	var known := true
 	for entries in flora:
 		for e in entries:
 			known = known and atlas.has(e[0])
 	check(known, "every plant of the flora table has a sprite")
+	var oak: Color = atlas.colors["trees/Oak"]
+	check(oak.g > oak.b and oak.a == 1.0, "every sprite has an average colour for its far-away dot (oak is green)")
 
 
 func test_sprite_batch() -> void:
@@ -346,6 +351,10 @@ func test_sprite_batch() -> void:
 	check(sorted and total == 2250, "sprites are drawn top to bottom, nearest last")
 	check(layer.get_child_count() == 16 and batch.get_child(0).get_child_count() == 16,
 			"one strip of sprites and one of shadows per 16 rows of tiles")
+	batch.set_zoom(0.3)
+	var far: bool = not batch.get_child(0).visible
+	batch.set_zoom(2.0)
+	check(far and batch.get_child(0).visible, "shadows hide when zoomed far out, where sprites are dots")
 	batch.free()
 
 
@@ -396,3 +405,57 @@ func test_trackpad() -> void:
 	cam.handle_input(plus)
 	check(cam.zoom.x > before, "the + key zooms in")
 	cam.free()
+
+
+func test_species_data() -> void:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/species.json"))
+	var atlas := SpriteAtlas.shared()
+	var ok: bool = data.species.size() >= 5
+	for sp in data.species:
+		ok = ok and atlas.has(sp.sprite) and sp.speed > 0.0
+		for b in sp.biomes:
+			ok = ok and Biomes.NAMES.has(b)
+	check(ok, "every species record has a known sprite, biomes and a speed (%d species)" % data.species.size())
+
+
+func test_simulation() -> void:
+	var w := make("sim", 128)
+	var sim: Node2D = load("res://sim/Simulation.cs").new()
+	root.add_child(sim)
+	sim.Start(w, PackedStringArray(Biomes.NAMES))
+	var placed: int = sim.SpawnMany(600)
+	check(placed == 600 and sim.UnitCount() == 600, "600 animals spawned (%d)" % sim.UnitCount())
+	check(sim.CountOnWater() == 0, "animals spawn on land")
+	var before := []
+	for i in 50:
+		before.append(sim.UnitPosition(i))
+	sim.RunSteps(300)  # 10 simulated seconds
+	var moved := 0
+	for i in 50:
+		if sim.UnitPosition(i).distance_to(before[i]) > 0.2:
+			moved += 1
+	check(moved > 25, "animals wander (%d of 50 moved in 10 s)" % moved)
+	check(sim.CountOnWater() == 0, "animals never walk into water")
+
+	# Zones answer like a scan of every unit.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var same := true
+	for t in 20:
+		var p := Vector2(rng.randf() * 128.0, rng.randf() * 128.0)
+		var r := rng.randf_range(2.0, 20.0)
+		var brute := 0
+		for i in sim.UnitCount():
+			if sim.UnitPosition(i).distance_to(p) <= r:
+				brute += 1
+		same = same and sim.CountNear(p.x, p.y, r) == brute
+	check(same, "zone queries find exactly the units in range")
+
+	# A world process visits the whole map, one slice at a time.
+	sim.AddCountingProcess("test", 0.1, 8)
+	sim.RunSteps(3)
+	var partial: int = sim.RowsVisited("test")
+	sim.RunSteps(30)
+	check(partial < 128 and sim.RowsVisited("test") >= 128,
+			"world processes work through the map in slices (%d rows, then %d)" % [partial, sim.RowsVisited("test")])
+	sim.queue_free()
