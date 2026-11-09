@@ -1,0 +1,219 @@
+{
+ "_about": "Plants as data records, read by scripts/world/flora.gd. For each biome (names from scripts/world/biomes.gd): the plant sprites that grow there and how many per tile on average (above 1 places several). ground_cover: low plants drawn under the others and hidden when zoomed out.",
+ "ground_cover": [
+  "plants/Flowers",
+  "plants/Grass"
+ ],
+ "biomes": {
+  "Forest": [
+   {
+    "sprite": "trees/Oak",
+    "per_tile": 0.34
+   },
+   {
+    "sprite": "trees/Autumn_oak",
+    "per_tile": 0.03
+   },
+   {
+    "sprite": "trees/Red_oak",
+    "per_tile": 0.02
+   },
+   {
+    "sprite": "trees/Golden_oak",
+    "per_tile": 0.02
+   },
+   {
+    "sprite": "trees/Pine",
+    "per_tile": 0.04
+   },
+   {
+    "sprite": "plants/Bush",
+    "per_tile": 0.08
+   }
+  ],
+  "Jungle": [
+   {
+    "sprite": "trees/Jungle_tree",
+    "per_tile": 0.35
+   },
+   {
+    "sprite": "trees/Palm",
+    "per_tile": 0.08
+   },
+   {
+    "sprite": "plants/Jungle_bush",
+    "per_tile": 0.2
+   }
+  ],
+  "Taiga": [
+   {
+    "sprite": "trees/Pine",
+    "per_tile": 0.4
+   },
+   {
+    "sprite": "trees/Snowy_pine",
+    "per_tile": 0.05
+   }
+  ],
+  "Snow": [
+   {
+    "sprite": "trees/Snowy_pine",
+    "per_tile": 0.05
+   }
+  ],
+  "Tundra": [
+   {
+    "sprite": "trees/Snowy_pine",
+    "per_tile": 0.02
+   },
+   {
+    "sprite": "plants/Rock",
+    "per_tile": 0.03
+   }
+  ],
+  "Grassland": [
+   {
+    "sprite": "trees/Oak",
+    "per_tile": 0.025
+   },
+   {
+    "sprite": "plants/Bush",
+    "per_tile": 0.035
+   },
+   {
+    "sprite": "plants/Grassy_rock",
+    "per_tile": 0.012
+   },
+   {
+    "sprite": "plants/Flowers",
+    "per_tile": 0.06
+   }
+  ],
+  "Flower meadow": [
+   {
+    "sprite": "trees/Oak",
+    "per_tile": 0.015
+   },
+   {
+    "sprite": "plants/Bush",
+    "per_tile": 0.03
+   },
+   {
+    "sprite": "plants/Flowers",
+    "per_tile": 0.35
+   }
+  ],
+  "Hills": [
+   {
+    "sprite": "trees/Oak",
+    "per_tile": 0.06
+   },
+   {
+    "sprite": "trees/Pine",
+    "per_tile": 0.04
+   },
+   {
+    "sprite": "plants/Grassy_rock",
+    "per_tile": 0.04
+   }
+  ],
+  "Savanna": [
+   {
+    "sprite": "trees/Acacia",
+    "per_tile": 0.03
+   },
+   {
+    "sprite": "plants/Bush",
+    "per_tile": 0.02
+   }
+  ],
+  "Desert": [
+   {
+    "sprite": "plants/Cactus",
+    "per_tile": 0.02
+   },
+   {
+    "sprite": "plants/Rock",
+    "per_tile": 0.012
+   }
+  ],
+  "Beach": [
+   {
+    "sprite": "trees/Palm",
+    "per_tile": 0.035
+   }
+  ],
+  "Swamp": [
+   {
+    "sprite": "trees/Swamp_tree",
+    "per_tile": 0.16
+   },
+   {
+    "sprite": "trees/Dead_tree",
+    "per_tile": 0.03
+   },
+   {
+    "sprite": "plants/Bush",
+    "per_tile": 0.06
+   }
+  ],
+  "Mountain": [
+   {
+    "sprite": "plants/Rock",
+    "per_tile": 0.05
+   },
+   {
+    "sprite": "plants/Boulder",
+    "per_tile": 0.025
+   },
+   {
+    "sprite": "trees/Pine",
+    "per_tile": 0.03
+   }
+  ],
+  "Peak": [
+   {
+    "sprite": "plants/Boulder",
+    "per_tile": 0.01
+   }
+  ],
+  "Volcanic rock": [
+   {
+    "sprite": "plants/Rock",
+    "per_tile": 0.06
+   },
+   {
+    "sprite": "trees/Dead_tree",
+    "per_tile": 0.03
+   }
+  ],
+  "Mushroom land": [
+   {
+    "sprite": "plants/Red_mushroom",
+    "per_tile": 0.12
+   },
+   {
+    "sprite": "plants/Pink_mushroom",
+    "per_tile": 0.1
+   },
+   {
+    "sprite": "plants/Purple_mushroom",
+    "per_tile": 0.08
+   }
+  ],
+  "Cursed land": [
+   {
+    "sprite": "trees/Dead_tree",
+    "per_tile": 0.2
+   },
+   {
+    "sprite": "plants/Purple_mushroom",
+    "per_tile": 0.05
+   },
+   {
+    "sprite": "plants/Rock",
+    "per_tile": 0.03
+   }
+  ]
+ }
+}

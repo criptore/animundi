@@ -3,6 +3,8 @@ extends CanvasLayer
 
 signal generate_requested
 signal layer_selected(layer: String)
+## The player asked for more animals (stress test of the simulation).
+signal spawn_requested(count: int)
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
@@ -19,6 +21,7 @@ var _stats_label: Label
 var _layer_buttons := {}
 var _world_stats := ""
 var _sprite_count := 0
+var _sim_stats := ""
 
 
 func _ready() -> void:
@@ -91,6 +94,11 @@ func _ready() -> void:
 		b.pressed.connect(func(): layer_selected.emit(layer))
 		layers.add_child(b)
 		_layer_buttons[layer] = b
+	var spawn := Button.new()
+	spawn.text = "+1000 animals (U)"
+	spawn.tooltip_text = "Spawn 1000 wandering animals: a stress test of the C# simulation"
+	spawn.pressed.connect(func(): spawn_requested.emit(1000))
+	layers.add_child(spawn)
 	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nR: random seed")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
@@ -104,6 +112,8 @@ func _ready() -> void:
 	bottom.add_child(info)
 	_hover_label = _label("")
 	_hover_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The stats on the right keep their room; the hover text is cut if it doesn't fit.
+	_hover_label.clip_text = true
 	info.add_child(_hover_label)
 	_stats_label = _label("")
 	info.add_child(_stats_label)
@@ -115,6 +125,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if key.keycode == KEY_R:
 		randomize_seed()
+	elif key.keycode == KEY_U:
+		spawn_requested.emit(1000)
 	elif key.keycode >= KEY_1 and key.keycode < KEY_1 + MapRenderer.LAYERS.size():
 		var layer: String = MapRenderer.LAYERS[key.keycode - KEY_1]
 		_layer_buttons[layer].button_pressed = true
@@ -134,7 +146,13 @@ func set_stats(world) -> void:
 	var total := 0.0
 	for ms in world.stage_ms.values():
 		total += ms
-	_world_stats = "Seed %d · %dx%d · generated in %.0f ms" % [world.seed_value, world.width, world.height, total]
+	_world_stats = "Seed %d · %d² · %.1f s" % [world.seed_value, world.width, total / 1000.0]
+	_refresh_stats()
+
+
+## Units alive, average milliseconds of a simulation step, frames per second.
+func set_sim_stats(units: int, step_ms: float, fps: float) -> void:
+	_sim_stats = "%d animals · sim %.2f ms · %d fps" % [units, step_ms, fps]
 	_refresh_stats()
 
 
@@ -145,7 +163,7 @@ func set_sprite_count(n: int) -> void:
 
 func _refresh_stats() -> void:
 	if _stats_label != null:
-		_stats_label.text = "%s · %d sprites" % [_world_stats, _sprite_count]
+		_stats_label.text = "%s · %d plants%s" % [_world_stats, _sprite_count, (" · " + _sim_stats) if _sim_stats != "" else ""]
 
 
 func _request() -> void:

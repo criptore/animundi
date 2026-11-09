@@ -8,7 +8,7 @@ config_version=5
 config/name="Animundi"
 config/description="A pixel-art god sandbox where every world is generated from a seed."
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
 [display]
@@ -22,3 +22,7 @@ renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
 textures/canvas_textures/default_texture_filter=0
 2d/snap/snap_2d_transforms_to_pixel=true
+
+[dotnet]
+
+project/assembly_name="Animundi"

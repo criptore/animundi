@@ -10,10 +10,6 @@ const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
 const Flora = preload("res://scripts/world/flora.gd")
 
-## Per biome: list of [sprite id, chance per tile] (shared with the 2D map).
-const FLORA := Flora.FLORA
-
-
 ## Returns {sprite id: MultiMesh}.
 static func build(world: WorldData, h: PackedFloat32Array) -> Dictionary:
 	var rng := SeededRng.new(world.seed_value).stream("vegetation")
@@ -24,9 +20,9 @@ static func build(world: WorldData, h: PackedFloat32Array) -> Dictionary:
 			if world.is_water(i):
 				continue
 			var b := world.biome[i]
-			if not FLORA.has(b):
+			if not Flora.table().has(b):
 				continue
-			for entry in FLORA[b]:
+			for entry in Flora.table()[b]:
 				var id: String = entry[0]
 				var chance: float = entry[1]
 				while chance > 0.0:
@@ -54,7 +50,7 @@ static func build(world: WorldData, h: PackedFloat32Array) -> Dictionary:
 ## Flowers: no shadows (they would only darken the ground in speckles), and hidden when zoomed out,
 ## where they would shrink to dots.
 static func is_ground_cover(id: String) -> bool:
-	return id in Flora.GROUND_COVER
+	return id in Flora.ground_cover()
 
 
 ## Dense grass tufts per biome (instances per tile), drawn by shaders/grass.gdshader.

@@ -105,7 +105,7 @@ func _add_strip(order: Array, ids: PackedStringArray, positions: PackedVector2Ar
 		var shadow := Vector2(size.x * SHADOW_WIDTH, size.x * SHADOW_HEIGHT)
 		shadows.set_instance_transform_2d(n, Transform2D(0.0, shadow, 0.0,
 				positions[k] + Vector2(size.x * SHADOW_SHIFT, shadow.y * 0.45)))
-	_add_instance(_shadows, shadows, _shadow_texture_get(), _shadow_material)
+	_add_instance(_shadows, shadows, shadow_texture(), _shadow_material)
 	_add_instance(_sprites, sprites, atlas.texture, _sprite_material)
 
 
@@ -123,13 +123,13 @@ static func _multimesh(n: int, custom: bool) -> MultiMesh:
 	mm.transform_format = MultiMesh.TRANSFORM_2D
 	mm.use_custom_data = custom
 	mm.use_colors = custom
-	mm.mesh = _unit_quad()
+	mm.mesh = unit_quad()
 	mm.instance_count = n
 	return mm
 
 
 ## A quad one unit wide and tall, with its bottom centre (the feet) at the origin.
-static func _unit_quad() -> ArrayMesh:
+static func unit_quad() -> ArrayMesh:
 	if _quad == null:
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
@@ -142,7 +142,7 @@ static func _unit_quad() -> ArrayMesh:
 
 
 ## A small pixel-art ellipse, black and see-through, stretched under each sprite.
-static func _shadow_texture_get() -> ImageTexture:
+static func shadow_texture() -> ImageTexture:
 	if _shadow_texture == null:
 		var w := 16
 		var h := 6
