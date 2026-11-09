@@ -617,3 +617,358 @@ def all_homes():
                 rng = random.Random(f"{people}-{tier}-{v}")
                 out[f"{tier}_{people}_{v}"] = style(rng, t, pal)
     return out
+
+
+# ---------------------------------------------------------------------------------- great buildings
+
+def family(people):
+    return {style_timber: "timber", style_stump: "stump", style_stone: "stone", style_tent: "tent",
+            style_dome: "dome"}[PEOPLES[people][0]]
+
+
+def great_material(people):
+    """Wall material and colour of a people's great buildings."""
+    fam = family(people)
+    pal = PEOPLES[people][1]
+    if fam == "tent":
+        return pal.get("hall", "logs"), pal["wall"]
+    if fam == "dome":
+        return pal["mat"], pal["wall"]
+    return "stone", pal["stone"]
+
+
+def great_roof(cv, people, rng, cx, ybase, half, height):
+    """The roof of a great building in the people's way: gables, caps, cones or domes."""
+    fam = family(people)
+    if fam in ("timber", "stone"):
+        gable_roof(cv, cx, ybase, half, height, PEOPLES[people][1].get("roof_tex", "shingles"), rng)
+    elif fam == "stump":
+        round_roof(cv, cx, ybase, half + 1, height, scallop=True)
+    elif fam == "tent":
+        pal = PEOPLES[people][1]
+        cone(cv, cx, ybase, half + 1, height + 1, stripes=pal.get("stripes", False), patches=pal.get("patch"), rng=rng)
+    else:
+        round_roof(cv, cx, ybase, half + 1, height - 1, spots=(250, 246, 240) if PEOPLES[people][1]["roof"] == "cap" else None, rng=rng)
+
+
+def glass_of(people):
+    return PEOPLES[people][1].get("glass", (240, 200, 90))
+
+
+def town_hall(people, rng):
+    """A long hall with a bell tower, banners on both sides."""
+    cv = Canvas()
+    cx, yb = 17, 28
+    mat, col = great_material(people)
+    w = 19
+    x0, x1 = cx - w // 2, cx + w // 2
+    wall(cv, x0, x1, yb - 6, yb - 1, mat, col, rng)
+    footing(cv, x0, x1, yb, (130, 126, 120), rng)
+    door(cv, cx - 1, yb - 1, 4, (60, 40, 26), sh(col, 0.6), arch=True, w=3)
+    for wx in (x0 + 2, x0 + 5, x1 - 6, x1 - 3):
+        window(cv, wx, yb - 5, glass_of(people), sh(col, 0.65), h=2)
+    great_roof(cv, people, rng, cx, yb - 7, w // 2, 7)
+    # Bell tower over the middle.
+    wall(cv, cx - 2, cx + 2, yb - 16, yb - 11, mat, sh(col, 1.05), rng)
+    window(cv, cx - 1, yb - 15, (60, 50, 40), sh(col, 0.65), h=2)
+    cv.set(cx, yb - 14, (230, 190, 70))
+    cone(cv, cx, yb - 17, 3, 5)
+    flag(cv, cx, yb - 26, None)
+    for x in (x0 - 1, x1 + 1):
+        flag(cv, x, yb - 12, None)
+    props(cv, rng, x0, x1, yb, ["barrel", "crate", "flowers"], 2)
+    return cv.image()
+
+
+def temple(people, rng):
+    """Columns in front, a steep roof and a spire with a golden tip."""
+    cv = Canvas()
+    cx, yb = 17, 28
+    mat, col = great_material(people)
+    w = 15
+    x0, x1 = cx - w // 2, cx + w // 2
+    wall(cv, x0, x1, yb - 6, yb - 1, mat, col, rng)
+    for x in range(x0 + 1, x1, 3):
+        for y in range(yb - 6, yb):
+            cv.set(x, y, sh(col, 1.25 if y < yb - 1 else 1.0))
+    for x in range(x0 - 1, x1 + 2):
+        cv.set(x, yb, sh((150, 146, 140), 1.0 if x % 2 else 0.85))
+    door(cv, cx - 1, yb - 1, 4, (50, 34, 40), (230, 190, 70), arch=True, w=3)
+    great_roof(cv, people, rng, cx, yb - 7, w // 2, 6)
+    # Spire.
+    for y in range(yb - 20, yb - 12):
+        cv.set(cx, y, sh(col, 1.1))
+        cv.set(cx + 1, y, sh(col, 0.8))
+    cone(cv, cx, yb - 21, 2, 4)
+    for y in range(yb - 26, yb - 22):
+        cv.set(cx, y, (240, 200, 80))
+    cv.set(cx - 1, yb - 25, (240, 200, 80))
+    cv.set(cx + 1, yb - 25, (240, 200, 80))
+    window(cv, cx, yb - 17, (150, 100, 210), sh(col, 0.7), w=1, h=2)
+    props(cv, rng, x0, x1, yb, ["flowers", "bush"], 2)
+    return cv.image()
+
+
+def library(people, rng):
+    """Two storeys of lit windows, books in the windows, a chimney."""
+    cv = Canvas()
+    cx, yb = 17, 28
+    mat, col = great_material(people)
+    w = 15
+    x0, x1 = cx - w // 2, cx + w // 2
+    wall(cv, x0, x1, yb - 9, yb - 1, mat, col, rng)
+    for x in range(x0, x1 + 1):
+        cv.set(x, yb - 5, sh(col, 0.7))
+    door(cv, cx - 1, yb - 1, 3, (70, 46, 30), sh(col, 0.6), w=2)
+    for wx in (x0 + 1, x0 + 4, x1 - 5, x1 - 2):
+        window(cv, wx, yb - 8, (250, 220, 130), sh(col, 0.65))
+        if abs(wx - cx) > 2:
+            window(cv, wx, yb - 4, (250, 220, 130), sh(col, 0.65))
+    for x in range(x0 + 1, x1, 2):
+        cv.set(x, yb - 7, rng.choice([(180, 60, 50), (60, 100, 170), (90, 140, 70), (200, 160, 60)]))
+    great_roof(cv, people, rng, cx, yb - 10, w // 2, 6)
+    chimney(cv, x1 - 3, yb - 16, 4, (130, 126, 120))
+    props(cv, rng, x0, x1, yb, ["crate", "flowers"], 1)
+    return cv.image()
+
+
+def barracks(people, rng):
+    """A long fort of a house: crenellated walls, banners, a weapons rack."""
+    cv = Canvas()
+    cx, yb = 17, 28
+    mat, col = great_material(people)
+    w = 19
+    x0, x1 = cx - w // 2, cx + w // 2
+    wall(cv, x0, x1, yb - 6, yb - 1, mat, col, rng)
+    footing(cv, x0, x1, yb, (130, 126, 120), rng)
+    for x in range(x0, x1 + 1):
+        if (x - x0) % 3 != 2:
+            cv.set(x, yb - 7, sh(col, 1.1))
+    door(cv, cx - 1, yb - 1, 4, (50, 36, 26), (90, 64, 40), w=3)
+    for wx in (x0 + 2, x1 - 3):
+        cv.set(wx, yb - 4, (40, 34, 30))
+        cv.set(wx, yb - 5, (40, 34, 30))
+    # A low roof in the middle, the kingdom's banners, a rack of spears.
+    great_roof(cv, people, rng, cx, yb - 8, 5, 4)
+    for x in (x0 + 1, x1 - 1):
+        flag(cv, x, yb - 13, None)
+    for k in range(3):
+        for y in range(yb - 4, yb + 1):
+            cv.set(x1 + 3 + k * 2, y, (120, 84, 46))
+        cv.set(x1 + 3 + k * 2, yb - 5, (200, 200, 210))
+    return cv.image()
+
+
+def watch_tower(people, rng):
+    """A tall tower with arrow slits and a crenellated top under a small roof."""
+    cv = Canvas()
+    cx, yb = 17, 28
+    mat, col = great_material(people)
+    if mat in ("logs", "planks"):
+        # Wooden peoples build theirs as a stilted lookout.
+        for y in range(yb - 12, yb + 1):
+            for x in (cx - 3, cx + 3):
+                cv.set(x, y, (120, 84, 46))
+        for k in range(0, 12, 3):
+            cv.set(cx - 2 + k % 5, yb - k, (100, 70, 40))
+        wall(cv, cx - 4, cx + 4, yb - 16, yb - 13, "planks", col, rng)
+    else:
+        wall(cv, cx - 3, cx + 3, yb - 14, yb - 1, mat, col, rng)
+        for y in (yb - 10, yb - 5):
+            cv.set(cx, y, (30, 26, 24))
+            cv.set(cx, y + 1, (30, 26, 24))
+        wall(cv, cx - 4, cx + 4, yb - 17, yb - 15, mat, sh(col, 1.05), rng)
+        door(cv, cx - 1, yb - 1, 3, (50, 36, 26), sh(col, 0.6), arch=True)
+    for x in range(cx - 4, cx + 5, 2):
+        cv.set(x, yb - 18, sh(col, 1.1))
+    cone(cv, cx, yb - 19, 3, 4)
+    flag(cv, cx, yb - 27, None)
+    return cv.image()
+
+
+GREAT = {"town_hall": town_hall, "temple": temple, "library": library, "barracks": barracks,
+         "watch_tower": watch_tower}
+
+
+def all_great():
+    """name -> image: <building>_<people>."""
+    out = {}
+    for people in PEOPLES:
+        for name, draw in GREAT.items():
+            out[f"{name}_{people}"] = draw(people, random.Random(f"{people}-{name}"))
+    return out
+
+
+# ---------------------------------------------------------------------------------- shared buildings
+
+STONE = (150, 146, 138)
+WOOD = (150, 104, 58)
+
+
+def stockpile(rng):
+    cv = Canvas()
+    yb = 28
+    for k, x in enumerate((10, 14)):
+        crate(cv, x, yb)
+        crate(cv, x + 1, yb - 3)
+    for k in range(3):
+        barrel(cv, 18 + k * 2, yb)
+    woodpile(cv, 22, yb)
+    for x in range(9, 27):
+        cv.set(x, yb + 1, (110, 80, 50))
+    return cv.image()
+
+
+def windmill(frame):
+    cv = Canvas()
+    cx, yb = 17, 28
+    rng = random.Random("windmill")
+    # Tapered body.
+    for y in range(yb - 11, yb):
+        hw = 2 + (y - (yb - 11)) // 4
+        for x in range(cx - hw, cx + hw + 1):
+            cv.set(x, y, sh((226, 210, 172), light(x, cx - hw, cx + hw)))
+    door(cv, cx - 1, yb - 1, 3, (70, 46, 30), WOOD)
+    window(cv, cx, yb - 8, (60, 50, 40), WOOD, w=1)
+    footing(cv, cx - 4, cx + 4, yb, STONE, rng)
+    for x in range(cx - 3, cx + 4):
+        for y in range(yb - 14, yb - 11):
+            if abs(x - cx) <= 3 - (yb - 12 - y):
+                cv.set(x, y, MASK["base"] if x <= cx else MASK["lo"])
+    # Sails turning: an X or a +.
+    hub = (cx, yb - 11)
+    for r in range(1, 8):
+        for dx, dy in (((1, 1), (-1, 1), (1, -1), (-1, -1)) if frame == 0 else ((1, 0), (-1, 0), (0, 1), (0, -1))):
+            x, y = hub[0] + dx * r, hub[1] + dy * r
+            cv.set(x, y, (120, 84, 46))
+            if r > 2:
+                cv.set(x + (dy if frame else 0), y + (dx if frame else 0), (236, 228, 210))
+    cv.set(*hub, (60, 44, 30))
+    return cv.image()
+
+
+def well(rng):
+    cv = Canvas()
+    cx, yb = 17, 28
+    wall(cv, cx - 4, cx + 4, yb - 2, yb, "stone", STONE, rng)
+    for x in range(cx - 3, cx + 4):
+        cv.set(x, yb - 3, (60, 120, 200) if abs(x - cx) < 3 else sh(STONE, 1.1))
+    for y in range(yb - 8, yb - 2):
+        cv.set(cx - 4, y, WOOD)
+        cv.set(cx + 4, y, sh(WOOD, 0.8))
+    for x in range(cx - 5, cx + 6):
+        cv.set(x, yb - 9, MASK["base"] if x <= cx else MASK["lo"])
+        if abs(x - cx) <= 3:
+            cv.set(x, yb - 10, MASK["hi"])
+    cv.set(cx, yb - 6, (90, 80, 70))
+    cv.set(cx, yb - 5, (90, 80, 70))
+    return cv.image()
+
+
+def mine(rng):
+    cv = Canvas()
+    cx, yb = 17, 28
+    for y in range(yb - 8, yb + 1):
+        hw = 3 + (y - (yb - 8))
+        for x in range(cx - hw, cx + hw + 1):
+            cv.set(x, y, sh(STONE, (0.9 + 0.2 * rng.random()) * light(x, cx - hw, cx + hw)))
+    for y in range(yb - 4, yb + 1):
+        for x in range(cx - 2, cx + 3):
+            cv.set(x, y, (34, 28, 26))
+    for y in range(yb - 5, yb + 1):
+        cv.set(cx - 3, y, WOOD)
+        cv.set(cx + 3, y, sh(WOOD, 0.8))
+    for x in range(cx - 3, cx + 4):
+        cv.set(x, yb - 5, WOOD)
+    # A cart of ore on its rails.
+    for x in range(cx + 5, cx + 12):
+        cv.set(x, yb, (90, 80, 70))
+    for x in range(cx + 6, cx + 10):
+        cv.set(x, yb - 1, (110, 80, 50))
+        cv.set(x, yb - 2, rng.choice([(140, 140, 150), (230, 190, 70), (120, 116, 110)]))
+    return cv.image()
+
+
+def dock(rng):
+    cv = Canvas()
+    yb = 28
+    for x in range(9, 26):
+        cv.set(x, yb - 2, sh(WOOD, 1.1 if x % 3 else 0.85))
+        cv.set(x, yb - 1, sh(WOOD, 0.8))
+    for x in (10, 16, 22, 25):
+        cv.set(x, yb, (90, 64, 40))
+        cv.set(x, yb + 1, (90, 64, 40))
+    barrel(cv, 12, yb - 3)
+    crate(cv, 18, yb - 3)
+    for y in range(yb - 8, yb - 2):
+        cv.set(24, y, (90, 64, 40))
+    cv.set(25, yb - 8, MASK["base"])
+    cv.set(26, yb - 8, MASK["base"])
+    cv.set(25, yb - 7, MASK["lo"])
+    return cv.image()
+
+
+def market(rng):
+    cv = Canvas()
+    yb = 28
+    for x0 in (9, 18):
+        for y in range(yb - 6, yb):
+            cv.set(x0, y, WOOD)
+            cv.set(x0 + 7, y, sh(WOOD, 0.8))
+        for x in range(x0 - 1, x0 + 9):
+            for y in (yb - 8, yb - 7):
+                cv.set(x, y, MASK["base"] if (x // 2) % 2 == 0 else (240, 232, 214))
+        for x in range(x0, x0 + 8):
+            cv.set(x, yb - 2, sh(WOOD, 1.1))
+            cv.set(x, yb - 3, rng.choice([(220, 70, 60), (240, 200, 70), (90, 160, 70), (200, 120, 60), (240, 240, 230)]))
+    return cv.image()
+
+
+def statue(rng):
+    cv = Canvas()
+    cx, yb = 17, 28
+    wall(cv, cx - 3, cx + 3, yb - 2, yb, "stone", STONE, rng)
+    gold = (232, 192, 74)
+    figure = ["..#..", ".###.", "#.#.#", "..#..", ".#.#.", ".#.#."]
+    for r, row in enumerate(figure):
+        for c, ch in enumerate(row):
+            if ch == "#":
+                cv.set(cx - 2 + c, yb - 9 + r, sh(gold, 1.1 if c < 2 else 0.85))
+    cv.set(cx, yb - 10, sh(gold, 1.15))
+    return cv.image()
+
+
+def dummy(rng):
+    cv = Canvas()
+    cx, yb = 17, 28
+    for y in range(yb - 6, yb + 1):
+        cv.set(cx, y, WOOD)
+    for x in range(cx - 2, cx + 3):
+        cv.set(x, yb - 5, WOOD)
+    for y in range(yb - 8, yb - 5):
+        for x in range(cx - 1, cx + 2):
+            cv.set(x, y, (216, 184, 100))
+    cv.set(cx, yb - 7, (180, 60, 50))
+    return cv.image()
+
+
+def ruin(rng):
+    cv = Canvas()
+    yb = 28
+    for x in range(9, 24):
+        h = rng.choice([0, 1, 1, 2, 3, 4]) if x not in (9, 23) else 5
+        for y in range(yb - h, yb + 1):
+            cv.set(x, y, sh(STONE, 0.75 + 0.25 * rng.random()))
+    for k in range(5):
+        cv.set(rng.randint(10, 22), yb, (60, 50, 44))
+    return cv.image()
+
+
+def all_shared():
+    rng = lambda n: random.Random(n)
+    return {
+        "stockpile": stockpile(rng("stockpile")), "windmill_0": windmill(0), "windmill_1": windmill(1),
+        "well": well(rng("well")), "mine": mine(rng("mine")), "dock": dock(rng("dock")),
+        "market": market(rng("market")), "statue": statue(rng("statue")), "dummy": dummy(rng("dummy")),
+        "ruin": ruin(rng("ruin")),
+    }
