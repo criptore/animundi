@@ -13,6 +13,10 @@ const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
 const VegetationBuilder = preload("res://scripts/render3d/vegetation_builder.gd")
 const WorldMap = preload("res://scripts/render2d/world_map.gd")
 const MapCamera = preload("res://scripts/ui/map_camera.gd")
+const Flora = preload("res://scripts/world/flora.gd")
+const SpriteAtlas = preload("res://scripts/render2d/sprite_atlas.gd")
+const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
+const SpriteBatch = preload("res://scripts/render2d/sprite_batch.gd")
 
 var _failures := 0
 
@@ -32,6 +36,9 @@ func _initialize() -> void:
 	test_levels()
 	test_world_map()
 	test_map_camera()
+	test_flora()
+	test_sprite_atlas()
+	test_sprite_batch()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -241,3 +248,74 @@ func test_map_camera() -> void:
 	cam.pan_screen(Vector2(1e6, 1e6))
 	check(cam.position == Vector2.ZERO, "the view stays on the map")
 	cam.free()
+
+
+func test_flora() -> void:
+	var w := make("flora", 128)
+	var a := Flora.place(w)
+	var b := Flora.place(w)
+	check(a.id == b.id and a.pos == b.pos and a.flip == b.flip and a.scale == b.scale, "same world, same plants")
+	check(a.id.size() > 500, "a 128 world has plants (%d)" % a.id.size())
+	var ok := true
+	for k in a.id.size():
+		var t := Vector2i(floori(a.pos[k].x), floori(a.pos[k].y))
+		if not w.in_bounds(t.x, t.y) or w.is_water(w.index(t.x, t.y)):
+			ok = false
+	check(ok, "every plant stands on a land tile")
+
+
+func test_sprite_atlas() -> void:
+	var atlas := SpriteAtlas.shared()
+	var ok := true
+	for group in SpriteAtlas.GROUPS:
+		for id in SpriteLibrary.list(group):
+			ok = ok and atlas.has(id)
+	check(ok and atlas.regions.size() > 90, "every sprite is in the atlas (%d)" % atlas.regions.size())
+	var rects: Array = atlas.regions.values()
+	var inside := true
+	var apart := true
+	for n in rects.size():
+		var r: Rect2 = rects[n]
+		inside = inside and r.position.x >= 0.0 and r.position.y >= 0.0 and r.end.x <= 1.0 and r.end.y <= 1.0
+		for m in range(n + 1, rects.size()):
+			apart = apart and not r.intersects(rects[m])
+	check(inside and apart, "atlas regions fit in the texture and never overlap")
+	var flora := Flora.FLORA.values()
+	var known := true
+	for entries in flora:
+		for e in entries:
+			known = known and atlas.has(e[0])
+	check(known, "every plant of the flora table has a sprite")
+
+
+func test_sprite_batch() -> void:
+	var ids := PackedStringArray()
+	var pos := PackedVector2Array()
+	var flips := PackedByteArray()
+	var scales := PackedFloat32Array()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for k in 3000:
+		ids.append(["trees/Oak", "plants/Bush", "animals/Cow", "nope/Missing"][k % 4])
+		pos.append(Vector2(rng.randf_range(0, 2048), rng.randf_range(0, 2048)))
+		flips.append(k % 2)
+		scales.append(1.0)
+	var batch := SpriteBatch.new()
+	batch.set_sprites(ids, pos, flips, scales)
+	check(batch.count == 2250, "unknown sprites are skipped (%d drawn)" % batch.count)
+	# Sprites layer: strips in order, and sprites sorted by feet height inside each strip.
+	var layer: Node = batch.get_child(1)
+	var last := -INF
+	var total := 0
+	var sorted := true
+	for strip in layer.get_children():
+		var mm: MultiMesh = (strip as MultiMeshInstance2D).multimesh
+		total += mm.instance_count
+		for n in mm.instance_count:
+			var y := mm.get_instance_transform_2d(n).origin.y
+			sorted = sorted and y >= last
+			last = y
+	check(sorted and total == 2250, "sprites are drawn top to bottom, nearest last")
+	check(layer.get_child_count() == 16 and batch.get_child(0).get_child_count() == 16,
+			"one strip of sprites and one of shadows per 16 rows of tiles")
+	batch.free()

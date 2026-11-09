@@ -10,13 +10,15 @@ The twist: every people, monster species and force of nature (forest, volcano, o
 
 ![A generated world](docs/images/world_0.15.png)
 
-The world is a **flat 2D map drawn as one texture, one texel per tile**, scaled up with sharp pixels: the whole map costs one draw call whatever its size, the way WorldBox does it. Each tile has its biome colour, lighter on higher levels, with a slight variation so big biomes are not one flat colour. Zoomed in, a shader cuts each tile into 8×8 pattern pixels (the pixel size of the sprites) and draws a light ground pattern (grass, forest floor, sand ripples, snow sparkles, rock, glowing lava, water glints) and **step edges** where the ground goes down a level: a dark cliff face on the south side, darker lines on the sides, a light rim on the north. Zoomed out, patterns fade and the map reads like a map.
+The world is a **flat 2D map drawn as one texture, one texel per tile**, scaled up with sharp pixels: the whole map costs one draw call whatever its size, the way WorldBox does it. Each tile has its biome colour, lighter on higher levels, with a slight variation so big biomes are not one flat colour. Zoomed in, a shader cuts each tile into 8×8 pattern pixels and draws a light ground pattern (grass, forest floor, sand ripples, snow sparkles, rock, glowing lava, water glints) and **step edges** where the ground goes down a level: a dark cliff face on the south side, darker lines on the sides, a light rim on the north. Zoomed out, patterns fade and the map reads like a map.
 
 ![Close up](docs/images/world_0.15_close.png)
 
 Every world is generated from a seed: continents, five terrain levels, climate (latitude, altitude, winds and rain shadows), rivers and lakes, and 21 biomes, including volcanoes, mushroom lands and cursed lands.
 
-Next in 0.15: sprites drawn in batches on the map (trees, plants, peoples, animals), zoom-dependent detail, animated water. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are only used by the asset sheet tool for now.
+Plants (trees, bushes, rocks, cacti, mushrooms, flowers) are scattered over the map by biome from the seed, and **drawn in batches**: every sprite is packed into one atlas texture at start, and all of them go into a few MultiMeshes, one per strip of 16 tile rows, sorted by the height of their feet so nearer sprites cover the ones behind. A 512 world draws its ~22,000 plants in a few dozen MultiMeshes instead of 22,000 draws. Each sprite has a small drawn shadow (no real-time lighting). Flowers hide when zoomed out.
+
+Next in 0.15: zoom-dependent detail (units as dots from far), animated water and wind sway, the C# simulation core. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -53,12 +55,12 @@ Type any word or number as the seed: the same seed and settings always give the 
 
 | Path | Content |
 |---|---|
-| `scripts/world/` | world settings, data and the generator (shape → climate → hydrology → biomes) |
-| `scripts/render2d/` | the world map: one texture, one texel per tile |
+| `scripts/world/` | world settings, data, the generator (shape → climate → hydrology → biomes) and flora placement |
+| `scripts/render2d/` | the world map (one texture, one texel per tile), the sprite atlas and sprite batches |
 | `scripts/render/` | 2D map renderer (preview tool) and data layer colours |
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
-| `shaders/` | `map.gdshader` (ground patterns and step edges); the others belong to the retired 3D view |
+| `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
 | `assets/tiles/` | terrain atlas used by the game |

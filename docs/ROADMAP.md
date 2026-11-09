@@ -14,7 +14,7 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 
 ## 0.15 2D core
 - [x] Map drawn as one texture (one pixel per tile, scaled up), biome and level colours, step edges, zoom-in patterns; 2D map camera (zoom toward the mouse, pan, stays on the map)
-- [ ] Sprites drawn in batches (MultiMesh2D), sorted by screen height, drawn shadows
+- [x] Sprites drawn in batches (MultiMesh2D, one atlas, strips of 16 rows), sorted by screen height, drawn shadows; plants placed by biome
 - [ ] Zoom-dependent detail: dots when zoomed out, full sprites when zoomed in
 - [ ] Animated water and wind sway, cheaply
 - [ ] C# simulation core: world object, one manager per kind of entity, zones for spatial queries, batched ticks at different rates, world processes on timers over map slices

@@ -8,29 +8,10 @@ const Biomes = preload("res://scripts/world/biomes.gd")
 const SeededRng = preload("res://scripts/core/seeded_rng.gd")
 const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
+const Flora = preload("res://scripts/world/flora.gd")
 
-## Per biome: list of [sprite id, chance per tile]. A chance above 1 places several per tile.
-const FLORA := {
-	Biomes.FOREST: [["trees/Oak", 0.34], ["trees/Autumn_oak", 0.03], ["trees/Red_oak", 0.02],
-			["trees/Golden_oak", 0.02], ["trees/Pine", 0.04], ["plants/Bush", 0.08]],
-	Biomes.JUNGLE: [["trees/Jungle_tree", 0.35], ["trees/Palm", 0.08], ["plants/Jungle_bush", 0.2]],
-	Biomes.TAIGA: [["trees/Pine", 0.4], ["trees/Snowy_pine", 0.05]],
-	Biomes.SNOW: [["trees/Snowy_pine", 0.05]],
-	Biomes.TUNDRA: [["trees/Snowy_pine", 0.02], ["plants/Rock", 0.03]],
-	Biomes.GRASSLAND: [["trees/Oak", 0.025], ["plants/Bush", 0.035], ["plants/Grassy_rock", 0.012],
-			["plants/Flowers", 0.06]],
-	Biomes.MEADOW: [["trees/Oak", 0.015], ["plants/Bush", 0.03], ["plants/Flowers", 0.35]],
-	Biomes.HILLS: [["trees/Oak", 0.06], ["trees/Pine", 0.04], ["plants/Grassy_rock", 0.04]],
-	Biomes.SAVANNA: [["trees/Acacia", 0.03], ["plants/Bush", 0.02]],
-	Biomes.DESERT: [["plants/Cactus", 0.02], ["plants/Rock", 0.012]],
-	Biomes.BEACH: [["trees/Palm", 0.035]],
-	Biomes.SWAMP: [["trees/Swamp_tree", 0.16], ["trees/Dead_tree", 0.03], ["plants/Bush", 0.06]],
-	Biomes.MOUNTAIN: [["plants/Rock", 0.05], ["plants/Boulder", 0.025], ["trees/Pine", 0.03]],
-	Biomes.PEAK: [["plants/Boulder", 0.01]],
-	Biomes.VOLCANIC: [["plants/Rock", 0.06], ["trees/Dead_tree", 0.03]],
-	Biomes.MUSHROOM: [["plants/Red_mushroom", 0.12], ["plants/Pink_mushroom", 0.1], ["plants/Purple_mushroom", 0.08]],
-	Biomes.CURSED: [["trees/Dead_tree", 0.2], ["plants/Purple_mushroom", 0.05], ["plants/Rock", 0.03]],
-}
+## Per biome: list of [sprite id, chance per tile] (shared with the 2D map).
+const FLORA := Flora.FLORA
 
 
 ## Returns {sprite id: MultiMesh}.
@@ -73,7 +54,7 @@ static func build(world: WorldData, h: PackedFloat32Array) -> Dictionary:
 ## Flowers: no shadows (they would only darken the ground in speckles), and hidden when zoomed out,
 ## where they would shrink to dots.
 static func is_ground_cover(id: String) -> bool:
-	return id == "plants/Flowers"
+	return id in Flora.GROUND_COVER
 
 
 ## Dense grass tufts per biome (instances per tile), drawn by shaders/grass.gdshader.
