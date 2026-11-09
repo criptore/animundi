@@ -90,7 +90,7 @@ Villages now do everything WorldBox villages do (the full list, and how each rul
 
 ![A human city](docs/images/city_0.4.png)
 
-Next: 0.5 AI minds (villages that grow into towns, roads, kingdoms, diplomacy and war). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+Next: 0.5 AI minds (peoples that invent their own objects and buildings with a small local model). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
