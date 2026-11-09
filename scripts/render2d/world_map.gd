@@ -19,7 +19,7 @@ const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 const TILE := 8
 
 ## Ground pattern drawn up close (same ids as in shaders/map.gdshader).
-enum Pattern { PLAIN, GRASS, SAND, SNOW, ROCK, LAVA, FOREST, WATER }
+enum Pattern { PLAIN, GRASS, SAND, SNOW, ROCK, LAVA, FOREST, WATER, MEADOW }
 
 ## Brightness of each level (WorldData.Level): higher ground is lighter.
 const LEVEL_TINT := [0.9, 1.0, 1.0, 1.07, 1.12]
@@ -128,7 +128,9 @@ func pixel_size() -> Vector2:
 
 static func pattern(b: int) -> int:
 	match b:
-		Biomes.GRASSLAND, Biomes.MEADOW, Biomes.HILLS, Biomes.SAVANNA:
+		Biomes.MEADOW:
+			return Pattern.MEADOW
+		Biomes.GRASSLAND, Biomes.HILLS, Biomes.SAVANNA:
 			return Pattern.GRASS
 		Biomes.FOREST, Biomes.JUNGLE, Biomes.TAIGA, Biomes.SWAMP, Biomes.MUSHROOM, Biomes.CURSED:
 			return Pattern.FOREST

@@ -26,6 +26,7 @@ const int ROCK = 4;
 const int LAVA = 5;
 const int FOREST = 6;
 const int WATER = 7;
+const int MEADOW = 8;
 
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -42,15 +43,31 @@ int level_at(ivec2 c) {
 	return int(round(tile_data(c).r * 4.0));
 }
 
+// A flower colour: red, yellow, white, blue, pink or orange.
+vec3 flower_color(float h) {
+	if (h < 0.2) return vec3(0.89, 0.25, 0.27);
+	if (h < 0.4) return vec3(0.98, 0.84, 0.30);
+	if (h < 0.58) return vec3(0.96, 0.96, 0.92);
+	if (h < 0.74) return vec3(0.40, 0.58, 0.95);
+	if (h < 0.88) return vec3(0.95, 0.55, 0.78);
+	return vec3(0.98, 0.60, 0.25);
+}
+
 vec3 pattern(int kind, vec3 base, ivec2 cell, ivec2 sub) {
 	vec2 p = vec2(cell) * SUB + vec2(sub);
 	float h = hash(p);
 	float h2 = hash(p + 17.0);
 	switch (kind) {
 		case GRASS:
+		case MEADOW: {
+			// Flowers are single pixels of colour on the grass, as in WorldBox: a few on
+			// grassland, many on flower meadows.
+			float flowers = kind == MEADOW ? 0.06 : 0.006;
+			if (h2 < flowers) return flower_color(hash(p + 91.0));
 			if (h < 0.07) return base * 1.18;
 			if (h > 0.96) return base * 0.84;
 			break;
+		}
 		case FOREST:
 			if (h < 0.10) return base * 0.78;
 			if (h > 0.95) return base * 1.15;

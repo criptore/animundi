@@ -54,7 +54,36 @@ Animundi takes the **mechanisms**: layers, toggles, feedback, emergent loops. It
 - **Silly, expressive powers**: forgetting dusts (forget language, culture, religion, family or kingdom), whispers of war, friendship, spite, curses, blessings, possession of a creature. Each social system gets a power that pokes it directly.
 - **Save, share, workshop**: worlds are saved, uploaded and downloaded, and mods are first-class.
 
-## 3. What this means for Animundi
+## 3. Who appears naturally, and how creatures look
+
+**Natural spawning is a property of biomes.**
+- Each biome lists the creatures born in it on their own, with relative rates. Mushroom land, for example, gets sheep at rate 1 and frogs at rate 3. This happens only while the "Animal Spawn" world law is on.
+- Most monsters are never born at random. They come from:
+  - the player's powers and buildings (a tower that spawns cold creatures, a tower that spawns demons)
+  - events and ages (moon horrors)
+  - deaths: the cursed rise as skeletons, those who die on corrupted land as ghosts
+  - evolution: a monument that uplifts animals
+  - special biomes, which the player sows
+- A fresh world has animals, never monsters. Monsters arrive with the biomes the player makes, the disasters the player allows, or the player's own hand.
+
+**Sprites** (measured on the wiki's sprite sheets, 10× scale):
+
+| What | Size and look |
+|---|---|
+| Animals and people | About 9 pixels tall, a simple side-view silhouette, 3 walking frames, plus a small "swimming" variant |
+| Colours | Drawn with placeholder mask colours (magenta, green) that the game swaps for the kingdom's colours or the subspecies' skin. Skin colours ("phenotypes") come in ramps of 5 shades, chosen by biome (polar white, savanna tan, swamp teal…) |
+| Trees | 11–14 pixels tall, soft shading and a drawn shadow, packed densely, with several tints per biome |
+| Ground | Flat colour per biome, two shades (high and low). Flowers and grass are single pixels of colour on the ground, not sprites |
+| Tiles | 185 tile types with 2–5 variants each, every one with a hex colour and an edge colour |
+
+Animundi takes the **rules**, never the art:
+- Spawning is data: each species lists the biomes it is born in, with weights. Species with none never appear on their own; monsters live only in special biomes.
+- Flowers are single pixels drawn by the map shader.
+- Walking units hop on two frames (a cheap stand-in until real walk cycles in 0.2).
+- Sizes stay close: a unit is about one tile tall, a tree about two.
+- Still to come: walk cycles, colour masks for kingdom colours and biome skins, high and low shades per biome.
+
+## 4. What this means for Animundi
 
 | WorldBox mechanism | Animundi version | Milestone |
 |---|---|---|

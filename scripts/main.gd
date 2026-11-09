@@ -60,7 +60,7 @@ func generate() -> void:
 	_map.show_layer(current_layer)
 	_place_flora()
 	_sim.Start(world, PackedStringArray(Biomes.NAMES))
-	_sim.SpawnMany(world.size() / TILES_PER_ANIMAL)
+	_sim.SpawnNatural(world.size() / TILES_PER_ANIMAL)
 	_camera.bounds = _map.pixel_size()
 	_camera.frame_all()
 	_hud.set_stats(world)
@@ -103,7 +103,7 @@ func _process(_delta: float) -> void:
 
 ## Adds `count` wandering animals of every species, spread over their biomes.
 func spawn_animals(count: int) -> void:
-	_sim.SpawnMany(count)
+	_sim.SpawnNatural(count)
 
 
 ## Scatters the world's plants (scripts/world/flora.gd) into the two sprite batches.

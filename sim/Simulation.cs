@@ -79,7 +79,8 @@ public partial class Simulation : Node2D
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "zones", Interval = 0.25f, Batches = 1, Run = (_, _, _) => Zones.Rebuild(Units) });
 	}
 
-	/// <summary>Spawns up to `count` animals of a species on random tiles of its biomes.
+	/// <summary>Spawns `count` creatures of one species, as a god power: on random tiles of the
+	/// biomes it lives in, or anywhere on land for a creature that never appears by itself.
 	/// Returns how many were placed.</summary>
 	public int SpawnSpecies(string id, int count)
 	{
@@ -87,7 +88,7 @@ public partial class Simulation : Node2D
 		if (s < 0 || World == null)
 			return 0;
 		var allowed = new HashSet<int>();
-		foreach (var name in Assets.Species[s].Biomes)
+		foreach (var name in Assets.Species[s].Natural.Keys)
 		{
 			int b = Array.IndexOf(_biomeNames, name);
 			if (b >= 0)
@@ -100,31 +101,83 @@ public partial class Simulation : Node2D
 		if (tiles.Count == 0)
 			return 0;
 		for (int k = 0; k < count; k++)
+			SpawnOnTile(s, tiles[_rng.Next(tiles.Count)]);
+		Zones.Rebuild(Units);
+		return count;
+	}
+
+	/// <summary>Spawns `count` creatures the way nature would (WorldBox's "Animal Spawn"): on random
+	/// land tiles, each tile's biome picking a species among those born there, by weight. Tiles of
+	/// biomes where nothing lives are skipped, and species that never appear by themselves
+	/// (monsters of special biomes aside) are never chosen. Returns how many were placed.</summary>
+	public int SpawnNatural(int count)
+	{
+		if (World == null)
+			return 0;
+		// Per biome: species and cumulative weights.
+		var tables = new List<(int species, float upTo)>[_biomeNames.Length];
+		var totals = new float[_biomeNames.Length];
+		for (int s = 0; s < Assets.Species.Count; s++)
+			foreach (var (name, weight) in Assets.Species[s].Natural)
+			{
+				int b = Array.IndexOf(_biomeNames, name);
+				if (b < 0 || weight <= 0f)
+					continue;
+				tables[b] ??= new();
+				totals[b] += weight;
+				tables[b].Add((s, totals[b]));
+			}
+		var tiles = new List<int>();
+		for (int i = 0; i < World.Biome.Length; i++)
+			if (World.Water[i] == SimWorld.WaterLand && tables[World.Biome[i]] != null)
+				tiles.Add(i);
+		if (tiles.Count == 0)
+			return 0;
+		for (int k = 0; k < count; k++)
 		{
 			int t = tiles[_rng.Next(tiles.Count)];
-			Units.Spawn(s, t % World.Width + (float)_rng.NextDouble(), t / World.Width + (float)_rng.NextDouble());
+			int b = World.Biome[t];
+			float r = (float)_rng.NextDouble() * totals[b];
+			var table = tables[b];
+			int pick = table[^1].species;
+			foreach (var (species, upTo) in table)
+				if (r < upTo)
+				{
+					pick = species;
+					break;
+				}
+			SpawnOnTile(pick, t);
 		}
 		Zones.Rebuild(Units);
 		return count;
 	}
 
-	/// <summary>Spawns `count` animals spread over every species (for tests and the
-	/// performance check). Returns how many were placed.</summary>
-	public int SpawnMany(int count)
+	private void SpawnOnTile(int species, int tile) =>
+		Units.Spawn(species, tile % World.Width + (float)_rng.NextDouble(), tile / World.Width + (float)_rng.NextDouble());
+
+	/// <summary>How many living units belong to species that never appear by themselves.</summary>
+	public int CountUnnatural()
 	{
-		int placed = 0;
-		int per = Math.Max(1, count / Math.Max(Assets.Species.Count, 1));
-		foreach (var s in Assets.Species)
+		int n = 0;
+		for (int i = 0; i < Units.Capacity; i++)
+			if (Units.Alive[i] && !Assets.Species[Units.Species[i]].IsNatural)
+				n++;
+		return n;
+	}
+
+	/// <summary>How many living units stand on a biome where their species is not born.</summary>
+	public int CountOutOfHabitat()
+	{
+		int n = 0;
+		for (int i = 0; i < Units.Capacity; i++)
 		{
-			if (placed >= count)
-				break;
-			placed += SpawnSpecies(s.Id, Math.Min(per, count - placed));
+			if (!Units.Alive[i])
+				continue;
+			int tile = World.Index((int)Units.X[i], (int)Units.Y[i]);
+			if (!Assets.Species[Units.Species[i]].Natural.ContainsKey(_biomeNames[World.Biome[tile]]))
+				n++;
 		}
-		// Whatever is left (rounding, species without land) goes to the first species that fits.
-		foreach (var s in Assets.Species)
-			if (placed < count)
-				placed += SpawnSpecies(s.Id, count - placed);
-		return placed;
+		return n;
 	}
 
 	public void ClearUnits()
@@ -389,10 +442,20 @@ public partial class Simulation : Node2D
 			float ox = Units.X[i] * Tile;
 			float oy = Units.Y[i] * Tile;
 			float sx = Units.FacingLeft[i] ? -size.X : size.X;
+			// Walking: a two-frame hop, the cheap version of WorldBox's walk cycles. Up a world
+			// pixel and stretched a little on one frame, squashed on the other.
+			bool moving = MathF.Abs(Units.TargetX[i] - Units.X[i]) + MathF.Abs(Units.TargetY[i] - Units.Y[i]) > 0.01f;
+			float sy = size.Y;
+			if (moving)
+			{
+				bool up = MathF.Sin((float)Scheduler.Time * 9f + i * 0.37f) > 0f;
+				oy -= up ? 0.8f : 0f;
+				sy *= up ? 1.04f : 0.97f;
+			}
 			int o = k * 16;
 			// Transform2D rows: (x.x, y.x, 0, origin.x), (x.y, y.y, 0, origin.y).
 			_buffer[o] = sx; _buffer[o + 1] = 0f; _buffer[o + 2] = 0f; _buffer[o + 3] = ox;
-			_buffer[o + 4] = 0f; _buffer[o + 5] = size.Y; _buffer[o + 6] = 0f; _buffer[o + 7] = oy;
+			_buffer[o + 4] = 0f; _buffer[o + 5] = sy; _buffer[o + 6] = 0f; _buffer[o + 7] = oy;
 			Color c = _spriteColor[s];
 			_buffer[o + 8] = c.R; _buffer[o + 9] = c.G; _buffer[o + 10] = c.B; _buffer[o + 11] = size.Y / 256f;
 			Rect2 r = _spriteRect[s];
@@ -401,7 +464,7 @@ public partial class Simulation : Node2D
 			float w = size.X * 0.75f, h = size.X * 0.28f;
 			int q = k * 8;
 			_shadowBuffer[q] = w; _shadowBuffer[q + 1] = 0f; _shadowBuffer[q + 2] = 0f; _shadowBuffer[q + 3] = ox + size.X * 0.08f;
-			_shadowBuffer[q + 4] = 0f; _shadowBuffer[q + 5] = h; _shadowBuffer[q + 6] = 0f; _shadowBuffer[q + 7] = oy + h * 0.45f;
+			_shadowBuffer[q + 4] = 0f; _shadowBuffer[q + 5] = h; _shadowBuffer[q + 6] = 0f; _shadowBuffer[q + 7] = Units.Y[i] * Tile + h * 0.45f;
 		}
 		_mesh.VisibleInstanceCount = n;
 		_shadowMesh.VisibleInstanceCount = n;
