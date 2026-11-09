@@ -5,11 +5,14 @@ signal generate_requested
 signal layer_selected(layer: String)
 ## The player picked a speed of time (0 = pause).
 signal speed_selected(scale: float)
+## The player started the world with these peoples (from the setup panel).
+signal start_requested(races: PackedStringArray, per_village: int)
 ## The player asked for more animals (stress test of the simulation).
 signal spawn_requested(count: int)
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
+const SetupPanel = preload("res://scripts/ui/setup_panel.gd")
 
 var settings: WorldSettings
 
@@ -28,6 +31,11 @@ var _time_label: Label
 var _events_label: Label
 var _population_label: Label
 var _events: PackedStringArray = []
+var _villages_label: Label
+var _setup: PanelContainer
+var _root: Control
+## Village names drawn over the map.
+var _name_labels: Array[Label] = []
 
 ## Event lines kept on screen.
 const EVENTS_SHOWN := 6
@@ -44,6 +52,7 @@ func _ready() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	_root = root
 
 	# Top bar: world settings.
 	var top := PanelContainer.new()
@@ -114,7 +123,7 @@ func _ready() -> void:
 	spawn.tooltip_text = "Spawn 1000 wandering animals: a stress test of the C# simulation"
 	spawn.pressed.connect(func(): spawn_requested.emit(1000))
 	layers.add_child(spawn)
-	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nR: random seed\nF: fire under the mouse (test)")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nHover a creature: who it is\nR: new world\nF: fire under the mouse (test)")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 
@@ -145,6 +154,10 @@ func _ready() -> void:
 	_population_label = _label("")
 	_population_label.add_theme_font_size_override("font_size", 12)
 	life.add_child(_population_label)
+	life.add_child(_label("Villages"))
+	_villages_label = _label("")
+	_villages_label.add_theme_font_size_override("font_size", 12)
+	life.add_child(_villages_label)
 	life.add_child(_label("Events"))
 	_events_label = _label("")
 	_events_label.add_theme_font_size_override("font_size", 12)
@@ -234,6 +247,48 @@ func set_populations(table: Dictionary) -> void:
 	_population_label.text = "  ".join(parts)
 	_population_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_population_label.custom_minimum_size.x = 290
+
+
+## Shows the world setup (choosing the peoples) over a new world.
+func show_setup() -> void:
+	if _setup == null:
+		_setup = SetupPanel.new()
+		_setup.start_requested.connect(func(races, n):
+			_setup.visible = false
+			start_requested.emit(races, n))
+		_root.add_child(_setup)
+	_setup.visible = true
+
+
+func setup_visible() -> bool:
+	return _setup != null and _setup.visible
+
+
+## One line per village: name, people, population, stores, houses.
+func set_villages(villages: Array) -> void:
+	var lines := PackedStringArray()
+	for v in villages:
+		lines.append("%s (%s) %d · food %d · wood %d · %d houses" % [v.name, v.people, v.population, v.food, v.wood, v.houses])
+	_villages_label.text = "\n".join(lines) if lines.size() > 0 else "none yet"
+
+
+## Village names over the map: `labels` is [[name, screen position], ...].
+func set_map_labels(labels: Array) -> void:
+	while _name_labels.size() < labels.size():
+		var l := Label.new()
+		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		l.add_theme_constant_override("outline_size", 4)
+		l.add_theme_font_size_override("font_size", 14)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_root.add_child(l)
+		_root.move_child(l, 0)
+		_name_labels.append(l)
+	for k in _name_labels.size():
+		var l := _name_labels[k]
+		l.visible = k < labels.size()
+		if l.visible:
+			l.text = labels[k][0]
+			l.position = labels[k][1] - Vector2(l.size.x / 2.0, 34)
 
 
 func set_sprite_count(n: int) -> void:

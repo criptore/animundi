@@ -45,13 +45,15 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
   - peoples assembled from parts: a body per race (ears, horns, beard, tusks, crest, tail, fins, foliage, wings, sockets) and an outfit per role (villager's sack, warrior's helmet and sword, chief's crown and cape, shaman's hood and staff)
 
 ## 0.3 Peoples
-- [ ] World setup before starting: choose the peoples that live in the world (at least two), then watch them at any speed
-- [ ] The 12 races placed in their preferred biomes at world start
-- [ ] Per-world race variation (colours, stats, temperament)
-- [ ] Language generator for names (people, cities, rivers, gods)
-- [ ] Individuals: age, traits, skills, family, life cycle
-- [ ] Jobs: gatherer, farmer, woodcutter, miner, builder, hunter…
-- [ ] First villages, with utility AI for inhabitants (no language model): each action a "neuron" with weight, cooldown and priority, visible and switchable in the unit inspector
+- [x] World setup before starting: the world waits while the player picks the peoples (at least two) and how many found each village, then starts it and watches at any speed
+- [x] Peoples as data (`data/races.json`): liked biomes, size, speed, lifespan, temperament, stats, language sounds; each founds its first village in a biome it likes, near fresh water, far from the others
+- [x] Per-world race variation: stats, temperament, speed and lifespan shifted by the seed (colour variation comes with the colour masks)
+- [x] Language generator (`sim/Language.cs`): each people's sounds narrowed by the seed into a dialect, syllable patterns, endings and a small lexicon; names for people and villages (rivers, gods and kingdoms later)
+- [x] Individuals: name, sex, age, two traits (brave, lazy, kind, greedy, wise, strong), partner, mother and father; children grow up (adults at 16 at most, so elves and dwarves grow up in time), work, pair, have children, grow old and die; hovering a creature tells who it is
+- [x] Jobs handed out by the village by what it lacks: gatherers (wild food from the grass), woodcutters (trees are felled), hunters (animals of their size or a little bigger), builders (houses from wood); warriors prefer the hunt and defend; chiefs and shamans lead (a new chief when the old one dies)
+- [ ] More jobs: farmer, herder, miner, fisher (0.4, with fields and mines)
+- [x] First villages: a bonfire, then houses in each people's style built when room runs out (`art/buildings.py`), food and wood stores; villages are abandoned when everyone is gone
+- [x] Utility AI for people, as WorldBox's neurons: each action (drink, eat, rest, pair, breed, work, play, wander) has a weight, a cooldown, a priority and a switch; urgent thirst and hunger interrupt any task (the unit inspector that shows and switches them comes with 0.9)
 - [ ] Home biome gives species and peoples their starting traits
 
 ## 0.4 Civilisation

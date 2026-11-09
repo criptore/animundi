@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core and 0.2 Life
+## Status: 0.15 2D core, 0.2 Life and 0.3 Peoples
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -39,7 +39,30 @@ Every living being is **redrawn in pixel art at display size** (`art/creatures.p
 
 All poses: [docs/images/creatures.png](docs/images/creatures.png).
 
-Next: 0.3 Peoples (choose at least two peoples and watch them live). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+## 0.3 Peoples
+
+![Choosing the peoples](docs/images/setup_0.3.png)
+
+A new world **waits for you to choose who lives in it**: at least two of the 12 peoples, and how many found each village. Then time runs and you watch.
+
+![A village of humans](docs/images/village_0.3.png)
+
+- Each people is a data record (`data/races.json`) that **every world varies**: stats, temperament, speed and lifespan. It also has its own **generated language**: elves are called Rialie or Vivavi, orcs Krazkrash or Dauk, and their villages Virivae or Dadgog.
+- Each people founds a **village** in a land it likes, near fresh water: a bonfire, then **houses in its own style** built from wood when room runs out, with stores of food and wood.
+- The village hands out **work** by what it lacks:
+  - **gatherers** bring wild food from the grass
+  - **woodcutters** fell trees
+  - **hunters** bring meat
+  - **builders** raise houses
+  
+  Warriors prefer the hunt and fight off beasts. Chiefs and shamans lead, and a new chief rises when the old one dies.
+- **Individuals** have a name, sex, age, traits, a partner and parents. They pair up and have children, who grow up and work in turn. Hover a creature to see who it is.
+- People decide with a small **utility AI made of neurons**, as in WorldBox: drink, eat, rest, pair, breed, work, play and wander, each with a weight, a cooldown and a priority. Urgent thirst and hunger interrupt anything.
+- Village names float over the map, and the left panel lists villages, populations and the events of the world.
+
+`tools/village_check.gd` runs a world with peoples for years and prints how each village fares.
+
+Next: 0.4 Civilisation (villages that grow into towns, roads, kingdoms, diplomacy and war). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -69,7 +92,8 @@ Controls:
 |---|---|
 | Zoom (toward the mouse) | mouse wheel, trackpad pinch, + / - keys |
 | Pan | drag with any mouse button (or click and drag on a trackpad), trackpad two-finger scroll, WASD, arrow keys |
-| New random world | R or the **Random** button |
+| New random world (then choose its peoples) | R or the **Random** button |
+| Who is this creature? | hover it |
 | Add 1000 wandering animals (stress test) | U or the **+1000 animals** button |
 | Pause / resume, slower / faster time | Space, comma / period, or the ×1 ×2 ×5 ×10 buttons |
 | Set fire under the mouse (test tool) | F |
@@ -88,8 +112,8 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
 | `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
-| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
-| `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |
+| `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples, villages, jobs and neurons (`Peoples.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
+| `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `races.json` (the 12 peoples), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |
 | `scripts/core/` | seeded random streams, priority queue |
 | `scripts/generated/` | files written by `art/sprites.py`, do not edit |
 | `assets/tiles/` | terrain atlas used by the game |
@@ -113,6 +137,12 @@ dotnet build
 godot --headless --path . --script res://tests/test_world.gd
 ```
 
+A world with peoples over the years (villages, food, wood, houses, events):
+
+```bash
+godot --headless --path . --script res://tools/village_check.gd -- 10 humans,elves,orcs animundi
+```
+
 Living world over the years (populations, deaths by cause, plants):
 
 ```bash
@@ -132,7 +162,7 @@ godot --headless --path . --script res://tools/render_preview.gd -- <seed> <size
 Screenshot of the game (needs a display; on a headless machine wrap it in `xvfb-run`). `zoom` is screen pixels per world pixel, a tile being 8 world pixels; 0 shows the whole map:
 
 ```bash
-godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [volcano]
+godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano] [years]
 ```
 
 To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, NumPy, SciPy):
@@ -141,10 +171,14 @@ To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, Nu
 python3 art/extract_sprites.py
 ```
 
-The sprites of every living being (animals, monsters, peoples and their poses) and their preview sheet are drawn by:
+The sprites of every living being (animals, monsters, peoples and their poses) and of the first buildings, with their preview sheets, are drawn by:
 
 ```bash
 python3 art/creatures.py
+```
+
+```bash
+cd art && python3 buildings.py
 ```
 
 The old 8×8 sprites and the 2D terrain atlas used by the preview tool are generated by:

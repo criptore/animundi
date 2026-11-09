@@ -48,6 +48,7 @@ func _initialize() -> void:
 	test_life()
 	test_scripts_load()
 	test_nature()
+	test_peoples()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -671,7 +672,56 @@ func test_nature() -> void:
 func test_scripts_load() -> void:
 	var ok := true
 	for path in ["res://scripts/ui/hud.gd", "res://scripts/main.gd", "res://scripts/ui/map_camera.gd",
-			"res://scripts/render2d/world_map.gd"]:
+			"res://scripts/render2d/world_map.gd", "res://scripts/ui/setup_panel.gd"]:
 		var script: GDScript = load(path)
 		ok = ok and script != null and script.can_instantiate()
 	check(ok, "the HUD, main scene and map scripts compile")
+
+
+func test_peoples() -> void:
+	var made := make_sim("peoples", 192)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	var founded: int = sim.StartPeoples(PackedStringArray(["humans", "elves", "orcs"]), 12)
+	check(founded == 3 and sim.VillageCount() == 3 and sim.PeopleCount() == 36,
+			"three peoples found a village each, 12 people per village (%d villages, %d people)" % [founded, sim.PeopleCount()])
+
+	# Each people speaks its own generated language.
+	var elves: PackedStringArray = sim.SampleNames("elves", 20)
+	var orcs: PackedStringArray = sim.SampleNames("orcs", 20)
+	var shared := 0
+	var tidy := true
+	var regex := RegEx.create_from_string("[aeiouy]{3}|(.)\\1\\1")
+	for n in elves:
+		if n in orcs:
+			shared += 1
+		tidy = tidy and n.length() > 0 and n.length() <= 9 and regex.search(n.to_lower()) == null
+	check(shared < 3 and tidy, "elves and orcs have different languages; names are short and smooth (%s / %s)" % [elves.slice(0, 4), orcs.slice(0, 4)])
+
+	# Races vary from one world to the next.
+	var other := make_sim("peoples-2", 128)
+	other[1].StartPeoples(PackedStringArray(["humans", "elves"]), 8)
+	check(sim.RaceOf("humans") != other[1].RaceOf("humans"), "the same people differs from world to world")
+	other[1].queue_free()
+
+	# Villages live: they gather food and wood, build houses, and families have children.
+	sim.RunSteps(30 * 60 * 3)  # 3 years
+	var houses := 0
+	for v in sim.VillageTable():
+		houses += v.houses
+	var stats: Dictionary = sim.LifeStats()
+	check(houses >= 2, "villages build houses (%d in 3 years)" % houses)
+	check(stats["people_births"] > 0, "families have children (%d births)" % stats["people_births"])
+	var family := false
+	var people_ok := true
+	for i in 4000:
+		if not sim.UnitAlive(i) or not sim.UnitIsPeople(i):
+			continue
+		if sim.UnitMother(i) >= 0 and sim.UnitFather(i) >= 0:
+			family = true
+		people_ok = people_ok and sim.UnitVillage(i) >= 0 and sim.UnitName(i) != ""
+	check(family and people_ok, "children have a mother and a father; everyone has a name and a village")
+	check(sim.CountOnWater() == 0, "no one walks on water")
+	check(sim.UnitInfo(sim.UnitAt(w.width / 2.0, w.height / 2.0, 500.0)) != "", "the HUD can describe a creature")
+	sim.queue_free()

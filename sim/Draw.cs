@@ -124,6 +124,8 @@ public partial class Simulation
 
 	private void ClearDrawing()
 	{
+		_speciesFrames = Array.Empty<(Vector2, Rect2, Color)[]>();
+		_peopleFrames = Array.Empty<(Vector2, Rect2, Color)[][]>();
 		foreach (var child in _plantLayer.GetChildren())
 			child.QueueFree();
 		foreach (var child in _plantShadowLayer.GetChildren())
@@ -243,12 +245,14 @@ public partial class Simulation
 	/// <summary>Poses of a creature sprite (art/creatures.py), in order.</summary>
 	private static readonly string[] Poses = { "idle", "walk1", "walk2", "attack", "swim", "death" };
 	private const int Idle = 0, Walk1 = 1, Walk2 = 2, Attack = 3, Dead = 5;
+	// Per people species, role and pose (the sprite changes with the role).
+	private (Vector2 size, Rect2 rect, Color color)[][][] _peopleFrames = Array.Empty<(Vector2, Rect2, Color)[][]>();
 	// Per species and pose: size in world pixels, atlas rectangle, average colour.
 	private (Vector2 size, Rect2 rect, Color color)[][] _speciesFrames = Array.Empty<(Vector2, Rect2, Color)[]>();
 
 	private void DrawUnits()
 	{
-		int cap = Units.Capacity + _burning.Count + _burningTiles.Count + _remains.Count;
+		int cap = Units.Capacity + _burning.Count + _burningTiles.Count + _remains.Count + Buildings.Count;
 		if (_order.Length < cap)
 		{
 			_order = new int[cap];
@@ -279,6 +283,15 @@ public partial class Simulation
 			_keys[n] = _remains[r].y - 0.01f;
 			n++;
 		}
+		// Buildings: -2^28 - building, standing on the lower part of their tile.
+		for (int b = 0; b < Buildings.Count; b++)
+		{
+			if (!Buildings[b].Alive)
+				continue;
+			_order[n] = -(1 << 28) - b;
+			_keys[n] = Buildings[b].Y + 0.8f;
+			n++;
+		}
 		foreach (int t in _burningTiles)
 		{
 			_order[n] = int.MinValue + t;
@@ -290,11 +303,26 @@ public partial class Simulation
 		if (_speciesFrames.Length != Assets.Species.Count)
 		{
 			_speciesFrames = new (Vector2, Rect2, Color)[Assets.Species.Count][];
+			_peopleFrames = new (Vector2, Rect2, Color)[Assets.Species.Count][][];
 			for (int s = 0; s < Assets.Species.Count; s++)
 			{
+				var sp = Assets.Species[s];
+				if (sp.IsPeople)
+				{
+					// creatures/<race>_<role>_<pose>
+					_peopleFrames[s] = new (Vector2, Rect2, Color)[RoleNames.Length][];
+					for (int r = 0; r < RoleNames.Length; r++)
+					{
+						_peopleFrames[s][r] = new (Vector2, Rect2, Color)[Poses.Length];
+						for (int f = 0; f < Poses.Length; f++)
+							_peopleFrames[s][r][f] = SpriteInfo($"{sp.Sprite}_{RoleNames[r]}_{Poses[f]}");
+					}
+					_speciesFrames[s] = _peopleFrames[s][0];
+					continue;
+				}
 				_speciesFrames[s] = new (Vector2, Rect2, Color)[Poses.Length];
 				for (int f = 0; f < Poses.Length; f++)
-					_speciesFrames[s][f] = SpriteInfo($"{Assets.Species[s].Sprite}_{Poses[f]}");
+					_speciesFrames[s][f] = SpriteInfo($"{sp.Sprite}_{Poses[f]}");
 			}
 		}
 		var fireFrames = new (Rect2 rect, Color color)[3];
@@ -327,6 +355,22 @@ public partial class Simulation
 				float fy = (t / World.Width + 0.85f) * Tile;
 				WriteSprite(_unitBuffer, k * Stride, fh * 0.75f, fh, fx, fy, trect, tcolor, fh);
 				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+				continue;
+			}
+			if (i > -(1 << 29) && i <= -(1 << 28))
+			{
+				// A building: bonfires flicker, houses wear their people's style, sites are frames.
+				var bld = Buildings[-(1 << 28) - i];
+				string id = bld.Kind switch
+				{
+					BuildingKind.Bonfire => $"buildings/bonfire_{(int)(time * 6f + bld.X) % 3}",
+					BuildingKind.Site => "buildings/site",
+					_ => $"buildings/house_{Assets.Species[Villages[bld.Village].Species].Id}",
+				};
+				var (bsize, brect, bcolor) = SpriteInfo(id);
+				float bx = (bld.X + 0.5f) * Tile, by = (bld.Y + 1f) * Tile;
+				WriteSprite(_unitBuffer, k * Stride, bsize.X, bsize.Y, bx, by, brect, bcolor, bsize.Y);
+				WriteShadow(_unitShadowBuffer, k * 8, bld.Kind == BuildingKind.Bonfire ? 0f : bsize.X * 0.9f, bx, by);
 				continue;
 			}
 			if (i <= -(1 << 29))
@@ -364,9 +408,10 @@ public partial class Simulation
 				int step = (int)(time * (4f + sp.Speed * 4f) + (i & 7)) & 3;
 				pose = step == 1 ? Walk1 : step == 3 ? Walk2 : Idle;
 			}
-			var (size, rect, avg) = _speciesFrames[Units.Species[i]][pose];
+			var frames = sp.IsPeople ? _peopleFrames[Units.Species[i]][Units.Role[i]] : _speciesFrames[Units.Species[i]];
+			var (size, rect, avg) = frames[pose];
 			// The young grow from 60% to full size.
-			float grown = Math.Clamp(Units.Age[i] / (sp.Lifespan * Maturity), 0f, 1f);
+			float grown = Math.Clamp(Units.Age[i] / AdultAge(sp), 0f, 1f);
 			size *= 0.6f + 0.4f * grown;
 			float ox = Units.X[i] * Tile;
 			float oy = Units.Y[i] * Tile;

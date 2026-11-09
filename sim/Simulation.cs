@@ -56,6 +56,7 @@ public partial class Simulation : Node2D
 		Scheduler.WorldProcesses.Clear();
 		Scheduler.Time = 0;
 		_processRows.Clear();
+		SetupPeoples();
 		SetupLife();
 		SetupNature();
 		ClearDrawing();
@@ -69,6 +70,8 @@ public partial class Simulation : Node2D
 		// Fire: every step. Births over time: twice a second.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "fire", Global = true, Interval = Scheduler.Step, Batches = 1, Run = (_, _, dt) => FireStep(0, 0, dt) });
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spawn", Global = true, Interval = 0.5f, Batches = 1, Run = (_, _, dt) => SpawnOverTime(0, 0, dt) });
+		// Villages hand out work and plan houses every two seconds.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "villages", Global = true, Interval = 2f, Batches = 1, Run = VillageStep });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}
@@ -141,7 +144,7 @@ public partial class Simulation : Node2D
 	{
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
-			if (Units.Alive[i] && !Assets.Species[Units.Species[i]].IsNatural)
+			if (Units.Alive[i] && !Assets.Species[Units.Species[i]].IsNatural && !Assets.Species[Units.Species[i]].IsPeople)
 				n++;
 		return n;
 	}
@@ -206,7 +209,11 @@ public partial class Simulation : Node2D
 	{
 		var d = new Godot.Collections.Dictionary { ["births"] = Births, ["plants_burned"] = PlantsBurned };
 		foreach (Death c in Enum.GetValues<Death>())
+		{
 			d[c.ToString()] = Deaths[(int)c];
+			d["people_" + c.ToString()] = PeopleDeaths[(int)c];
+		}
+		d["people_births"] = PeopleBirths;
 		return d;
 	}
 

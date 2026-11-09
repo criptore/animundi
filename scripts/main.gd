@@ -41,6 +41,7 @@ func _ready() -> void:
 	_hud.layer_selected.connect(show_layer)
 	_hud.spawn_requested.connect(spawn_animals)
 	_hud.speed_selected.connect(func(v): _sim.SetTimeScale(v))
+	_hud.start_requested.connect(start_peoples)
 	add_child(_hud)
 	generate()
 
@@ -56,6 +57,15 @@ func generate() -> void:
 	_camera.frame_all()
 	_hud.set_stats(world)
 	_hud.clear_events()
+	# The world waits while the player chooses its peoples.
+	_sim.SetTimeScale(0.0)
+	_hud.show_setup()
+
+
+## Brings the chosen peoples into the world and lets time run.
+func start_peoples(races: PackedStringArray, per_village: int) -> void:
+	_sim.StartPeoples(races, per_village)
+	_sim.SetTimeScale(1.0)
 
 
 func show_layer(layer: String) -> void:
@@ -94,7 +104,16 @@ func _process(_delta: float) -> void:
 		_hud.set_time("Year %d · %s%s" % [_sim.Year(), _sim.SeasonName(), "  (paused)" if speed == 0.0 else ""])
 		_hud.set_sprite_count(_sim.PlantCount())
 		_hud.set_populations(_sim.PopulationTable())
-	var tile := pick_tile(get_viewport().get_mouse_position())
+		_hud.set_villages(_sim.VillageTable())
+	_update_map_labels()
+	var mouse := get_viewport().get_mouse_position()
+	# A creature under the mouse: who it is.
+	var at := _camera.screen_to_world(mouse) / WorldMap.TILE
+	var unit: int = _sim.UnitAt(at.x, at.y, 0.9)
+	if unit >= 0:
+		_hud.set_hover_text(_sim.UnitInfo(unit))
+		return
+	var tile := pick_tile(mouse)
 	if tile.x < 0:
 		_hud.set_hover_text("")
 		return
@@ -104,6 +123,18 @@ func _process(_delta: float) -> void:
 	_hud.set_hover_text("(%d, %d)  %s  ·  %s  ·  height %s  ·  %d °C  ·  humidity %d%%" % [
 		tile.x, tile.y, Biomes.NAMES[world.biome[i]], LEVEL_NAMES[world.level[i]], height_text,
 		roundi(lerpf(-30.0, 45.0, world.temperature[i])), roundi(world.humidity[i] * 100.0)])
+
+
+## Village names over their bonfires, when zoomed in enough to read them.
+func _update_map_labels() -> void:
+	var labels := []
+	if _camera.zoom.x >= 0.8 and current_layer == "Biomes":
+		var view := get_viewport().get_visible_rect().size
+		for v in _sim.VillageTable():
+			var p := (Vector2(v.x + 0.5, v.y) * WorldMap.TILE - _camera.position) * _camera.zoom.x + view / 2.0
+			if Rect2(Vector2.ZERO, view).has_point(p):
+				labels.append([v.name, p])
+	_hud.set_map_labels(labels)
 
 
 ## Adds `count` wandering animals of every species, spread over their biomes.
