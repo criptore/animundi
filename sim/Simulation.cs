@@ -172,6 +172,9 @@ public partial class Simulation : Node2D
 
 	public int UnitCount() => Units.Count;
 
+	/// <summary>Dead creatures still lying on the ground.</summary>
+	public int RemainsCount() => _remains.Count;
+
 	public bool UnitAlive(int i) => i >= 0 && i < Units.Capacity && Units.Alive[i];
 
 	/// <summary>Living units of species `id`.</summary>

@@ -9,7 +9,8 @@ namespace Animundi.Sim;
 /// Drawing of the simulation, straight into MultiMesh buffers (no node per creature or plant):
 /// - plants: one MultiMesh per strip of 16 tile rows, sorted by feet height, rebuilt only when a
 ///   plant in the strip grew, appeared, burned or died; their shadows in a layer under them;
-/// - creatures: one MultiMesh rebuilt every frame, sorted by feet height, young ones smaller;
+/// - creatures: one MultiMesh rebuilt every frame, sorted by feet height, young ones smaller,
+///   animated with the poses of art/creatures.py (walking steps, strikes) and leaving remains;
 /// - flames: a three-frame pixel-art flame (made in scripts/render2d/sprite_atlas.gd) over every
 ///   burning plant, drawn with the creatures so it sorts by height with them.
 /// All sprites come from the shared atlas (scripts/render2d/sprite_atlas.gd).
@@ -43,7 +44,6 @@ public partial class Simulation
 	private int[] _order = Array.Empty<int>();
 	private float[] _keys = Array.Empty<float>();
 	private bool[] _stripDirty = Array.Empty<bool>();
-	private (Vector2 size, Rect2 rect, Color color)[] _speciesSprites = Array.Empty<(Vector2, Rect2, Color)>();
 	private readonly List<(MultiMesh plants, MultiMesh shadows)> _strips = new();
 	private double _drawMs;
 	private int _drawSamples;
@@ -240,14 +240,22 @@ public partial class Simulation
 
 	/// <summary>Writes every living creature and every flame into the MultiMesh buffers, nearest
 	/// (lowest) last. Flames are stored in the order as ~plant (negative numbers).</summary>
+	/// <summary>Poses of a creature sprite (art/creatures.py), in order.</summary>
+	private static readonly string[] Poses = { "idle", "walk1", "walk2", "attack", "swim", "death" };
+	private const int Idle = 0, Walk1 = 1, Walk2 = 2, Attack = 3, Dead = 5;
+	// Per species and pose: size in world pixels, atlas rectangle, average colour.
+	private (Vector2 size, Rect2 rect, Color color)[][] _speciesFrames = Array.Empty<(Vector2, Rect2, Color)[]>();
+
 	private void DrawUnits()
 	{
-		int cap = Units.Capacity + _burning.Count + _burningTiles.Count;
+		int cap = Units.Capacity + _burning.Count + _burningTiles.Count + _remains.Count;
 		if (_order.Length < cap)
 		{
 			_order = new int[cap];
 			_keys = new float[cap];
 		}
+		// Everything drawn here, sorted by feet height: creatures (their index), flames over plants
+		// (~plant), remains of the dead (-2^29 - remains), flames over tiles (int.MinValue + tile).
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
 		{
@@ -265,7 +273,12 @@ public partial class Simulation
 			_keys[n] = _pY[p] + 0.01f;
 			n++;
 		}
-		// Burning tiles: codes below -2^30 (int.MinValue + tile).
+		for (int r = 0; r < _remains.Count; r++)
+		{
+			_order[n] = -(1 << 29) - r;
+			_keys[n] = _remains[r].y - 0.01f;
+			n++;
+		}
 		foreach (int t in _burningTiles)
 		{
 			_order[n] = int.MinValue + t;
@@ -273,12 +286,16 @@ public partial class Simulation
 			n++;
 		}
 		Array.Sort(_keys, _order, 0, n);
-		// Sprite of every species, looked up once per frame (not once per creature).
-		if (_speciesSprites.Length != Assets.Species.Count)
+		// Frames of every species, looked up once (not once per creature).
+		if (_speciesFrames.Length != Assets.Species.Count)
 		{
-			_speciesSprites = new (Vector2, Rect2, Color)[Assets.Species.Count];
+			_speciesFrames = new (Vector2, Rect2, Color)[Assets.Species.Count][];
 			for (int s = 0; s < Assets.Species.Count; s++)
-				_speciesSprites[s] = SpriteInfo(Assets.Species[s].Sprite);
+			{
+				_speciesFrames[s] = new (Vector2, Rect2, Color)[Poses.Length];
+				for (int f = 0; f < Poses.Length; f++)
+					_speciesFrames[s][f] = SpriteInfo($"{Assets.Species[s].Sprite}_{Poses[f]}");
+			}
 		}
 		var fireFrames = new (Rect2 rect, Color color)[3];
 		for (int f = 0; f < 3; f++)
@@ -286,6 +303,7 @@ public partial class Simulation
 			var info = SpriteInfo($"effects/Fire_{f}");
 			fireFrames[f] = (info.rect, info.color);
 		}
+		float time = (float)Scheduler.Time;
 
 		if (_unitMesh.InstanceCount < n)
 		{
@@ -311,6 +329,16 @@ public partial class Simulation
 				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
 				continue;
 			}
+			if (i <= -(1 << 29))
+			{
+				// The remains of a dead creature, lying where it fell.
+				var dead = _remains[-(1 << 29) - i];
+				var (dsize, drect, dcolor) = _speciesFrames[dead.species][Dead];
+				dsize *= dead.scale;
+				WriteSprite(_unitBuffer, k * Stride, dead.left ? -dsize.X : dsize.X, dsize.Y, dead.x * Tile, dead.y * Tile, drect, dcolor, dsize.Y);
+				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+				continue;
+			}
 			if (i < 0)
 			{
 				// A flame over a burning plant: as wide as the plant, rising then dying down,
@@ -326,23 +354,23 @@ public partial class Simulation
 				continue;
 			}
 			var sp = Assets.Species[Units.Species[i]];
-			var (size, rect, avg) = _speciesSprites[Units.Species[i]];
-			// The young grow from 55% to full size.
+			// Pose: walking cycles idle, step, idle, other step; a hunter next to its prey strikes.
+			int pose = Idle;
+			if (Units.Task[i] == (byte)Task.Hunt && Units.Prey[i] >= 0 && Units.Alive[Units.Prey[i]]
+				&& MathF.Abs(Units.X[Units.Prey[i]] - Units.X[i]) + MathF.Abs(Units.Y[Units.Prey[i]] - Units.Y[i]) < 1.5f)
+				pose = ((int)(time * 6f + i) & 1) == 0 ? Attack : Idle;
+			else if (!AtTarget(i))
+			{
+				int step = (int)(time * (4f + sp.Speed * 4f) + (i & 7)) & 3;
+				pose = step == 1 ? Walk1 : step == 3 ? Walk2 : Idle;
+			}
+			var (size, rect, avg) = _speciesFrames[Units.Species[i]][pose];
+			// The young grow from 60% to full size.
 			float grown = Math.Clamp(Units.Age[i] / (sp.Lifespan * Maturity), 0f, 1f);
-			size *= 0.55f + 0.45f * grown;
+			size *= 0.6f + 0.4f * grown;
 			float ox = Units.X[i] * Tile;
 			float oy = Units.Y[i] * Tile;
-			float sx = Units.FacingLeft[i] ? -size.X : size.X;
-			// Walking: a two-frame hop, the cheap version of WorldBox's walk cycles.
-			float sy = size.Y;
-			float hop = 0f;
-			if (!AtTarget(i))
-			{
-				bool up = MathF.Sin((float)Scheduler.Time * 9f + i * 0.37f) > 0f;
-				hop = up ? 0.8f : 0f;
-				sy *= up ? 1.04f : 0.97f;
-			}
-			WriteSprite(_unitBuffer, k * Stride, sx, sy, ox, oy - hop, rect, avg, size.Y);
+			WriteSprite(_unitBuffer, k * Stride, Units.FacingLeft[i] ? -size.X : size.X, size.Y, ox, oy, rect, avg, size.Y);
 			WriteShadow(_unitShadowBuffer, k * 8, size.X, ox, oy);
 		}
 		_unitMesh.VisibleInstanceCount = n;

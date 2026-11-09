@@ -72,6 +72,7 @@ public partial class Simulation
 		Population = new int[Assets.Species.Count];
 		Array.Clear(Deaths);
 		Births = 0;
+		_remains.Clear();
 		_spawnTables = new List<(int, float)>[_biomeNames.Length];
 		_spawnTotals = new float[_biomeNames.Length];
 		for (int s = 0; s < Assets.Species.Count; s++)
@@ -131,11 +132,33 @@ public partial class Simulation
 		return i;
 	}
 
+	/// <summary>Remains of a creature: drawn lying where it died for a few seconds.</summary>
+	private struct Remains
+	{
+		public float x, y, scale, time;
+		public int species;
+		public bool left;
+	}
+
+	private readonly List<Remains> _remains = new();
+	/// <summary>Seconds the remains of a dead creature stay on the ground.</summary>
+	public const float RemainsSeconds = 5f;
+
 	private void KillUnit(int i, Death cause)
 	{
 		if (!Units.Alive[i])
 			return;
 		int s = Units.Species[i];
+		// The eaten leave nothing; the others lie where they fell for a while.
+		if (cause != Death.Eaten && _remains.Count < 4000)
+		{
+			var sp = Assets.Species[s];
+			_remains.Add(new Remains
+			{
+				x = Units.X[i], y = Units.Y[i], species = s, left = Units.FacingLeft[i], time = RemainsSeconds,
+				scale = 0.6f + 0.4f * Math.Clamp(Units.Age[i] / (sp.Lifespan * Maturity), 0f, 1f),
+			});
+		}
 		Units.Kill(i);
 		Deaths[(int)cause]++;
 		Population[s]--;
@@ -454,6 +477,16 @@ public partial class Simulation
 	/// <summary>World law "animal spawn": now and then, a natural creature is born on a quiet tile.</summary>
 	private void SpawnOverTime(int a, int b, float dt)
 	{
+		// Remains fade away.
+		for (int r = _remains.Count - 1; r >= 0; r--)
+		{
+			var rem = _remains[r];
+			rem.time -= dt;
+			if (rem.time <= 0f)
+				_remains.RemoveAt(r);
+			else
+				_remains[r] = rem;
+		}
 		if (!Law("animal_spawn") || _spawnTiles.Count == 0)
 			return;
 		for (int k = 0; k < 3; k++)

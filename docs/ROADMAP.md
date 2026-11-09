@@ -36,13 +36,13 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] World laws as switches in the simulation (animal spawn, hunger, old age, natural disasters, tree growth); a menu for them comes with 0.9
 - [x] Events panel (extinctions, lightning fires), time of year and population per species in the HUD; F sets fire under the mouse (test tool, not a power)
 - [x] Time controls: pause, ×1, ×2, ×5, ×10 (buttons, Space, comma and period)
-- [ ] Simple sprite animations: real walk cycles (2–3 frames) and attack, replacing the two-frame hop; colour masks for kingdom colours and biome skins (WorldBox-style phenotypes)
-- [ ] **Redraw the sprites of every living being** (animals, monsters, the 12 peoples and their roles), original art in the spirit of WorldBox (see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3):
-  - tiny, readable side views: about one tile (8–10 px) tall, a strong silhouette, few colours
-  - a set of frames per creature: idle, 2–3 walking frames, attack, swim, death; child versions
-  - colour-mask pixels for kingdom colours and biome skin ramps
-  - drawn at the size they are shown, so no scaling down from large art
-  - an art script and sheet that make adding a creature easy, generated or hand-drawn
+- [x] Sprite animations: two walking steps, a strike when a hunter reaches its prey, remains lying where a creature died (5 s); young creatures drawn smaller
+- [ ] Colour masks for kingdom colours and biome skins (WorldBox-style phenotypes); dedicated child sprites; swimming once creatures can swim
+- [x] **Redrawn sprites of every living being** (`art/creatures.py`, sheet in [images/creatures.png](images/creatures.png)): 12 animals, 9 monsters and the 12 peoples in their 4 roles, original pixel art in the spirit of WorldBox (see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3):
+  - drawn at display size, one sprite pixel per world pixel: about a tile tall (animals 6–13 px wide, people 7×9), a dragon three tiles long
+  - a text template and palette per creature, automatic shading (lit top edge, soft darker outline)
+  - six poses each, made from the template: idle, two walking steps (the legs swing), attack (lunge), swim, death (lying down)
+  - peoples assembled from parts: a body per race (ears, horns, beard, tusks, crest, tail, fins, foliage, wings, sockets) and an outfit per role (villager's sack, warrior's helmet and sword, chief's crown and cape, shaman's hood and staff)
 
 ## 0.3 Peoples
 - [ ] World setup before starting: choose the peoples that live in the world (at least two), then watch them at any speed

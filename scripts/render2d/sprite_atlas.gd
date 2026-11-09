@@ -6,7 +6,7 @@ extends RefCounted
 
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
 
-const GROUPS := ["trees", "plants", "peoples", "races", "animals", "monsters"]
+const GROUPS := ["trees", "plants", "creatures"]
 const WIDTH := 1024
 ## Frames of the flame drawn over burning plants (made here, in pixel art: see fire_frame).
 const FIRE_FRAMES := 3

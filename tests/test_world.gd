@@ -17,6 +17,7 @@ const MapCamera = preload("res://scripts/ui/map_camera.gd")
 const Flora = preload("res://scripts/world/flora.gd")
 const SpriteAtlas = preload("res://scripts/render2d/sprite_atlas.gd")
 const SpriteLibrary = preload("res://scripts/render3d/sprite_library.gd")
+const Races = preload("res://scripts/world/races.gd")
 const SpriteBatch = preload("res://scripts/render2d/sprite_batch.gd")
 
 var _failures := 0
@@ -41,6 +42,7 @@ func _initialize() -> void:
 	test_flora()
 	test_sprite_atlas()
 	test_sprite_batch()
+	test_creature_sprites()
 	test_species_data()
 	test_simulation()
 	test_life()
@@ -269,7 +271,7 @@ func test_flora() -> void:
 			ok = false
 	check(ok, "every plant's sprite stands over land, never over water")
 	var mushroom := SpriteLibrary.world_size("plants/Red_mushroom")
-	var villager := SpriteLibrary.world_size("peoples/Elves_Villager")
+	var villager := SpriteLibrary.world_size("creatures/elves_villager_idle")
 	check(mushroom.y < villager.y * 0.6, "mushrooms are smaller than the peoples")
 
 	# Changing a tile only changes the plants on and right around it.
@@ -332,7 +334,7 @@ func test_sprite_batch() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for k in 3000:
-		ids.append(["trees/Oak", "plants/Bush", "animals/Cow", "nope/Missing"][k % 4])
+		ids.append(["trees/Oak", "plants/Bush", "creatures/cow_idle", "nope/Missing"][k % 4])
 		pos.append(Vector2(rng.randf_range(0, 2048), rng.randf_range(0, 2048)))
 		flips.append(k % 2)
 		scales.append(1.0)
@@ -410,19 +412,45 @@ func test_trackpad() -> void:
 	cam.free()
 
 
+const MONSTERS := ["skeleton", "zombie", "ghost", "spider", "slime", "demon", "golem", "yeti", "dragon"]
+
+
+func test_creature_sprites() -> void:
+	# Drawn at display size: about a tile tall (8 world pixels), never scaled from large art.
+	var ok := true
+	var sizes := []
+	for id in ["creatures/cow_idle", "creatures/wolf_idle", "creatures/humans_villager_idle", "creatures/dwarves_warrior_idle"]:
+		var size := SpriteLibrary.world_size(id) * WorldMap.TILE
+		sizes.append(size)
+		ok = ok and size.y >= 5.0 and size.y <= 12.0
+	check(ok, "creatures are about one tile tall %s" % [sizes])
+	var walk_differs: bool = SpriteLibrary.texture("creatures/cow_walk1").get_image().get_data() \
+			!= SpriteLibrary.texture("creatures/cow_idle").get_image().get_data()
+	var dead := SpriteLibrary.texture("creatures/humans_villager_death")
+	check(walk_differs and dead.get_width() > dead.get_height(), "creatures have walking frames and lie down when dead")
+	var people := 0
+	for race in Races.RACES:
+		for role in Races.ROLES:
+			if SpriteLibrary.exists("creatures/%s_%s_idle" % [race.to_lower(), role.to_lower()]):
+				people += 1
+	check(people == 48, "every people has a sprite for each of its 4 roles (%d)" % people)
+
+
 func test_species_data() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/species.json"))
 	var atlas := SpriteAtlas.shared()
 	var ok: bool = data.species.size() >= 5
 	var natural_monsters := []
 	for sp in data.species:
-		ok = ok and atlas.has(sp.sprite) and sp.speed > 0.0
+		for pose in ["idle", "walk1", "walk2", "attack", "swim", "death"]:
+			ok = ok and atlas.has("%s_%s" % [sp.sprite, pose])
+		ok = ok and sp.speed > 0.0
 		for b in sp.natural:
 			ok = ok and Biomes.NAMES.has(b)
 			# Monsters may only be born in special biomes, which only the player creates.
-			if sp.sprite.begins_with("monsters/") and not b in ["Mushroom land", "Cursed land", "Volcanic rock", "Lava"]:
+			if sp.id in MONSTERS and not b in ["Mushroom land", "Cursed land", "Volcanic rock", "Lava"]:
 				natural_monsters.append(sp.id)
-	check(ok, "every species record has a known sprite, known biomes and a speed (%d species)" % data.species.size())
+	check(ok, "every species record has all its poses in the atlas, known biomes and a speed (%d species)" % data.species.size())
 	check(natural_monsters.is_empty(), "monsters are only born in special biomes %s" % [natural_monsters])
 
 
