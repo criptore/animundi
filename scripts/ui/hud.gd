@@ -7,6 +7,8 @@ signal layer_selected(layer: String)
 signal speed_selected(scale: float)
 ## The player started the world with these peoples (from the setup panel).
 signal start_requested(races: PackedStringArray, per_village: int)
+## The player asked to run time to `year` in about `seconds` of real time (0 = as fast as possible).
+signal go_to_year_requested(year: int, seconds: float)
 ## The player asked for more animals (stress test of the simulation).
 signal spawn_requested(count: int)
 
@@ -152,6 +154,33 @@ func _ready() -> void:
 		speeds.add_child(b)
 		_speed_buttons.append(b)
 	life.add_child(speeds)
+	# "Go to year": pick the year to reach and how long it may take, time runs there and pauses.
+	var go := HBoxContainer.new()
+	go.add_child(_label("Go to year"))
+	var year_box := SpinBox.new()
+	year_box.min_value = 2
+	year_box.max_value = 1000000
+	year_box.value = 10000
+	year_box.tooltip_text = "The year to reach; time pauses there"
+	go.add_child(year_box)
+	go.add_child(_label("in"))
+	var minutes_box := SpinBox.new()
+	minutes_box.min_value = 0
+	minutes_box.max_value = 600
+	minutes_box.step = 0.5
+	minutes_box.value = 10
+	minutes_box.suffix = "min"
+	minutes_box.tooltip_text = "Real time it should take (0 = as fast as the computer can)"
+	go.add_child(minutes_box)
+	var go_button := Button.new()
+	go_button.text = "Go"
+	go_button.focus_mode = Control.FOCUS_NONE
+	go_button.pressed.connect(func():
+		for b in _speed_buttons:
+			b.button_pressed = false
+		go_to_year_requested.emit(int(year_box.value), minutes_box.value * 60.0))
+	go.add_child(go_button)
+	life.add_child(go)
 	_population_label = _label("")
 	_population_label.add_theme_font_size_override("font_size", 12)
 	life.add_child(_population_label)
@@ -325,6 +354,16 @@ func _set_speed(v: float) -> void:
 	if k >= 0:
 		_speed_buttons[k].button_pressed = true
 	speed_selected.emit(v)
+
+
+## Shows the speed buttons as `v` without changing the speed (after "go to year" ends).
+func show_speed(v: float) -> void:
+	if v == 0.0 and _speed != 0.0:
+		_speed_before_pause = _speed
+	_speed = v
+	var k := SPEEDS.find(v)
+	if k >= 0:
+		_speed_buttons[k].button_pressed = true
 
 
 func clear_events() -> void:

@@ -24,8 +24,13 @@ public sealed class Scheduler
 		/// <summary>A system that is not about units (fire, births over time): it runs at its rate
 		/// even when there are no units, with an empty range.</summary>
 		public bool Global;
+		/// <summary>Interval in coarse steps (ultra-fast mode), when longer than Interval:
+		/// decisions are taken less often there. 0 = same as Interval.</summary>
+		public float CoarseInterval;
 		internal float Clock;
 		internal int Next;
+		/// <summary>Real milliseconds spent in this system since the last TakeTimes.</summary>
+		public double Ms;
 	}
 
 	public sealed class WorldProcess
@@ -59,16 +64,19 @@ public sealed class Scheduler
 		foreach (var s in UnitSystems)
 		{
 			s.Clock += dt;
-			float slice = s.Interval / s.Batches;
+			float interval = StepScale > 1 && s.CoarseInterval > 0f ? s.CoarseInterval : s.Interval;
+			float slice = interval / s.Batches;
 			if (s.Batches == 1 && s.Clock >= slice * 2f)
 			{
 				// Several runs due at once (coarse steps): one run over the whole time.
 				int due = (int)(s.Clock / slice);
 				s.Clock -= due * slice;
+				long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
 				if (s.Global)
-					s.Run(0, 0, s.Interval * due);
+					s.Run(0, 0, interval * due);
 				else if (unitCapacity > 0)
-					s.Run(0, unitCapacity, s.Interval * due);
+					s.Run(0, unitCapacity, interval * due);
+				s.Ms += System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
 				continue;
 			}
 			while (s.Clock >= slice)
@@ -77,10 +85,12 @@ public sealed class Scheduler
 				int per = (unitCapacity + s.Batches - 1) / Math.Max(s.Batches, 1);
 				int a = s.Next * per;
 				int b = Math.Min(unitCapacity, a + per);
+				long t1 = System.Diagnostics.Stopwatch.GetTimestamp();
 				if (s.Global)
-					s.Run(0, 0, s.Interval);
+					s.Run(0, 0, interval);
 				else if (a < b)
-					s.Run(a, b, s.Interval);
+					s.Run(a, b, interval);
+				s.Ms += System.Diagnostics.Stopwatch.GetElapsedTime(t1).TotalMilliseconds;
 				s.Next = (s.Next + 1) % s.Batches;
 			}
 		}

@@ -18,6 +18,8 @@ const TILES_PER_ANIMAL := 300
 
 const LEVEL_NAMES := ["deep sea", "shallow water", "plain", "hill", "mountain"]
 
+## Whether the "go to year" mode is running (to show the pause once it ends).
+var _going := false
 var settings := WorldSettings.new()
 var world: WorldData
 var current_layer := "Biomes"
@@ -41,6 +43,7 @@ func _ready() -> void:
 	_hud.layer_selected.connect(show_layer)
 	_hud.spawn_requested.connect(spawn_animals)
 	_hud.speed_selected.connect(func(v): _sim.SetTimeScale(v))
+	_hud.go_to_year_requested.connect(func(year, seconds): _going = _sim.GoToYear(year, seconds))
 	_hud.start_requested.connect(start_peoples)
 	add_child(_hud)
 	generate()
@@ -102,7 +105,16 @@ func _process(_delta: float) -> void:
 		_stats_frames = 0
 		_hud.set_sim_stats(_sim.UnitCount(), _sim.TakeStepMs(), Engine.get_frames_per_second())
 		var speed: float = _sim.GetTimeScale()
-		_hud.set_time("Year %d · %s%s" % [_sim.Year(), _sim.SeasonName(), "  (paused)" if speed == 0.0 else ""])
+		var target: int = _sim.TargetYear
+		if target > 0:
+			var left: float = _sim.GoToSecondsLeft()
+			_hud.set_time("Year %d · → %d (%d%%%s)" % [_sim.Year(), target, int(_sim.GoToProgress() * 100.0),
+					", %d:%02d left" % [int(left) / 60, int(left) % 60] if left >= 0.0 else ""])
+		else:
+			if _going:
+				_going = false
+				_hud.show_speed(speed)
+			_hud.set_time("Year %d · %s%s" % [_sim.Year(), _sim.SeasonName(), "  (paused)" if speed == 0.0 else ""])
 		_hud.set_sprite_count(_sim.PlantCount())
 		_hud.set_populations(_sim.PopulationTable())
 		_hud.set_villages(_sim.VillageTable())

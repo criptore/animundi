@@ -742,6 +742,20 @@ func test_villages() -> void:
 			if b.x == hut.x and b.y == hut.y:
 				after = b.id if not b.burning else "burning"
 		check(after != "burning", "a burning house is put out or burns down (now: %s, %d put out, %d burned)" % [after, sim.FiresPutOut, sim.BuildingsBurned])
+
+	# Ultra-fast mode: coarse steps still run whole years, on land.
+	var year: int = sim.Year()
+	sim.RunYears(3, 6)
+	check(sim.Year() == year + 3 and sim.CountOnWater() == 0 and sim.VillageCount() > 0,
+			"coarse steps run 3 years in a go (year %d → %d), no one on water" % [year, sim.Year()])
+	# "Go to year": time runs to the year asked, then pauses.
+	check(sim.GoToYear(sim.Year() + 2, 0.0), "time can be sent to a year ahead")
+	for k in 400:
+		if sim.TargetYear == 0:
+			break
+		sim._Process(0.05)
+	check(sim.TargetYear == 0 and sim.Year() == year + 5 and sim.GetTimeScale() == 0.0,
+			"the year asked is reached, then time pauses (year %d)" % sim.Year())
 	sim.queue_free()
 
 

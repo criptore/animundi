@@ -45,6 +45,9 @@ public partial class Simulation
 		public readonly List<int> RoadPlan = new();
 		/// <summary>Village it was founded from, or -1.</summary>
 		public int Mother = -1;
+		/// <summary>Its standing buildings by type, refreshed every two seconds (fast lookups:
+		/// the nearest store, well, mine...).</summary>
+		public readonly Dictionary<int, List<int>> ByType = new();
 	}
 
 	public sealed class Building
@@ -91,6 +94,9 @@ public partial class Simulation
 
 	/// <summary>Villages one people may have (kingdoms will hold them together in 0.4).</summary>
 	public const int MaxVillagesPerPeople = 60;
+	/// <summary>A village stops adding homes past this: it is full, and sends settlers instead
+	/// (WorldBox's cities stop growing too).</summary>
+	public const int MaxVillageHomes = 200;
 
 	public int TowerKills { get; private set; }
 	public int BuildingsBurned { get; private set; }
@@ -310,6 +316,7 @@ public partial class Simulation
 			}
 			// The bonfire gives a little food of the land (berries, roots) every time.
 			village.Food += 0.4f * dt / 2f;
+			IndexBuildings(village);
 			AssignHomes(v, people);
 			if (Scheduler.Time >= village.NextPlan)
 			{
@@ -322,6 +329,21 @@ public partial class Simulation
 			TowersShoot(v);
 			if (Scheduler.Time >= village.NextSettlers)
 				SendSettlers(v, people);
+		}
+	}
+
+	private void IndexBuildings(Village village)
+	{
+		foreach (var list in village.ByType.Values)
+			list.Clear();
+		foreach (int b in village.Buildings)
+		{
+			var bld = Buildings[b];
+			if (!bld.Alive || !bld.Done)
+				continue;
+			if (!village.ByType.TryGetValue(bld.Type, out var list))
+				village.ByType[bld.Type] = list = new List<int>();
+			list.Add(b);
 		}
 	}
 
@@ -433,7 +455,8 @@ public partial class Simulation
 		if (village.Site >= 0 && Buildings[village.Site].Alive && (Buildings[village.Site].Progress < 1f))
 			return;
 		village.Site = -1;
-		bool crowded = pop + 3 > Homes(v);
+		int homes = Homes(v);
+		bool crowded = pop + 3 > homes && homes < MaxVillageHomes;
 		if (crowded)
 		{
 			if (_rng.NextDouble() < 0.5 && TryUpgrade(v, pop))
@@ -444,12 +467,14 @@ public partial class Simulation
 		for (int t = 0; t < Assets.Buildings.Count; t++)
 		{
 			var rec = Assets.Buildings[t];
-			if (t == _tHut || rec.Upgrade != "" || !Allowed(v, t, pop) || !CanAfford(village, rec))
+			if (t == _tHut || rec.Upgrade != "" || !Allowed(v, t, pop) || !CanAfford(village, rec)
+				|| rec.Homes > 0 && homes >= MaxVillageHomes)
 				continue;
 			if (TryStart(v, t))
 				return;
 		}
-		TryUpgrade(v, pop);
+		if (homes < MaxVillageHomes)
+			TryUpgrade(v, pop);
 	}
 
 	private bool TryStart(int v, int type)

@@ -478,7 +478,7 @@ public partial class Simulation
 	private void Pair(int i)
 	{
 		_found.Clear();
-		Zones.Query(Units, Units.X[i], Units.Y[i], 12f, _found);
+		Zones.Query(Units, Units.X[i], Units.Y[i], 6f, _found);
 		foreach (int j in _found)
 			if (j != i && Units.Alive[j] && Units.Village[j] == Units.Village[i] && Units.Female[j] != Units.Female[i]
 				&& Units.Partner[j] < 0 && IsAdult(j) && Units.Mother[j] != i && Units.Mother[i] != j)

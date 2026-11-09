@@ -54,6 +54,7 @@ func _initialize() -> void:
 			var r: Dictionary = table[p]
 			line += " %s %d v %d p %d z (max %d) |" % [p, r.villages, r.people, r.zones, r.biggest]
 		print(line)
+		print("    seconds per system: ", sim.TakeSystemTimes())
 		if done % map_every == 0 or done == years:
 			_save_map(sim, world, "%s/year_%05d.png" % [out_dir, done])
 	print("done in %.0f s" % ((Time.get_ticks_msec() - start) / 1000.0))

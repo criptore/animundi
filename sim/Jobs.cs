@@ -82,8 +82,8 @@ public partial class Simulation
 			(Job.Farmer, fields > 0 ? Math.Max(1, fields / 5) : 0),
 			(Job.Woodcutter, village.Wood > 30 + pop ? 1 : 2 + pop / 10),
 			(Job.Hunter, food < pop * 2f ? 2 : 1),
-			(Job.Miner, CountOf(v, _tMine, true) > 0 ? Math.Min(5, 1 + pop / 10) : 0),
-			(Job.Fisher, CountOf(v, _tDock, true) > 0 ? Math.Min(3, 1 + pop / 15) : 0),
+			(Job.Miner, village.ByType.TryGetValue(_tMine, out var mines) && mines.Count > 0 ? Math.Min(5, 1 + pop / 10) : 0),
+			(Job.Fisher, village.ByType.TryGetValue(_tDock, out var docks) && docks.Count > 0 ? Math.Min(3, 1 + pop / 15) : 0),
 			(Job.Blacksmith, pop >= 15 && village.Metal >= 1f ? 1 : 0),
 			(Job.RoadBuilder, village.RoadPlan.Count > 0 ? 1 : 0),
 		};
@@ -166,17 +166,22 @@ public partial class Simulation
 	{
 		int best = -1;
 		float bestD = float.MaxValue;
-		foreach (int b in Villages[v].Buildings)
+		foreach (int type in _storeTypes)
 		{
-			var bld = Buildings[b];
-			if (!bld.Alive || !bld.Done || !_storeTypes.Contains(bld.Type))
+			if (!Villages[v].ByType.TryGetValue(type, out var list))
 				continue;
-			float dx = bld.X + 0.5f - Units.X[i], dy = bld.Y + 1f - Units.Y[i];
-			float d = dx * dx + dy * dy;
-			if (d < bestD)
+			foreach (int b in list)
 			{
-				bestD = d;
-				best = b;
+				var bld = Buildings[b];
+				if (!bld.Alive || !bld.Done)
+					continue;
+				float dx = bld.X + 0.5f - Units.X[i], dy = bld.Y + 1f - Units.Y[i];
+				float d = dx * dx + dy * dy;
+				if (d < bestD)
+				{
+					bestD = d;
+					best = b;
+				}
 			}
 		}
 		return best;
@@ -365,7 +370,9 @@ public partial class Simulation
 	{
 		int best = -1;
 		float bestD = float.MaxValue;
-		foreach (int b in Villages[v].Buildings)
+		if (!Villages[v].ByType.TryGetValue(type, out var list))
+			return -1;
+		foreach (int b in list)
 		{
 			var bld = Buildings[b];
 			if (!bld.Alive || !bld.Done || bld.Type != type)

@@ -64,7 +64,7 @@ public partial class Simulation : Node2D
 		// Walking and chasing: every step, every unit.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "move", Interval = Scheduler.Step, Batches = 1, Run = Move });
 		// Needs and decisions: each unit once a second, spread over 10 batches.
-		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "think", Interval = 1f, Batches = 10, Run = Think });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "think", Interval = 1f, CoarseInterval = 2f, Batches = 10, Run = Think });
 		// Zones: rebuilt 4 times a second.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "zones", Global = true, Interval = 0.25f, Batches = 1, Run = (_, _, _) => Zones.Rebuild(Units) });
 		// Fire: every step. Births over time: twice a second.
@@ -302,8 +302,21 @@ public partial class Simulation : Node2D
 	/// UltraStepScale fixed steps each, to watch centuries go by.</summary>
 	public void SetTimeScale(float scale)
 	{
+		TargetYear = 0;
 		TimeScale = Math.Clamp(scale, 0f, MaxTimeScale);
 		Scheduler.StepScale = TimeScale > UltraFrom ? UltraStepScale : 1;
+	}
+
+	/// <summary>Real seconds spent in each system since the last call (profiling long runs).</summary>
+	public Godot.Collections.Dictionary TakeSystemTimes()
+	{
+		var d = new Godot.Collections.Dictionary();
+		foreach (var s in Scheduler.UnitSystems)
+		{
+			d[s.Name] = Math.Round(s.Ms / 1000.0, 1);
+			s.Ms = 0;
+		}
+		return d;
 	}
 
 	/// <summary>Coarse steps for tools that run long histories without a window (1 = normal).</summary>
@@ -321,10 +334,83 @@ public partial class Simulation : Node2D
 
 	public float GetTimeScale() => TimeScale;
 
+	// ------------------------------------------------------------------ "go to year" mode
+
+	/// <summary>Target year of the "go to year" mode, or 0 when it is off.</summary>
+	public int TargetYear { get; private set; }
+	private double _targetFrom, _targetTime, _targetSeconds, _targetElapsed;
+	/// <summary>Real time the simulation may take per frame in this mode (the rest draws the world
+	/// and keeps the interface responsive).</summary>
+	public const double TargetFrameBudgetMs = 40.0;
+
+	/// <summary>Runs time to the start of `year` in about `seconds` of real time, then pauses:
+	/// the speed is worked out (years to go / seconds), in coarse steps above x10. With 0 seconds
+	/// (or a computer too slow for the time asked), it goes as fast as the computer allows,
+	/// within a frame budget so the world still shows. Returns false if the year is already past.</summary>
+	public bool GoToYear(int year, float seconds)
+	{
+		double target = (year - 1) * (double)YearSeconds;
+		if (World == null || target <= Scheduler.Time)
+			return false;
+		TargetYear = year;
+		_targetFrom = Scheduler.Time;
+		_targetTime = target;
+		_targetSeconds = Math.Max(0f, seconds);
+		_targetElapsed = 0;
+		TimeScale = 1f;
+		Scheduler.StepScale = UltraStepScale;
+		return true;
+	}
+
+	public void CancelGoToYear()
+	{
+		TargetYear = 0;
+		Scheduler.StepScale = TimeScale > UltraFrom ? UltraStepScale : 1;
+	}
+
+	/// <summary>Progress of the "go to year" mode: 0..1, and the real seconds left at the
+	/// current pace (-1 when unknown).</summary>
+	public float GoToProgress() => TargetYear == 0 ? 0f : (float)((Scheduler.Time - _targetFrom) / (_targetTime - _targetFrom));
+
+	public float GoToSecondsLeft()
+	{
+		double done = Scheduler.Time - _targetFrom;
+		if (TargetYear == 0 || done <= 0 || _targetElapsed <= 0)
+			return -1f;
+		return (float)((_targetTime - Scheduler.Time) / (done / _targetElapsed));
+	}
+
+	/// <summary>One frame of the "go to year" mode: as many coarse steps as the schedule asks
+	/// (or the frame budget allows), then the target is reached and time pauses.</summary>
+	private void GoToYearFrame(double delta)
+	{
+		_targetElapsed += delta;
+		double want = _targetSeconds > 0
+			? _targetFrom + (_targetTime - _targetFrom) * Math.Min(1.0, _targetElapsed / _targetSeconds)
+			: _targetTime;
+		long start = Stopwatch.GetTimestamp();
+		while (Scheduler.Time < want && Scheduler.Time < _targetTime
+			&& Stopwatch.GetElapsedTime(start).TotalMilliseconds < TargetFrameBudgetMs)
+			TimedStep();
+		if (Scheduler.Time >= _targetTime)
+		{
+			LogEvent($"year {TargetYear} reached.");
+			TargetYear = 0;
+			TimeScale = 0f;
+			Scheduler.StepScale = 1;
+		}
+	}
+
 	public override void _Process(double delta)
 	{
 		if (World == null)
 			return;
+		if (TargetYear > 0)
+		{
+			GoToYearFrame(delta);
+			DrawAll();
+			return;
+		}
 		_accumulate += (float)delta * TimeScale;
 		// At most a few frames' worth of steps, so a slow frame never snowballs.
 		float stepLength = Scheduler.Step * Scheduler.StepScale;
