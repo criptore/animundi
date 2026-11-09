@@ -95,6 +95,7 @@ func _process(_delta: float) -> void:
 	if world == null:
 		return
 	_sim.SetZoom(_camera.zoom.x)
+	_sim.SetView(_camera.position, get_viewport().get_visible_rect().size / _camera.zoom.x)
 	_map.set_scorch(_sim.TakeScorchChanges())
 	_map.set_overlay(_sim.TakeOverlayChanges())
 	_map.set_frost(_sim.Coldness())

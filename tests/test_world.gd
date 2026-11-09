@@ -707,6 +707,14 @@ func test_villages() -> void:
 			made_kinds += 1
 	check(made_kinds >= 6, "villages build huts, houses, stockpiles, wells, windmills, mines, docks, town halls (%s)" % [kinds])
 	check(inside, "every building stands on its village's land")
+	var dry := 0
+	var wet := []
+	for b in sim.BuildingTable():
+		if b.on_land:
+			dry += 1
+		else:
+			wet.append("%s (%d, %d)" % [b.id, b.x, b.y])
+	check(wet.is_empty(), "no building's sprite hangs over water (%d on land, over water: %s)" % [dry, wet])
 
 	# Fields, roads, and the jobs that go with them.
 	var fields := 0

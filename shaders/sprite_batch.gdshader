@@ -3,7 +3,8 @@
 // rectangle in the atlas, its colour the sprite's average colour (rgb) and height in world pixels
 // (a, divided by 256). Shadows use the same shader on a shadow texture, without custom data.
 //
-// - Wind: the top of tall sprites sways a little, each with its own phase; the feet stay put.
+// - Wind: the top of tall plants sways a little, each with its own phase (packed with the height
+//   in the colour's alpha); the feet stay put. Creatures and buildings don't sway.
 // - Level of detail: when a sprite would be only a few screen pixels tall, it is drawn as a small
 //   dot of its average colour at its feet instead (crisp, readable from far, like WorldBox).
 shader_type canvas_item;
@@ -32,12 +33,17 @@ void vertex() {
 	if (from_atlas) {
 		UV = INSTANCE_CUSTOM.xy + UV * INSTANCE_CUSTOM.zw;
 		aspect = (INSTANCE_CUSTOM.z / TEXTURE_PIXEL_SIZE.x) / max(INSTANCE_CUSTOM.w / TEXTURE_PIXEL_SIZE.y, 1e-5);
-		float height = COLOR.a * 256.0;
+		// Alpha = (height in whole world pixels + sway phase) / 256; a phase of 0 never sways.
+		float packed = COLOR.a * 256.0;
+		float height = floor(packed + 0.02);
+		float sway_phase = packed - height;
 		// VERTEX is in the unit quad: y = -1 at the top, 0 at the feet. The sway is given in world
 		// pixels, so it is divided by the sprite's width (the instance transform scales it back).
 		// Short sprites (grass, rocks) barely move.
-		float phase = hash(float(INSTANCE_ID)) * 6.2831;
-		float sway = sin(TIME * 1.3 + phase) + 0.35 * sin(TIME * 3.1 + phase * 2.0);
+		// The phase comes from the sprite's position (set by the simulation), never from its
+		// place in the batch, so rebuilding a batch never makes plants jump.
+		float phase = sway_phase * 6.2831;
+		float sway = (sin(TIME * 1.3 + phase) + 0.35 * sin(TIME * 3.1 + phase * 2.0)) * step(0.03, sway_phase);
 		float width = max(height * aspect, 1.0);
 		VERTEX.x += sway * wind * smoothstep(0.0, 1.0, -VERTEX.y) / width * clamp(height / 12.0, 0.0, 1.0);
 	}
@@ -51,6 +57,13 @@ void fragment() {
 		float height_px = info.a * 256.0 * zoom;
 		if (height_px >= dot_below) {
 			COLOR = tex;
+			// The colour mask (magenta shades: roofs, banners): painted in the instance's colour
+			// (a building's village), keeping the shade, as WorldBox paints kingdom colours.
+			if (tex.g < 0.02 && abs(tex.r - tex.b) < 0.02 && tex.r > 0.25) {
+				float k = tex.r / 0.816;
+				vec3 c = info.rgb;
+				COLOR.rgb = k <= 1.0 ? c * k : mix(c, vec3(1.0), (k - 1.0) * 1.5);
+			}
 		} else {
 			// A dot of the sprite's average colour, 1 to 3 screen pixels wide, at its feet.
 			float dot_px = clamp(height_px * 0.5, 1.0, 3.0);

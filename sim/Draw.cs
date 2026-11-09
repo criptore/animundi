@@ -41,7 +41,6 @@ public partial class Simulation
 	private MultiMeshInstance2D _unitShadowInstance;
 	private float[] _unitBuffer = Array.Empty<float>();
 	private float[] _unitShadowBuffer = Array.Empty<float>();
-	private int[] _order = Array.Empty<int>();
 	private float[] _keys = Array.Empty<float>();
 	private bool[] _stripDirty = Array.Empty<bool>();
 	private readonly List<(MultiMesh plants, MultiMesh shadows)> _strips = new();
@@ -64,7 +63,7 @@ public partial class Simulation
 		_shadowMaterial.SetShaderParameter("from_atlas", false);
 		_plantMaterial = new ShaderMaterial { Shader = shader };
 		_unitMaterial = new ShaderMaterial { Shader = shader };
-		_unitMaterial.SetShaderParameter("wind", 0.0f);
+
 
 		// Children in drawing order: plant shadows, plants, creature shadows, then creatures and
 		// flames together (sorted by height, so a flame in front covers what stands behind).
@@ -109,15 +108,18 @@ public partial class Simulation
 	/// dots and shadows are hidden.</summary>
 	public void SetZoom(float zoom)
 	{
+		_zoom = zoom;
 		_unitMaterial?.SetShaderParameter("zoom", zoom);
 		_plantMaterial?.SetShaderParameter("zoom", zoom);
 		bool shadows = zoom >= 0.6f;
 		if (_unitShadowInstance != null)
 		{
 			_unitShadowInstance.Visible = shadows;
-			_plantShadowLayer.Visible = shadows;
+			_plantShadowLayer.Visible = shadows && !_near;
 		}
 	}
+
+	private float _zoom = 1f;
 
 	/// <summary>Shows or hides plants and creatures (the data layers of the map hide them).</summary>
 	public void SetLifeVisible(bool on) => Visible = on;
@@ -158,7 +160,8 @@ public partial class Simulation
 	private void DrawAll()
 	{
 		long started = Stopwatch.GetTimestamp();
-		for (int k = 0; k < _stripDirty.Length; k++)
+		// Up close the plants are drawn with the creatures: the strips wait until the camera is far.
+		for (int k = 0; k < _stripDirty.Length && !_near; k++)
 			if (_stripDirty[k])
 			{
 				_stripDirty[k] = false;
@@ -187,13 +190,15 @@ public partial class Simulation
 	}
 
 	/// <summary>Writes one sprite instance: feet at (ox, oy), size (sx may be negative to mirror).</summary>
-	private static void WriteSprite(float[] buf, int o, float sx, float sy, float ox, float oy, Rect2 rect, Color avg, float heightPx)
+	/// `sway` is the wind phase of a plant (0.05..0.95, from its position), 0 for what never sways;
+	/// it rides in the fractional part of the height (whole world pixels) so the shader gets both.
+	private static void WriteSprite(float[] buf, int o, float sx, float sy, float ox, float oy, Rect2 rect, Color avg, float heightPx, float sway = 0f)
 	{
 		// Transform2D rows: (x.x, y.x, 0, origin.x), (x.y, y.y, 0, origin.y).
 		buf[o] = sx; buf[o + 1] = 0f; buf[o + 2] = 0f; buf[o + 3] = ox;
 		buf[o + 4] = 0f; buf[o + 5] = sy; buf[o + 6] = 0f; buf[o + 7] = oy;
 		// Colour: average colour (the far-away dot) and height in world pixels / 256.
-		buf[o + 8] = avg.R; buf[o + 9] = avg.G; buf[o + 10] = avg.B; buf[o + 11] = heightPx / 256f;
+		buf[o + 8] = avg.R; buf[o + 9] = avg.G; buf[o + 10] = avg.B; buf[o + 11] = (MathF.Max(1f, MathF.Round(heightPx)) + sway) / 256f;
 		buf[o + 12] = rect.Position.X; buf[o + 13] = rect.Position.Y; buf[o + 14] = rect.Size.X; buf[o + 15] = rect.Size.Y;
 	}
 
@@ -213,7 +218,8 @@ public partial class Simulation
 			for (int x = 0; x < World.Width; x++)
 				for (int p = _tileFirst[World.Index(x, y)]; p >= 0; p = _pNext[p])
 					list.Add(p);
-		list.Sort((a, b) => _pY[a] != _pY[b] ? _pY[a].CompareTo(_pY[b]) : _pX[a].CompareTo(_pX[b]));
+		// Ties broken by index: the same order at every rebuild (no flicker between overlapping plants).
+		list.Sort((a, b) => _pY[a] != _pY[b] ? _pY[a].CompareTo(_pY[b]) : _pX[a] != _pX[b] ? _pX[a].CompareTo(_pX[b]) : a.CompareTo(b));
 		int n = list.Count;
 		if (plants.InstanceCount < n || plants.InstanceCount > n * 2 + 64)
 		{
@@ -229,7 +235,7 @@ public partial class Simulation
 			float s = _pScale[p] * _pGrowth[p];
 			float w = size.X * s, h = size.Y * s;
 			float ox = _pX[p] * Tile, oy = _pY[p] * Tile;
-			WriteSprite(buf, m * Stride, _pFlip[p] ? -w : w, h, ox, oy, rect, avg, h);
+			WriteSprite(buf, m * Stride, _pFlip[p] ? -w : w, h, ox, oy, rect, avg, h, SwayPhase(_pX[p], _pY[p]));
 			WriteShadow(sbuf, m * 8, w, ox, oy);
 		}
 		plants.VisibleInstanceCount = n;
@@ -257,7 +263,9 @@ public partial class Simulation
 	{
 		"hut", "house", "stone_house", "big_house", "town_hall", "temple", "library", "barracks", "watch_tower",
 	};
-	private readonly Dictionary<(int, int), string> _buildingSprites = new();
+	private readonly Dictionary<(int, int, int), string> _buildingSprites = new();
+	/// <summary>Homes come in variants (art/homes.py VARIANTS), picked by the building's place.</summary>
+	private const int HomeVariants = 4;
 
 	/// <summary>The sprite of a building: a site while it is first built, the bonfire and the
 	/// windmill animated, homes and great buildings in their people's style.</summary>
@@ -269,12 +277,21 @@ public partial class Simulation
 			return BonfireFrames[(int)(time * 6f + bld.X) % 3];
 		if (bld.Type == _tWindmill)
 			return WindmillFrames[(int)(time * 3f + bld.X) % 2];
-		int species = Villages[bld.Village].Species;
-		if (!_buildingSprites.TryGetValue((bld.Type, species), out var id))
+		return SpriteId(bld.Type, Villages[bld.Village].Species, bld.X, bld.Y);
+	}
+
+	/// <summary>The sprite of a standing building of `type` of `species` at tile (x, y): homes
+	/// pick one of their variants from their place.</summary>
+	private string SpriteId(int type, int species, int x, int y)
+	{
+		int variant = _houseTypes.Contains(type) ? (int)((uint)(x * 73856093 ^ y * 19349663) % HomeVariants) : 0;
+		if (!_buildingSprites.TryGetValue((type, species, variant), out var id))
 		{
-			string b = Assets.Buildings[bld.Type].Id;
-			id = PeopleStyled.Contains(b) ? $"buildings/{b}_{Assets.Species[species].Id}" : $"buildings/{b}";
-			_buildingSprites[(bld.Type, species)] = id;
+			string b = Assets.Buildings[type].Id;
+			string people = Assets.Species[species].Id;
+			id = _houseTypes.Contains(type) ? $"buildings/{b}_{people}_{variant}"
+				: PeopleStyled.Contains(b) ? $"buildings/{b}_{people}" : $"buildings/{b}";
+			_buildingSprites[(type, species, variant)] = id;
 		}
 		return id;
 	}
@@ -282,62 +299,109 @@ public partial class Simulation
 	private static readonly string[] BonfireFrames = { "buildings/bonfire_0", "buildings/bonfire_1", "buildings/bonfire_2" };
 	private static readonly string[] WindmillFrames = { "buildings/windmill_0", "buildings/windmill_1" };
 
+	// What a drawn item is (packed with its index into a long, sorted by feet height).
+	private const long KUnit = 0, KPlant = 1, KPlantFlame = 2, KRemains = 3, KBuilding = 4, KTileFlame = 5;
+	private long[] _items = Array.Empty<long>();
+
+	/// <summary>Animation clock in real seconds: flames, walking, the bonfire and windmills move at
+	/// the same pace whatever the speed of time (ultra-fast included).</summary>
+	private static float AnimTime => Time.GetTicksMsec() / 1000f;
+
+	// The camera's view in world pixels (SetView); empty = the whole map.
+	private Rect2 _view;
+	/// <summary>Up close (sprites bigger than dots, the view small enough), plants are drawn with
+	/// the creatures and buildings in one batch sorted by feet height, so whoever stands in front
+	/// covers whoever stands behind. Far away, plants are drawn by strips and creatures (dots) on top.</summary>
+	private bool _near;
+	public const float NearZoom = 0.5f;
+	private const int NearMaxTiles = 90000;
+
+	/// <summary>The part of the world the camera shows, in world pixels (scripts/main.gd, every frame).</summary>
+	public void SetView(Vector2 center, Vector2 size)
+	{
+		_view = new Rect2(center - size / 2f, size);
+		bool near = _zoom >= NearZoom && size.X * size.Y / (Tile * Tile) <= NearMaxTiles;
+		if (near == _near)
+			return;
+		_near = near;
+		if (_plantLayer != null)
+		{
+			_plantLayer.Visible = !near;
+			_plantShadowLayer.Visible = !near && _zoom >= 0.6f;
+		}
+	}
+
+	/// <summary>A stable sway phase for a plant at (x, y), from its position (never from its place
+	/// in a buffer, which changes whenever the strip is rebuilt).</summary>
+	private static float SwayPhase(float x, float y)
+	{
+		float h = MathF.Sin(x * 12.9898f + y * 78.233f) * 43758.547f;
+		return 0.05f + 0.9f * (h - MathF.Floor(h));
+	}
+
+	private bool InView(float x, float y, float margin)
+	{
+		if (_view.Size.X <= 0f)
+			return true;
+		float px = x * Tile, py = y * Tile;
+		return px >= _view.Position.X - margin && px <= _view.End.X + margin
+			&& py >= _view.Position.Y - margin && py <= _view.End.Y + margin + 40f;
+	}
+
+	private void Add(ref int n, long kind, int index, float key)
+	{
+		if (n == _items.Length)
+		{
+			Array.Resize(ref _items, Math.Max(256, n * 2));
+			Array.Resize(ref _keys, _items.Length);
+		}
+		_items[n] = (kind << 32) | (uint)index;
+		_keys[n] = key;
+		n++;
+	}
+
 	private void DrawUnits()
 	{
-		int cap = Units.Capacity + _burning.Count + _burningTiles.Count + _remains.Count + Buildings.Count * 2;
-		if (_order.Length < cap)
-		{
-			_order = new int[cap];
-			_keys = new float[cap];
-		}
-		// Everything drawn here, sorted by feet height: creatures (their index), flames over plants
-		// (~plant), remains of the dead (-2^29 - remains), flames over tiles (int.MinValue + tile).
+		if (_keys.Length < _items.Length)
+			Array.Resize(ref _keys, _items.Length);
+		// Everything drawn here, sorted by feet height: creatures, buildings, remains, flames, and
+		// up close the plants too. Up close, only what the camera sees.
+		bool cull = _near;
+		const float margin = 48f;
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
-		{
-			if (!Units.Alive[i])
-				continue;
-			_order[n] = i;
-			_keys[n] = Units.Y[i];
-			n++;
-		}
+			if (Units.Alive[i] && (!cull || InView(Units.X[i], Units.Y[i], margin)))
+				Add(ref n, KUnit, i, Units.Y[i]);
 		foreach (int p in _burning)
-		{
-			if (!_pAlive[p])
-				continue;
-			_order[n] = ~p;
-			_keys[n] = _pY[p] + 0.01f;
-			n++;
-		}
+			if (_pAlive[p] && (!cull || InView(_pX[p], _pY[p], margin)))
+				Add(ref n, KPlantFlame, p, _pY[p] + 0.0001f);
 		for (int r = 0; r < _remains.Count; r++)
-		{
-			_order[n] = -(1 << 29) - r;
-			_keys[n] = _remains[r].y - 0.01f;
-			n++;
-		}
-		// Buildings: -2^28 - building, standing on the lower part of their tile.
+			if (!cull || InView(_remains[r].x, _remains[r].y, margin))
+				Add(ref n, KRemains, r, _remains[r].y - 0.0001f);
 		for (int b = 0; b < Buildings.Count; b++)
 		{
-			if (!Buildings[b].Alive)
+			var bld = Buildings[b];
+			if (!bld.Alive || cull && !InView(bld.X + 0.5f, bld.Y + 1f, margin))
 				continue;
-			_order[n] = -(1 << 28) - b;
-			_keys[n] = Buildings[b].Y + 0.8f;
-			n++;
-			// A burning building: a big flame in front of it (drawn like a burning tile).
-			if (Buildings[b].Burning > 0f)
-			{
-				_order[n] = int.MinValue + World.Index(Buildings[b].X, Buildings[b].Y);
-				_keys[n] = Buildings[b].Y + 0.81f;
-				n++;
-			}
+			// Standing on the lower part of their tile; a burning one has a big flame in front.
+			Add(ref n, KBuilding, b, bld.Y + 0.8f);
+			if (bld.Burning > 0f)
+				Add(ref n, KTileFlame, World.Index(bld.X, bld.Y), bld.Y + 0.8001f);
 		}
 		foreach (int t in _burningTiles)
+			if (!cull || InView(t % World.Width + 0.5f, t / World.Width + 0.85f, margin))
+				Add(ref n, KTileFlame, t, t / World.Width + 0.85f);
+		if (_near)
 		{
-			_order[n] = int.MinValue + t;
-			_keys[n] = t / World.Width + 0.85f;
-			n++;
+			// The plants in view, from the tiles the camera sees.
+			int x0 = Math.Max(0, (int)((_view.Position.X - margin) / Tile)), x1 = Math.Min(World.Width - 1, (int)((_view.End.X + margin) / Tile));
+			int y0 = Math.Max(0, (int)((_view.Position.Y - margin) / Tile)), y1 = Math.Min(World.Height - 1, (int)((_view.End.Y + margin + 40f) / Tile));
+			for (int y = y0; y <= y1; y++)
+				for (int x = x0; x <= x1; x++)
+					for (int p = _tileFirst[World.Index(x, y)]; p >= 0; p = _pNext[p])
+						Add(ref n, KPlant, p, _pY[p]);
 		}
-		Array.Sort(_keys, _order, 0, n);
+		Array.Sort(_keys, _items, 0, n);
 		// Frames of every species, looked up once (not once per creature).
 		if (_speciesFrames.Length != Assets.Species.Count)
 		{
@@ -370,7 +434,7 @@ public partial class Simulation
 			var info = SpriteInfo($"effects/Fire_{f}");
 			fireFrames[f] = (info.rect, info.color);
 		}
-		float time = (float)Scheduler.Time;
+		float time = AnimTime;
 
 		if (_unitMesh.InstanceCount < n)
 		{
@@ -382,60 +446,78 @@ public partial class Simulation
 		}
 		for (int k = 0; k < n; k++)
 		{
-			int i = _order[k];
-			if (i < -(1 << 30))
+			long kind = _items[k] >> 32;
+			int i = (int)(_items[k] & 0xffffffff);
+			switch (kind)
 			{
-				// A burning tile: a small flame standing in the middle of it.
-				int t = i - int.MinValue;
-				float life = Math.Clamp(TileBurn[t] / Math.Max(_burnTime[World.Biome[t]], 0.1f), 0f, 1f);
-				float fh = 7f * (MathF.Sin(MathF.PI * life) * 0.5f + 0.5f);
-				int burningBuilding = _buildingAt[t];
-				if (burningBuilding >= 0 && Buildings[burningBuilding].Burning > 0f)
-					fh = 12f + 2f * MathF.Sin(time * 5f + t);
-				var (trect, tcolor) = fireFrames[(int)((float)Scheduler.Time * 9f + t * 7) % 3];
-				float fx = (t % World.Width + 0.5f) * Tile;
-				float fy = (t / World.Width + 0.85f) * Tile;
-				WriteSprite(_unitBuffer, k * Stride, fh * 0.75f, fh, fx, fy, trect, tcolor, fh);
-				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
-				continue;
-			}
-			if (i > -(1 << 29) && i <= -(1 << 28))
-			{
-				// A building: bonfires flicker, houses wear their people's style, sites are frames.
-				var bld = Buildings[-(1 << 28) - i];
-				var (bsize, brect, bcolor) = SpriteInfo(BuildingSprite(bld, time));
-				float bx = (bld.X + 0.5f) * Tile, by = (bld.Y + 1f) * Tile;
-				// Burning buildings darken.
-				if (bld.Burning > 0f)
-					bcolor = bcolor.Darkened(0.4f * (1f - bld.Health));
-				WriteSprite(_unitBuffer, k * Stride, bsize.X, bsize.Y, bx, by, brect, bcolor, bsize.Y);
-				bool flat = bld.Type == _tBonfire || bld.Type == _tRuin || bld.Type == _tDummy;
-				WriteShadow(_unitShadowBuffer, k * 8, flat ? 0f : bsize.X * 0.9f, bx, by);
-				continue;
-			}
-			if (i <= -(1 << 29))
-			{
-				// The remains of a dead creature, lying where it fell.
-				var dead = _remains[-(1 << 29) - i];
-				var (dsize, drect, dcolor) = _speciesFrames[dead.species][Dead];
-				dsize *= dead.scale;
-				WriteSprite(_unitBuffer, k * Stride, dead.left ? -dsize.X : dsize.X, dsize.Y, dead.x * Tile, dead.y * Tile, drect, dcolor, dsize.Y);
-				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
-				continue;
-			}
-			if (i < 0)
-			{
-				// A flame over a burning plant: as wide as the plant, rising then dying down,
-				// flickering through its three frames. No shadow (a zero-size one).
-				int p = ~i;
-				var plant = PlantSize(_pSprite[p]) * _pScale[p] * _pGrowth[p];
-				float life = Math.Clamp(_pBurn[p] / BurnSeconds, 0f, 1f);
-				float strength = MathF.Sin(MathF.PI * life) * 0.6f + 0.4f;
-				var (frect, fcolor) = fireFrames[(int)((float)Scheduler.Time * 9f + p) % 3];
-				float fh = plant.Y * 0.75f * strength;
-				WriteSprite(_unitBuffer, k * Stride, plant.X * 0.7f, fh, _pX[p] * Tile, _pY[p] * Tile, frect, fcolor, fh);
-				WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
-				continue;
+				case KPlant:
+				{
+					var (psize, prect, pavg) = SpriteInfo(_plantSprites[_pSprite[i]]);
+					float ps = _pScale[i] * _pGrowth[i];
+					float w = psize.X * ps, h = psize.Y * ps;
+					float px = _pX[i] * Tile, py = _pY[i] * Tile;
+					WriteSprite(_unitBuffer, k * Stride, _pFlip[i] ? -w : w, h, px, py, prect, pavg, h, SwayPhase(_pX[i], _pY[i]));
+					WriteShadow(_unitShadowBuffer, k * 8, w, px, py);
+					continue;
+				}
+				case KTileFlame:
+				{
+					// A burning tile: a small flame standing in the middle of it; a big one over a
+					// burning building.
+					int t = i;
+					float life = Math.Clamp(TileBurn[t] / Math.Max(_burnTime[World.Biome[t]], 0.1f), 0f, 1f);
+					float fh = 7f * (MathF.Sin(MathF.PI * life) * 0.5f + 0.5f);
+					int burningBuilding = _buildingAt[t];
+					if (burningBuilding >= 0 && Buildings[burningBuilding].Burning > 0f)
+						fh = 12f + 2f * MathF.Sin(time * 5f + t);
+					var (trect, tcolor) = fireFrames[(int)(time * 9f + t * 7) % 3];
+					float fx = (t % World.Width + 0.5f) * Tile;
+					float fy = (t / World.Width + 0.85f) * Tile;
+					WriteSprite(_unitBuffer, k * Stride, fh * 0.75f, fh, fx, fy, trect, tcolor, fh);
+					WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+					continue;
+				}
+				case KBuilding:
+				{
+					// Bonfires flicker, houses wear their people's style, sites are frames.
+					var bld = Buildings[i];
+					var (bsize, brect, bcolor) = SpriteInfo(BuildingSprite(bld, time));
+					float bx = (bld.X + 0.5f) * Tile, by = (bld.Y + 1f) * Tile;
+					// The village's colour paints the roofs (the colour mask) and the far-away dot.
+					if (bld.Type != _tRuin && (bld.Done || bld.UpgradeTo >= 0))
+						bcolor = Villages[bld.Village].Color;
+					// Burning buildings darken.
+					if (bld.Burning > 0f)
+						bcolor = bcolor.Darkened(0.4f * (1f - bld.Health));
+					WriteSprite(_unitBuffer, k * Stride, bsize.X, bsize.Y, bx, by, brect, bcolor, bsize.Y);
+					bool flat = bld.Type == _tBonfire || bld.Type == _tRuin || bld.Type == _tDummy;
+					WriteShadow(_unitShadowBuffer, k * 8, flat ? 0f : bsize.X * 0.9f, bx, by);
+					continue;
+				}
+				case KRemains:
+				{
+					// The remains of a dead creature, lying where it fell.
+					var dead = _remains[i];
+					var (dsize, drect, dcolor) = _speciesFrames[dead.species][Dead];
+					dsize *= dead.scale;
+					WriteSprite(_unitBuffer, k * Stride, dead.left ? -dsize.X : dsize.X, dsize.Y, dead.x * Tile, dead.y * Tile, drect, dcolor, dsize.Y);
+					WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+					continue;
+				}
+				case KPlantFlame:
+				{
+					// A flame over a burning plant: as wide as the plant, rising then dying down,
+					// flickering through its three frames. No shadow (a zero-size one).
+					int p = i;
+					var plant = PlantSize(_pSprite[p]) * _pScale[p] * _pGrowth[p];
+					float life = Math.Clamp(_pBurn[p] / BurnSeconds, 0f, 1f);
+					float strength = MathF.Sin(MathF.PI * life) * 0.6f + 0.4f;
+					var (frect, fcolor) = fireFrames[(int)(time * 9f + p) % 3];
+					float fh = plant.Y * 0.75f * strength;
+					WriteSprite(_unitBuffer, k * Stride, plant.X * 0.7f, fh, _pX[p] * Tile, _pY[p] * Tile, frect, fcolor, fh);
+					WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+					continue;
+				}
 			}
 			var sp = Assets.Species[Units.Species[i]];
 			// Pose: walking cycles idle, step, idle, other step; a hunter next to its prey strikes.
@@ -466,5 +548,4 @@ public partial class Simulation
 			RenderingServer.MultimeshSetBuffer(_unitShadowMesh.GetRid(), _unitShadowBuffer);
 		}
 	}
-
 }

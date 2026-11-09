@@ -537,7 +537,7 @@ public partial class Simulation
 			int t = World.Index(x, y);
 			if (_buildingAt[t] >= 0 || _ground[t] == GroundField || TileBurn[t] > 0f || _biomeNames[World.Biome[t]] == "Lava")
 				continue;
-			if (BuildingWithin(x, y, 1) >= 0)
+			if (BuildingWithin(x, y, 1) >= 0 || !FootprintOnLand(v, Assets.BuildingIndex(rec.Id), x, y))
 				continue;
 			float dx = x - village.X, dy = y - village.Y;
 			float dist = MathF.Sqrt(dx * dx + dy * dy);
@@ -592,6 +592,38 @@ public partial class Simulation
 			}
 		}
 		return best;
+	}
+
+	/// <summary>Size in world pixels of what a building of `type` at (x, y) will look like at its
+	/// biggest: a home is measured at its last tier (it is upgraded in place), in its variant.</summary>
+	private Vector2 FootprintSize(int v, int type, int x, int y)
+	{
+		int species = Villages[v].Species;
+		var size = Vector2.Zero;
+		var types = _houseTypes.Contains(type) ? (IEnumerable<int>)_houseTypes : new[] { type };
+		foreach (int t in types)
+		{
+			var s = SpriteInfo(SpriteId(t, species, x, y)).size;
+			size = new Vector2(Math.Max(size.X, s.X), Math.Max(size.Y, s.Y));
+		}
+		// No sprite (tools without the art): a conservative three tiles by three.
+		return size == Vector2.Zero ? new Vector2(Tile * 3, Tile * 3) : size;
+	}
+
+	/// <summary>Whether every tile a building's sprite covers is land, so no house hangs over
+	/// water. The sprite stands on the bottom of its tile, centred. Docks stand on the shore.</summary>
+	private bool FootprintOnLand(int v, int type, int x, int y)
+	{
+		if (type == _tDock)
+			return World.IsLand(x, y);
+		var size = FootprintSize(v, type, x, y);
+		int half = Math.Max(0, (int)MathF.Ceiling((size.X / 2f - Tile / 2f) / Tile));
+		int rows = Math.Max(1, (int)MathF.Ceiling(size.Y / Tile));
+		for (int dy = 0; dy < rows; dy++)
+			for (int dx = -half; dx <= half; dx++)
+				if (!World.IsLand(x + dx, y - dy))
+					return false;
+		return true;
 	}
 
 	/// <summary>A building within `r` tiles (Chebyshev) of (x, y), of `type` if it is not -1.</summary>
@@ -1112,6 +1144,7 @@ public partial class Simulation
 			{
 				["id"] = Assets.Buildings[bld.Type].Id, ["village"] = bld.Village, ["x"] = bld.X, ["y"] = bld.Y,
 				["done"] = bld.Done, ["burning"] = bld.Burning > 0f, ["owner_ok"] = Owns(bld.Village, bld.X, bld.Y),
+				["on_land"] = bld.Type == _tBonfire || bld.Type == _tRuin || FootprintOnLand(bld.Village, bld.Type, bld.X, bld.Y),
 			});
 		}
 		return list;

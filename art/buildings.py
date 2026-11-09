@@ -2,13 +2,13 @@
 creatures (art/creatures.py): one sprite pixel = one world pixel, a tile is 8 pixels, a hut a
 little more than a tile wide, a town hall more than two.
 
-Homes and great buildings are drawn in each people's style: three families of shapes (timber
-houses, round huts, tents and longhouses), each in the people's own colours, with four tiers of
-homes (hut, house, stone house, big house) and the town hall, temple, library, barracks and watch
-tower. The other buildings are the same for everyone: bonfire (3 frames), stockpile, windmill
-(2 frames), well, mine, dock, market, statue, training dummy, ruin and building site.
+Homes come from art/homes.py: 4 tiers x 4 variants per people, in WorldBox's 3/4 style. Great
+buildings (town hall, temple, library, barracks, watch tower) are templates in each people's
+colours. Roofs and banners are drawn in the colour mask (magenta shades) that the game paints in
+the village's colour. The other buildings are the same for everyone: bonfire (3 frames),
+stockpile, windmill (2 frames), well, mine, dock, market, statue, training dummy, ruin and site.
 
-Inspired by WorldBox's buildings (what they are and how big), drawn from scratch.
+Inspired by WorldBox's buildings (what they are, how big, the colour mask), drawn from scratch.
 
 Writes assets/sprites/buildings/*.png and docs/images/buildings.png.
     python3 art/buildings.py
@@ -18,7 +18,8 @@ from pathlib import Path
 
 from PIL import Image
 
-from creatures import parse, render
+from creatures import hex_rgb, parse, render
+import homes
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "sprites" / "buildings"
@@ -29,154 +30,6 @@ SHEET = ROOT / "docs" / "images" / "buildings.png"
 COMMON = {
     "S": "#9a958c", "K": "#4a4440", "T": "#8a5a32", "Y": "#f0c94a", "G": "#4f9a45", "A": "#3b8fe0",
     "F": "#ee5a1c", "H": "#d8b860", "P": "#efe6cf", "C": "#d8d0c0",
-}
-
-# ---------------------------------------------------------------------------------- homes
-
-TIMBER = {
-    "hut": """
-....RR....
-...RRRR...
-..RRRRRR..
-.RRRRRRRR.
-RRRRRRRRRR
-.WWWWWWWW.
-.WNWWWDDW.
-.WWWWWDDW.
-""",
-    "house": """
-.........KK.
-.....RR..KK.
-....RRRRRRR.
-...RRRRRRRR.
-..RRRRRRRRR.
-.RRRRRRRRRRR
-RRRRRRRRRRRR
-.WWWWWWWWWW.
-.WNNWWWWDDW.
-.WNNWWWWDDW.
-.WWWWWWWDDW.
-""",
-    "stone_house": """
-..........KK..
-......RR..KK..
-.....RRRRRRR..
-....RRRRRRRRR.
-...RRRRRRRRRR.
-..RRRRRRRRRRRR
-.RRRRRRRRRRRRR
-RRRRRRRRRRRRRR
-.SSSSSSSSSSSS.
-.SNNSSNNSSDDS.
-.SNNSSNNSSDDS.
-.SSSSSSSSSDDS.
-""",
-    "big_house": """
-.......RR.......
-......RRRR...KK.
-.....RRRRRR..KK.
-....RRRRRRRRRRR.
-...RRRRRRRRRRRR.
-..RRRRRRRRRRRRRR
-.RRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRRR
-.WWWWWWWWWWWWWW.
-.WNNWWNNWWNNWWW.
-.WNNWWNNWWNNWWW.
-.SSSSSSSSSSSSSS.
-.SNNSSNNSSSDDSS.
-.SNNSSNNSSSDDSS.
-.SSSSSSSSSSDDSS.
-""",
-}
-
-ROUND = {
-    "hut": """
-...RRRR...
-.RRRRRRRR.
-RRRRRRRRRR
-RRRRRRRRRR
-.WWWWWWWW.
-.WWWDDWWW.
-.WWWDDWWW.
-""",
-    "house": """
-.....RR.....
-...RRRRRR...
-..RRRRRRRR..
-.RRRRRRRRRR.
-RRRRRRRRRRRR
-.WWWWWWWWWW.
-.WWNWWWDDWW.
-.WWWWWWDDWW.
-.WWWWWWDDWW.
-""",
-    "stone_house": """
-.....RRR......
-...RRRRRRR....
-..RRRRRRRRR...
-.RRRRRRRRRRR..
-RRRRRRRRRRRRR.
-.SSSSSSSSSSS..
-.SSNSSSSDDSS..
-.SSSSSSSDDSS..
-.SSSSSSSDDSS..
-""",
-    "big_house": """
-.....RRR..........
-...RRRRRRR...RR...
-..RRRRRRRRR.RRRR..
-.RRRRRRRRRRRRRRRR.
-RRRRRRRRRRRRRRRRRR
-.SSSSSSSSSSSSSSSS.
-.SSNSSSNSSSSNSSSS.
-.SSSSSSSSSDDSSSSS.
-.SSNSSSNSSDDSSNSS.
-.SSSSSSSSSDDSSSSS.
-""",
-}
-
-TENT = {
-    "hut": """
-....RR....
-...RRRR...
-..RRWRRR..
-.RRRWRRRR.
-RRRRDDRRRR
-RRRRDDRRRR
-""",
-    "house": """
-.....BB.....
-.....RR.....
-....RRRR....
-...RRWRRR...
-..RRRWRRRR..
-.RRRRWRRRRR.
-RRRRRDDRRRRR
-RRRRRDDRRRRR
-""",
-    "stone_house": """
-.B..........B.
-.T..........T.
-.RRRRRRRRRRRR.
-RRRRRRRRRRRRRR
-RRRRRRRRRRRRRR
-.WWWWWWWWWWWW.
-.WWWWWDDWWWWW.
-.SSSSSDDSSSSS.
-""",
-    "big_house": """
-.B.....BB.....B.
-.T.....RR.....T.
-.RRRRRRRRRRRRRR.
-RRRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRRR
-.WWWWWWWWWWWWWW.
-.WWKWWWDDWWWKWW.
-.WWWWWWDDWWWWWW.
-.SSSSSSDDSSSSSS.
-""",
 }
 
 # ---------------------------------------------------------------------------------- great buildings
@@ -264,20 +117,21 @@ SSDDSSS.
 """,
 }
 
-# Per people: its family of homes and its colours (R roof, W wall, D door, N window, B banner).
+# Per people: the colours of its great buildings (W wall, D door, N window; R roof and B banner
+# are replaced by the colour mask). Homes are drawn by art/homes.py.
 STYLES = {
-    "humans": (TIMBER, {"R": "#b8483a", "W": "#e2cfa4", "D": "#6b4423", "N": "#8fd8ff", "B": "#4a86d0"}),
-    "elves": (TIMBER, {"R": "#5aae55", "W": "#f0e6c8", "D": "#8a6a3a", "N": "#f0d264", "B": "#9ad65a"}),
-    "dwarves": (ROUND, {"R": "#7a7470", "W": "#a8a29a", "D": "#5a3a1e", "N": "#e8a923", "B": "#e8a923"}),
-    "orcs": (TENT, {"R": "#8b5a2b", "W": "#c49a6a", "D": "#2a1a10", "N": "#d83a3a", "B": "#8c2323"}),
-    "goblins": (TENT, {"R": "#9aa04a", "W": "#c4a65a", "D": "#2a2010", "N": "#f0d264", "B": "#f0d264"}),
-    "lizardfolk": (ROUND, {"R": "#c9b458", "W": "#7aa070", "D": "#2a4a3a", "N": "#4dbfb0", "B": "#f08a2a"}),
-    "felines": (TENT, {"R": "#9b59c6", "W": "#f0d264", "D": "#3a2050", "N": "#f49ac1", "B": "#f0d264"}),
-    "merfolk": (ROUND, {"R": "#4dbfb0", "W": "#e8e0d0", "D": "#3b8fe0", "N": "#8fd8ff", "B": "#3b8fe0"}),
-    "treefolk": (ROUND, {"R": "#3f7a3f", "W": "#9a6a3a", "D": "#4a2d19", "N": "#9ad65a", "B": "#9ad65a"}),
-    "fairies": (ROUND, {"R": "#e05a8a", "W": "#f8f0f0", "D": "#b07ad0", "N": "#fff0a0", "B": "#f49ac1"}),
-    "bullfolk": (TIMBER, {"R": "#a03a32", "W": "#b08a60", "D": "#4a2a18", "N": "#f08a2a", "B": "#f08a2a"}),
-    "undead": (TIMBER, {"R": "#3d3d4a", "W": "#8a8478", "D": "#1b1b22", "N": "#b07ad0", "B": "#4f2470"}),
+    "humans": {"R": "#b8483a", "W": "#e2cfa4", "D": "#6b4423", "N": "#8fd8ff", "B": "#4a86d0"},
+    "elves": {"R": "#5aae55", "W": "#f0e6c8", "D": "#8a6a3a", "N": "#f0d264", "B": "#9ad65a"},
+    "dwarves": {"R": "#7a7470", "W": "#a8a29a", "D": "#5a3a1e", "N": "#e8a923", "B": "#e8a923"},
+    "orcs": {"R": "#8b5a2b", "W": "#c49a6a", "D": "#2a1a10", "N": "#d83a3a", "B": "#8c2323"},
+    "goblins": {"R": "#9aa04a", "W": "#c4a65a", "D": "#2a2010", "N": "#f0d264", "B": "#f0d264"},
+    "lizardfolk": {"R": "#c9b458", "W": "#7aa070", "D": "#2a4a3a", "N": "#4dbfb0", "B": "#f08a2a"},
+    "felines": {"R": "#9b59c6", "W": "#f0d264", "D": "#3a2050", "N": "#f49ac1", "B": "#f0d264"},
+    "merfolk": {"R": "#4dbfb0", "W": "#e8e0d0", "D": "#3b8fe0", "N": "#8fd8ff", "B": "#3b8fe0"},
+    "treefolk": {"R": "#3f7a3f", "W": "#9a6a3a", "D": "#4a2d19", "N": "#9ad65a", "B": "#9ad65a"},
+    "fairies": {"R": "#e05a8a", "W": "#f8f0f0", "D": "#b07ad0", "N": "#fff0a0", "B": "#f49ac1"},
+    "bullfolk": {"R": "#a03a32", "W": "#b08a60", "D": "#4a2a18", "N": "#f08a2a", "B": "#f08a2a"},
+    "undead": {"R": "#3d3d4a", "W": "#8a8478", "D": "#1b1b22", "N": "#b07ad0", "B": "#4f2470"},
 }
 
 # Stone tints per people: dwarves' grey granite, elves' pale stone, undead's dark rock...
@@ -449,7 +303,7 @@ def bonfire(k):
 
 
 def people_palette(race):
-    shape, pal = STYLES[race]
+    pal = STYLES[race]
     full = dict(COMMON)
     full.update(pal)
     if race in STONE:
@@ -457,17 +311,33 @@ def people_palette(race):
     return full
 
 
+def snap_mask(img):
+    """Roofs and banners are drawn in the colour mask (magenta shades, see art/homes.py); the
+    automatic shading of render() tints them a little: put them back on the mask exactly."""
+    px = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a and r > 60 and b > 60 and abs(r - b) < 12 and g < min(r, b) * 0.45:
+                v = (r + b) // 2
+                px[x, y] = (v, 0, v, a)
+    return img
+
+
 def all_buildings():
     """Every building sprite, by name (without the folder)."""
     images = {}
     for k in range(3):
         images[f"bonfire_{k}"] = bonfire(k)
-    for race, (family, _) in STYLES.items():
+    # Homes: 4 tiers x VARIANTS per people, drawn by art/homes.py.
+    images.update(homes.all_homes())
+    for race in STYLES:
         pal = people_palette(race)
-        for tier, shape in family.items():
-            images[f"{tier}_{race}"] = render(parse(shape), pal)
+        # Roofs and banners in the mask: the village's colour in the game.
+        pal["R"] = "#d000d0"
+        pal["B"] = "#d000d0"
         for name, shape in GREAT.items():
-            images[f"{name}_{race}"] = render(parse(shape), pal)
+            images[f"{name}_{race}"] = snap_mask(render(parse(shape), pal))
     images["stockpile"] = render(parse(STOCKPILE), COMMON)
     for k, shape in enumerate(WINDMILL):
         images[f"windmill_{k}"] = render(parse(shape), {**COMMON, **WINDMILL_PAL})
@@ -482,12 +352,29 @@ def all_buildings():
     return images
 
 
-def sheet(images, names, cols, cell=22, scale=4):
-    """A contact sheet of some sprites on grass, `cols` per row."""
+def recolor(img, rgb):
+    """The mask painted in a colour, as the game does (for the contact sheet)."""
+    img = img.copy()
+    px = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, a = px[x, y]
+            if a and g == 0 and r == b and r > 60:
+                k = r / 208
+                c = [int(v * k) if k <= 1 else min(255, int(v + (255 - v) * (k - 1) * 1.5)) for v in rgb]
+                px[x, y] = (*c, 255)
+    return img
+
+
+SHEET_COLOURS = ["#4a86d0", "#c8503e", "#5aae55", "#9b59c6", "#e8a923", "#4dbfb0"]
+
+
+def sheet(images, names, cols, cell=26, scale=4):
+    """A contact sheet of some sprites on grass, `cols` per row, each row in a village colour."""
     rows = (len(names) + cols - 1) // cols
     img = Image.new("RGBA", (cols * cell * scale, rows * cell * scale), (70, 120, 60, 255))
     for k, name in enumerate(names):
-        sprite = images[name]
+        sprite = recolor(images[name], hex_rgb(SHEET_COLOURS[(k // cols) % len(SHEET_COLOURS)]))
         x = (k % cols) * cell + (cell - sprite.width) // 2
         y = (k // cols) * cell + cell - sprite.height - 2
         img.alpha_composite(sprite.resize((sprite.width * scale, sprite.height * scale), Image.NEAREST), (x * scale, y * scale))
@@ -496,14 +383,14 @@ def sheet(images, names, cols, cell=22, scale=4):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    for f in OUT.glob("*.png"):
+    for f in list(OUT.glob("*.png")) + list(OUT.glob("*.png.import")):
         f.unlink()
     images = all_buildings()
     for name, img in images.items():
         img.save(OUT / f"{name}.png")
     # One row per people (homes and great buildings), then the shared buildings.
-    tiers = ["hut", "house", "stone_house", "big_house", *GREAT]
-    names = [f"{t}_{race}" for race in STYLES for t in tiers]
+    tiers = [f"{t}_{{}}_{v}" for t in homes.TIERS for v in (0, 1)] + [f"{g}_{{}}" for g in GREAT]
+    names = [t.format(race) for race in STYLES for t in tiers]
     shared = ["bonfire_0", "stockpile", "windmill_0", "windmill_1", "well", "mine", "dock", "market", "statue",
               "dummy", "ruin"]
     names += shared + ["site"]

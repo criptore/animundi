@@ -66,6 +66,12 @@ Animundi takes the **mechanisms**: layers, toggles, feedback, emergent loops. It
   - special biomes, which the player sows
 - A fresh world has animals, never monsters. Monsters arrive with the biomes the player makes, the disasters the player allows, or the player's own hand.
 
+**Reading the wiki from a session**: the cloud environment "animundi" allows the wiki's hosts. The wiki's web pages refuse automated clients, but its public MediaWiki API answers. Always read it this way:
+- page text: `https://the-official-worldbox-wiki.fandom.com/api.php?action=parse&page=<Page>&prop=wikitext&format=json`
+- images of a page: `...&prop=images`, then their URLs with `action=query&titles=File:<name>&prop=imageinfo&iiprop=url|size`, downloaded from `static.wikia.nocookie.net` for study only (never copied into the game)
+
+**Houses** (studied on the "Houses" page, 4 races × 6 tiers × 2 designs): a 3/4 view where the roof takes most of the height; roofs drawn in a magenta mask that the game paints in the kingdom's colour; short walls on a stone footing, a dark outline, light from the left; small props (barrels, crates, fences, flowers, chimneys, lean-to annexes); higher tiers become compounds (a second house, a tower, stone floors). Each race its materials: elves in tree stumps then white stone among trees, dwarves in stone, orcs in hide tents with horns and bones. Animundi's homes (`art/homes.py`) follow these rules with their own drawings, 12 peoples × 4 tiers × 4 variants.
+
 **Sprites** (measured on the wiki's sprite sheets, 10× scale):
 
 | What | Size and look |
