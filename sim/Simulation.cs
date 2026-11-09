@@ -7,13 +7,13 @@ namespace Animundi.Sim;
 
 /// <summary>
 /// The simulation core: the world object holding the tile grid, one manager per kind of entity
-/// (units for now; kingdoms, cities, cultures come later), zones for spatial queries, and the
-/// scheduler that runs systems at their own rates, in batches.
+/// (units and plants for now; kingdoms, cities, cultures come later), zones for spatial queries,
+/// and the scheduler that runs systems at their own rates, in batches.
 ///
-/// It is also the node that draws the units: every frame their sprites go into one MultiMesh,
-/// sorted by feet height, written straight into the MultiMesh buffer (no per-unit node).
+/// The rest of the class is split by topic: Life.cs (animals), Nature.cs (seasons, grass, plants,
+/// fire) and Draw.cs (drawing units, plants and flames).
 ///
-/// GDScript drives it through the methods below (scripts/main.gd).
+/// GDScript drives it through the public methods (scripts/main.gd).
 /// </summary>
 public partial class Simulation : Node2D
 {
@@ -31,35 +31,21 @@ public partial class Simulation : Node2D
 	private readonly Dictionary<string, int> _processRows = new();
 	private double _stepMs;
 	private int _stepSamples;
-	private double _drawMs;
-	private int _drawSamples;
-
-	// Rendering.
-	private MultiMesh _mesh;
-	private MultiMesh _shadowMesh;
-	private ShaderMaterial _material;
-	private float[] _buffer = Array.Empty<float>();
-	private float[] _shadowBuffer = Array.Empty<float>();
-	private int[] _order = Array.Empty<int>();
-	private float[] _keys = Array.Empty<float>();
-	// Per species: sprite size in world pixels, atlas rectangle (UV), average colour.
-	private Vector2[] _spriteSize = Array.Empty<Vector2>();
-	private Rect2[] _spriteRect = Array.Empty<Rect2>();
-	private Color[] _spriteColor = Array.Empty<Color>();
+	private float _accumulate;
 
 	public override void _Ready()
 	{
 		Assets ??= AssetLibrary.Load();
-		if (_mesh == null)
+		if (!_renderingReady)
 			SetupRendering();
 	}
 
 	/// <summary>Starts over on a new world. `worldData` is a GDScript WorldData, `biomeNames`
-	/// is Biomes.NAMES (biome ids are indices into it).</summary>
+	/// is Biomes.NAMES (biome ids are indices into it). Plants come next, with LoadPlants.</summary>
 	public void Start(GodotObject worldData, string[] biomeNames)
 	{
 		Assets ??= AssetLibrary.Load();
-		if (_mesh == null)
+		if (!_renderingReady)
 			SetupRendering();
 		World = SimWorld.FromWorldData(worldData);
 		_biomeNames = biomeNames;
@@ -70,14 +56,24 @@ public partial class Simulation : Node2D
 		Scheduler.WorldProcesses.Clear();
 		Scheduler.Time = 0;
 		_processRows.Clear();
+		SetupLife();
+		SetupNature();
+		ClearDrawing();
 
-		// Walking: every step, every unit.
+		// Walking and chasing: every step, every unit.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "move", Interval = Scheduler.Step, Batches = 1, Run = Move });
-		// Deciding where to go: each unit once a second, spread over 10 batches.
-		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "wander", Interval = 1f, Batches = 10, Run = Wander });
+		// Needs and decisions: each unit once a second, spread over 10 batches.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "think", Interval = 1f, Batches = 10, Run = Think });
 		// Zones: rebuilt 4 times a second.
-		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "zones", Interval = 0.25f, Batches = 1, Run = (_, _, _) => Zones.Rebuild(Units) });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "zones", Global = true, Interval = 0.25f, Batches = 1, Run = (_, _, _) => Zones.Rebuild(Units) });
+		// Fire: every step. Births over time: twice a second.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "fire", Global = true, Interval = Scheduler.Step, Batches = 1, Run = (_, _, dt) => FireStep(0, 0, dt) });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spawn", Global = true, Interval = 0.5f, Batches = 1, Run = (_, _, dt) => SpawnOverTime(0, 0, dt) });
+		// Nature (grass, ash, plants): one slice of the map at a time.
+		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}
+
+	// ------------------------------------------------------------------ spawning
 
 	/// <summary>Spawns `count` creatures of one species, as a god power: on random tiles of the
 	/// biomes it lives in, or anywhere on land for a creature that never appears by itself.
@@ -101,59 +97,44 @@ public partial class Simulation : Node2D
 		if (tiles.Count == 0)
 			return 0;
 		for (int k = 0; k < count; k++)
-			SpawnOnTile(s, tiles[_rng.Next(tiles.Count)]);
+		{
+			int t = tiles[_rng.Next(tiles.Count)];
+			SpawnUnit(s, t % World.Width + (float)_rng.NextDouble(), t / World.Width + (float)_rng.NextDouble(), false);
+		}
 		Zones.Rebuild(Units);
 		return count;
 	}
 
 	/// <summary>Spawns `count` creatures the way nature would (WorldBox's "Animal Spawn"): on random
 	/// land tiles, each tile's biome picking a species among those born there, by weight. Tiles of
-	/// biomes where nothing lives are skipped, and species that never appear by themselves
-	/// (monsters of special biomes aside) are never chosen. Returns how many were placed.</summary>
+	/// biomes where nothing lives are skipped, and species that never appear by themselves are
+	/// never chosen. Returns how many were placed.</summary>
 	public int SpawnNatural(int count)
 	{
-		if (World == null)
-			return 0;
-		// Per biome: species and cumulative weights.
-		var tables = new List<(int species, float upTo)>[_biomeNames.Length];
-		var totals = new float[_biomeNames.Length];
-		for (int s = 0; s < Assets.Species.Count; s++)
-			foreach (var (name, weight) in Assets.Species[s].Natural)
-			{
-				int b = Array.IndexOf(_biomeNames, name);
-				if (b < 0 || weight <= 0f)
-					continue;
-				tables[b] ??= new();
-				totals[b] += weight;
-				tables[b].Add((s, totals[b]));
-			}
-		var tiles = new List<int>();
-		for (int i = 0; i < World.Biome.Length; i++)
-			if (World.Water[i] == SimWorld.WaterLand && tables[World.Biome[i]] != null)
-				tiles.Add(i);
-		if (tiles.Count == 0)
+		if (World == null || _spawnTiles.Count == 0)
 			return 0;
 		for (int k = 0; k < count; k++)
 		{
-			int t = tiles[_rng.Next(tiles.Count)];
-			int b = World.Biome[t];
-			float r = (float)_rng.NextDouble() * totals[b];
-			var table = tables[b];
-			int pick = table[^1].species;
-			foreach (var (species, upTo) in table)
-				if (r < upTo)
-				{
-					pick = species;
-					break;
-				}
-			SpawnOnTile(pick, t);
+			int t = _spawnTiles[_rng.Next(_spawnTiles.Count)];
+			SpawnUnit(PickNatural(t), t % World.Width + (float)_rng.NextDouble(), t / World.Width + (float)_rng.NextDouble(), false);
 		}
 		Zones.Rebuild(Units);
 		return count;
 	}
 
-	private void SpawnOnTile(int species, int tile) =>
-		Units.Spawn(species, tile % World.Width + (float)_rng.NextDouble(), tile / World.Width + (float)_rng.NextDouble());
+	/// <summary>Spawns one creature of species `id` at (x, y) in tiles (tests, god powers).
+	/// Returns its unit index, or -1.</summary>
+	public int SpawnAt(string id, float x, float y, bool newborn)
+	{
+		int s = Assets.SpeciesIndex(id);
+		if (s < 0 || !World.IsLandAt(x, y))
+			return -1;
+		int i = SpawnUnit(s, x, y, newborn);
+		Zones.Rebuild(Units);
+		return i;
+	}
+
+	// ------------------------------------------------------------------ queries (HUD, tests)
 
 	/// <summary>How many living units belong to species that never appear by themselves.</summary>
 	public int CountUnnatural()
@@ -182,11 +163,69 @@ public partial class Simulation : Node2D
 
 	public void ClearUnits()
 	{
+		for (int i = 0; i < Units.Capacity; i++)
+			if (Units.Alive[i])
+				Population[Units.Species[i]]--;
 		Units.Clear();
 		Zones?.Rebuild(Units);
 	}
 
 	public int UnitCount() => Units.Count;
+
+	public bool UnitAlive(int i) => i >= 0 && i < Units.Capacity && Units.Alive[i];
+
+	/// <summary>Living units of species `id`.</summary>
+	public int PopulationOf(string id)
+	{
+		int s = Assets.SpeciesIndex(id);
+		return s >= 0 ? Population[s] : 0;
+	}
+
+	/// <summary>Species names and living counts (HUD).</summary>
+	public Godot.Collections.Dictionary PopulationTable()
+	{
+		var table = new Godot.Collections.Dictionary();
+		for (int s = 0; s < Assets.Species.Count; s++)
+			if (Population[s] > 0)
+				table[Assets.Species[s].Name] = Population[s];
+		return table;
+	}
+
+	/// <summary>How many of species `id` its habitat can feed.</summary>
+	public int CapacityOf(string id)
+	{
+		int s = Assets.SpeciesIndex(id);
+		return s >= 0 ? Capacity[s] : 0;
+	}
+
+	/// <summary>Deaths by cause and births since the world started.</summary>
+	public Godot.Collections.Dictionary LifeStats()
+	{
+		var d = new Godot.Collections.Dictionary { ["births"] = Births, ["plants_burned"] = PlantsBurned };
+		foreach (Death c in Enum.GetValues<Death>())
+			d[c.ToString()] = Deaths[(int)c];
+		return d;
+	}
+
+	/// <summary>Grass on tile (x, y), 0..1.</summary>
+	public float GrassAt(int x, int y) => Grass[World.Index(x, y)];
+
+	public void SetGrass(int x, int y, float value) => Grass[World.Index(x, y)] = value;
+
+	public int ScorchAt(int x, int y) => Scorch[World.Index(x, y)];
+
+	/// <summary>Sets a unit's needs (tests): hunger and thirst, 0..1.</summary>
+	public void SetNeeds(int i, float hunger, float thirst)
+	{
+		Units.Hunger[i] = hunger;
+		Units.Thirst[i] = thirst;
+	}
+
+	public float UnitHunger(int i) => Units.Hunger[i];
+
+	public float UnitThirst(int i) => Units.Thirst[i];
+
+	public float UnitAge(int i) => Units.Age[i];
 
 	/// <summary>Average milliseconds of one simulation step since the last call.</summary>
 	public double TakeStepMs()
@@ -195,23 +234,6 @@ public partial class Simulation : Node2D
 		_stepMs = 0;
 		_stepSamples = 0;
 		return ms;
-	}
-
-	/// <summary>Average milliseconds spent writing the units into the MultiMesh per frame since
-	/// the last call (CPU side of drawing).</summary>
-	public double TakeDrawMs()
-	{
-		double ms = _drawSamples > 0 ? _drawMs / _drawSamples : 0.0;
-		_drawMs = 0;
-		_drawSamples = 0;
-		return ms;
-	}
-
-	/// <summary>Writes the units into the MultiMesh `frames` times (tools: measures drawing).</summary>
-	public void DrawFrames(int frames)
-	{
-		for (int k = 0; k < frames; k++)
-			DrawUnits();
 	}
 
 	/// <summary>Runs `steps` simulation steps right away (tests and tools).</summary>
@@ -263,20 +285,17 @@ public partial class Simulation : Node2D
 		if (World == null)
 			return;
 		_accumulate += (float)delta;
-		while (_accumulate >= Scheduler.Step && _budget < 5)
+		int steps = 0;
+		while (_accumulate >= Scheduler.Step && steps < 5)
 		{
 			_accumulate -= Scheduler.Step;
 			TimedStep();
-			_budget++;
+			steps++;
 		}
-		if (_budget >= 5)
+		if (steps == 5)
 			_accumulate = 0f;
-		_budget = 0;
-		DrawUnits();
+		DrawAll();
 	}
-
-	private float _accumulate;
-	private int _budget;
 
 	private void TimedStep()
 	{
@@ -286,7 +305,7 @@ public partial class Simulation : Node2D
 		_stepSamples++;
 	}
 
-	// ------------------------------------------------------------------ systems
+	// ------------------------------------------------------------------ walking
 
 	private void Move(int a, int b, float dt)
 	{
@@ -294,18 +313,26 @@ public partial class Simulation : Node2D
 		{
 			if (!Units.Alive[i])
 				continue;
+			bool hunting = Units.Task[i] == (byte)Task.Hunt;
+			if (hunting)
+			{
+				Chase(i);
+				if (!Units.Alive[i] || Units.Task[i] != (byte)Task.Hunt)
+					continue;
+			}
 			float dx = Units.TargetX[i] - Units.X[i];
 			float dy = Units.TargetY[i] - Units.Y[i];
 			float d2 = dx * dx + dy * dy;
 			if (d2 < 1e-4f)
 				continue;
 			float d = MathF.Sqrt(d2);
-			float step = Assets.Species[Units.Species[i]].Speed * dt;
+			// Hunters run a little faster than they walk.
+			float step = Assets.Species[Units.Species[i]].Speed * dt * (hunting ? 1.25f : 1f);
 			float nx = step >= d ? Units.TargetX[i] : Units.X[i] + dx / d * step;
 			float ny = step >= d ? Units.TargetY[i] : Units.Y[i] + dy / d * step;
 			if (!World.IsLandAt(nx, ny))
 			{
-				// Water ahead: stop and think again.
+				// Water ahead: stop on the shore and think again.
 				Units.TargetX[i] = Units.X[i];
 				Units.TargetY[i] = Units.Y[i];
 				continue;
@@ -315,165 +342,5 @@ public partial class Simulation : Node2D
 			if (MathF.Abs(dx) > 0.01f)
 				Units.FacingLeft[i] = dx < 0f;
 		}
-	}
-
-	private void Wander(int a, int b, float dt)
-	{
-		for (int i = a; i < b; i++)
-		{
-			if (!Units.Alive[i])
-				continue;
-			bool idle = MathF.Abs(Units.TargetX[i] - Units.X[i]) + MathF.Abs(Units.TargetY[i] - Units.Y[i]) < 0.01f;
-			if (!idle)
-				continue;
-			Units.Wait[i] -= dt;
-			if (Units.Wait[i] > 0f)
-				continue;
-			float roam = Assets.Species[Units.Species[i]].Roam;
-			for (int tries = 0; tries < 4; tries++)
-			{
-				float tx = Units.X[i] + ((float)_rng.NextDouble() * 2f - 1f) * roam;
-				float ty = Units.Y[i] + ((float)_rng.NextDouble() * 2f - 1f) * roam;
-				if (World.IsLandAt(tx, ty))
-				{
-					Units.TargetX[i] = tx;
-					Units.TargetY[i] = ty;
-					break;
-				}
-			}
-			Units.Wait[i] = 1f + (float)_rng.NextDouble() * 4f;
-		}
-	}
-
-	// ------------------------------------------------------------------ drawing
-
-	/// <summary>Follows the camera zoom (screen pixels per world pixel): far away, units are dots
-	/// and their shadows are hidden.</summary>
-	public void SetZoom(float zoom)
-	{
-		_material?.SetShaderParameter("zoom", zoom);
-		if (_shadowInstance != null)
-			_shadowInstance.Visible = zoom >= 0.6f;
-	}
-
-	private MultiMeshInstance2D _shadowInstance;
-
-	private void SetupRendering()
-	{
-		var batchScript = GD.Load<GDScript>("res://scripts/render2d/sprite_batch.gd");
-		var atlas = GD.Load<GDScript>("res://scripts/render2d/sprite_atlas.gd").Call("shared").AsGodotObject();
-		var library = GD.Load<GDScript>("res://scripts/render3d/sprite_library.gd");
-		var regions = atlas.Get("regions").AsGodotDictionary();
-		var colors = atlas.Get("colors").AsGodotDictionary();
-
-		int n = Assets.Species.Count;
-		_spriteSize = new Vector2[n];
-		_spriteRect = new Rect2[n];
-		_spriteColor = new Color[n];
-		for (int s = 0; s < n; s++)
-		{
-			string id = Assets.Species[s].Sprite;
-			_spriteSize[s] = library.Call("world_size", id).AsVector2() * Tile;
-			_spriteRect[s] = regions.ContainsKey(id) ? regions[id].AsRect2() : new Rect2();
-			_spriteColor[s] = colors.ContainsKey(id) ? colors[id].AsColor() : Colors.Magenta;
-		}
-
-		var quad = batchScript.Call("unit_quad").As<Mesh>();
-		_shadowMesh = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform2D, Mesh = quad };
-		var shadowMaterial = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/sprite_batch.gdshader") };
-		shadowMaterial.SetShaderParameter("from_atlas", false);
-		_shadowInstance = new MultiMeshInstance2D
-		{
-			Multimesh = _shadowMesh, Material = shadowMaterial,
-			Texture = batchScript.Call("shadow_texture").As<Texture2D>(),
-			TextureFilter = TextureFilterEnum.NearestWithMipmaps,
-		};
-		AddChild(_shadowInstance);
-
-		_mesh = new MultiMesh
-		{
-			TransformFormat = MultiMesh.TransformFormatEnum.Transform2D,
-			UseColors = true, UseCustomData = true, Mesh = quad,
-		};
-		_material = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/sprite_batch.gdshader") };
-		_material.SetShaderParameter("wind", 0.0f);
-		AddChild(new MultiMeshInstance2D
-		{
-			Multimesh = _mesh, Material = _material,
-			Texture = atlas.Get("texture").As<Texture2D>(),
-			TextureFilter = TextureFilterEnum.NearestWithMipmaps,
-		});
-	}
-
-	/// <summary>Writes every living unit into the MultiMesh buffers, nearest (lowest) last.</summary>
-	private void DrawUnits()
-	{
-		long started = Stopwatch.GetTimestamp();
-		int cap = Units.Capacity;
-		if (_order.Length < cap)
-		{
-			_order = new int[cap];
-			_keys = new float[cap];
-		}
-		int n = 0;
-		for (int i = 0; i < cap; i++)
-		{
-			if (!Units.Alive[i])
-				continue;
-			_order[n] = i;
-			_keys[n] = Units.Y[i];
-			n++;
-		}
-		Array.Sort(_keys, _order, 0, n);
-
-		if (_mesh.InstanceCount < n)
-		{
-			int size = Math.Max(n, _mesh.InstanceCount * 2);
-			_mesh.InstanceCount = size;
-			_shadowMesh.InstanceCount = size;
-			_buffer = new float[size * 16];
-			_shadowBuffer = new float[size * 8];
-		}
-		for (int k = 0; k < n; k++)
-		{
-			int i = _order[k];
-			int s = Units.Species[i];
-			Vector2 size = _spriteSize[s];
-			float ox = Units.X[i] * Tile;
-			float oy = Units.Y[i] * Tile;
-			float sx = Units.FacingLeft[i] ? -size.X : size.X;
-			// Walking: a two-frame hop, the cheap version of WorldBox's walk cycles. Up a world
-			// pixel and stretched a little on one frame, squashed on the other.
-			bool moving = MathF.Abs(Units.TargetX[i] - Units.X[i]) + MathF.Abs(Units.TargetY[i] - Units.Y[i]) > 0.01f;
-			float sy = size.Y;
-			if (moving)
-			{
-				bool up = MathF.Sin((float)Scheduler.Time * 9f + i * 0.37f) > 0f;
-				oy -= up ? 0.8f : 0f;
-				sy *= up ? 1.04f : 0.97f;
-			}
-			int o = k * 16;
-			// Transform2D rows: (x.x, y.x, 0, origin.x), (x.y, y.y, 0, origin.y).
-			_buffer[o] = sx; _buffer[o + 1] = 0f; _buffer[o + 2] = 0f; _buffer[o + 3] = ox;
-			_buffer[o + 4] = 0f; _buffer[o + 5] = sy; _buffer[o + 6] = 0f; _buffer[o + 7] = oy;
-			Color c = _spriteColor[s];
-			_buffer[o + 8] = c.R; _buffer[o + 9] = c.G; _buffer[o + 10] = c.B; _buffer[o + 11] = size.Y / 256f;
-			Rect2 r = _spriteRect[s];
-			_buffer[o + 12] = r.Position.X; _buffer[o + 13] = r.Position.Y; _buffer[o + 14] = r.Size.X; _buffer[o + 15] = r.Size.Y;
-
-			float w = size.X * 0.75f, h = size.X * 0.28f;
-			int q = k * 8;
-			_shadowBuffer[q] = w; _shadowBuffer[q + 1] = 0f; _shadowBuffer[q + 2] = 0f; _shadowBuffer[q + 3] = ox + size.X * 0.08f;
-			_shadowBuffer[q + 4] = 0f; _shadowBuffer[q + 5] = h; _shadowBuffer[q + 6] = 0f; _shadowBuffer[q + 7] = Units.Y[i] * Tile + h * 0.45f;
-		}
-		_mesh.VisibleInstanceCount = n;
-		_shadowMesh.VisibleInstanceCount = n;
-		if (n > 0)
-		{
-			RenderingServer.MultimeshSetBuffer(_mesh.GetRid(), _buffer);
-			RenderingServer.MultimeshSetBuffer(_shadowMesh.GetRid(), _shadowBuffer);
-		}
-		_drawMs += Stopwatch.GetElapsedTime(started).TotalMilliseconds;
-		_drawSamples++;
 	}
 }

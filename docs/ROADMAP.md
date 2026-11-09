@@ -31,12 +31,14 @@ Special biomes are never generated at random: the player places them.
 - [ ] Plants and the map texture update only where the terrain changed
 
 ## 0.2 Life
-- [ ] Living flora: forests grow, spread, burn and regrow
+- [x] Living flora (C#): saplings grow, adult plants seed their neighbourhood up to their biome's density, bare ground is recolonised; fire (lightning or the player) spreads by biome dryness, leaves ash that fades over most of a year, then plants grow back; rocks don't burn
 - [x] Natural spawning as data: each species lists the biomes it is born in, with weights; monsters only in special biomes; a fresh world has animals, never monsters
-- [ ] Animals born over time by biome (world law "animal spawn"), and creatures that only the player, events or deaths bring (zombies, golems, dragons…)
-- [ ] Animals that move, with needs (hunger, thirst, rest, reproduction)
-- [ ] Food chains: herbivores and predators, populations that rise and crash
-- [ ] Seasonal migrations, extinctions
+- [x] Animals born over time by biome (world law "animal spawn"), only while their species is scarce; creatures with no natural biome only come from the player (events and deaths that bring zombies, skeletons… come with 0.7)
+- [x] Animals with needs: hunger (grazing a grass layer that regrows), thirst (walking to the nearest water), rest, breeding with a mate nearby; death by old age, hunger, thirst, predators or fire
+- [x] Food chains: herbivores graze, carnivores and omnivores hunt prey of their size or smaller; each species' habitat feeds a limited number (births slow down as it fills); fires and winters thin populations
+- [x] Seasons (a year is 60 s): growth fast in spring and stopped in midwinter, frost spreading from the poles on the map; migrating species head for the equator in winter; extinctions logged in the events panel
+- [x] World laws as switches in the simulation (animal spawn, hunger, old age, natural disasters, tree growth); a menu for them comes with 0.9
+- [x] Events panel (extinctions, lightning fires), time of year and population per species in the HUD; F sets fire under the mouse (placeholder god power)
 - [ ] Simple sprite animations: real walk cycles (2–3 frames) and attack, replacing the two-frame hop; colour masks for kingdom colours and biome skins (WorldBox-style phenotypes)
 - [ ] **Redraw the sprites of every living being** (animals, monsters, the 12 peoples and their roles), original art in the spirit of WorldBox (see [WORLDBOX_WIKI_LESSONS.md](WORLDBOX_WIKI_LESSONS.md) § 3):
   - tiny, readable side views: about one tile (8–10 px) tall, a strong silhouette, few colours

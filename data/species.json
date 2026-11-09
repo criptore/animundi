@@ -1,25 +1,317 @@
 {
-	"_about": "Creature species as data records, read by sim/AssetLibrary.cs. Adding a creature is adding a record. sprite: from assets/sprites/. speed: tiles per second. roam: how far (tiles) it wanders. natural: the biomes (names from scripts/world/biomes.gd) where it is born on its own, with a weight: in each biome, species are drawn in proportion to their weights. A species with no natural biome never appears by itself: only the player (god powers) or events bring it. Monsters live in special biomes, which only the player creates, so a fresh world never has monsters.",
+	"_about": "Creature species as data records, read by sim/AssetLibrary.cs. Adding a creature is adding a record. sprite: from assets/sprites/. speed: tiles per second. roam: how far (tiles) it wanders. natural: the biomes (names from scripts/world/biomes.gd) where it is born on its own, with a weight: in each biome, species are drawn in proportion to their weights. A species with no natural biome never appears by itself: only the player (god powers) or events bring it. Monsters live in special biomes, which only the player creates, so a fresh world never has monsters. diet: herbivore (grazes the grass of its tile), carnivore (hunts creatures of its size or smaller), omnivore (both), none (never eats: undead, golems). size: 0-12, a hunter only catches prey of its size or smaller. lifespan: years (a year lasts 60 s). litter: young per birth (0: does not breed). migrates: moves towards the equator in winter.",
 	"species": [
-		{"id": "cow", "name": "Cow", "sprite": "animals/Cow", "speed": 0.6, "roam": 6, "natural": {"Grassland": 2, "Flower meadow": 2}},
-		{"id": "sheep", "name": "Sheep", "sprite": "animals/Sheep", "speed": 0.6, "roam": 5, "natural": {"Grassland": 3, "Hills": 3, "Flower meadow": 1, "Mushroom land": 1}},
-		{"id": "pig", "name": "Pig", "sprite": "animals/Pig", "speed": 0.7, "roam": 5, "natural": {"Forest": 1, "Swamp": 1}},
-		{"id": "chicken", "name": "Chicken", "sprite": "animals/Chicken", "speed": 0.8, "roam": 3, "natural": {"Grassland": 2, "Savanna": 1}},
-		{"id": "horse", "name": "Horse", "sprite": "animals/Horse", "speed": 1.6, "roam": 12, "natural": {"Grassland": 1, "Savanna": 2}},
-		{"id": "deer", "name": "Deer", "sprite": "animals/Deer", "speed": 1.4, "roam": 10, "natural": {"Forest": 3, "Taiga": 2, "Hills": 1}},
-		{"id": "rabbit", "name": "Rabbit", "sprite": "animals/Rabbit", "speed": 1.2, "roam": 4, "natural": {"Grassland": 3, "Flower meadow": 3, "Tundra": 2, "Desert": 1}},
-		{"id": "fox", "name": "Fox", "sprite": "animals/Fox", "speed": 1.3, "roam": 9, "natural": {"Forest": 1, "Taiga": 1, "Grassland": 1}},
-		{"id": "wolf", "name": "Wolf", "sprite": "animals/Wolf", "speed": 1.5, "roam": 14, "natural": {"Taiga": 2, "Tundra": 2, "Snow": 1, "Forest": 1}},
-		{"id": "bear", "name": "Bear", "sprite": "animals/Bear", "speed": 0.9, "roam": 10, "natural": {"Forest": 1, "Taiga": 2, "Jungle": 1}},
-		{"id": "crab", "name": "Crab", "sprite": "animals/Crab", "speed": 0.5, "roam": 3, "natural": {"Beach": 1}},
-		{"id": "skeleton", "name": "Skeleton", "sprite": "monsters/Skeleton", "speed": 0.8, "roam": 8, "natural": {"Cursed land": 2}},
-		{"id": "ghost", "name": "Ghost", "sprite": "monsters/Ghost", "speed": 0.9, "roam": 10, "natural": {"Cursed land": 1}},
-		{"id": "spider", "name": "Spider", "sprite": "monsters/Spider", "speed": 1.1, "roam": 6, "natural": {"Cursed land": 1}},
-		{"id": "slime", "name": "Slime", "sprite": "monsters/Slime", "speed": 0.5, "roam": 4, "natural": {"Mushroom land": 2}},
-		{"id": "demon", "name": "Demon", "sprite": "monsters/Demon", "speed": 1.2, "roam": 12, "natural": {"Lava": 1, "Volcanic rock": 1}},
-		{"id": "zombie", "name": "Zombie", "sprite": "monsters/Zombie", "speed": 0.5, "roam": 8, "natural": {}},
-		{"id": "golem", "name": "Golem", "sprite": "monsters/Golem", "speed": 0.4, "roam": 6, "natural": {}},
-		{"id": "yeti", "name": "Yeti", "sprite": "monsters/Yeti", "speed": 0.9, "roam": 12, "natural": {}},
-		{"id": "dragon", "name": "Dragon", "sprite": "monsters/Dragon", "speed": 2.0, "roam": 30, "natural": {}}
+		{
+			"id": "cow",
+			"name": "Cow",
+			"sprite": "animals/Cow",
+			"speed": 0.6,
+			"roam": 6,
+			"natural": {
+				"Grassland": 2,
+				"Flower meadow": 2
+			},
+			"diet": "herbivore",
+			"size": 6,
+			"lifespan": 18,
+			"litter": 1,
+			"migrates": false
+		},
+		{
+			"id": "sheep",
+			"name": "Sheep",
+			"sprite": "animals/Sheep",
+			"speed": 0.6,
+			"roam": 5,
+			"natural": {
+				"Grassland": 3,
+				"Hills": 3,
+				"Flower meadow": 1,
+				"Mushroom land": 1
+			},
+			"diet": "herbivore",
+			"size": 5,
+			"lifespan": 14,
+			"litter": 2,
+			"migrates": false
+		},
+		{
+			"id": "pig",
+			"name": "Pig",
+			"sprite": "animals/Pig",
+			"speed": 0.7,
+			"roam": 5,
+			"natural": {
+				"Forest": 1,
+				"Swamp": 1
+			},
+			"diet": "omnivore",
+			"size": 5,
+			"lifespan": 14,
+			"litter": 3,
+			"migrates": false
+		},
+		{
+			"id": "chicken",
+			"name": "Chicken",
+			"sprite": "animals/Chicken",
+			"speed": 0.8,
+			"roam": 3,
+			"natural": {
+				"Grassland": 2,
+				"Savanna": 1
+			},
+			"diet": "herbivore",
+			"size": 2,
+			"lifespan": 8,
+			"litter": 3,
+			"migrates": false
+		},
+		{
+			"id": "horse",
+			"name": "Horse",
+			"sprite": "animals/Horse",
+			"speed": 1.6,
+			"roam": 12,
+			"natural": {
+				"Grassland": 1,
+				"Savanna": 2
+			},
+			"diet": "herbivore",
+			"size": 7,
+			"lifespan": 25,
+			"litter": 1,
+			"migrates": true
+		},
+		{
+			"id": "deer",
+			"name": "Deer",
+			"sprite": "animals/Deer",
+			"speed": 1.4,
+			"roam": 10,
+			"natural": {
+				"Forest": 3,
+				"Taiga": 2,
+				"Hills": 1
+			},
+			"diet": "herbivore",
+			"size": 6,
+			"lifespan": 15,
+			"litter": 1,
+			"migrates": true
+		},
+		{
+			"id": "rabbit",
+			"name": "Rabbit",
+			"sprite": "animals/Rabbit",
+			"speed": 1.2,
+			"roam": 4,
+			"natural": {
+				"Grassland": 3,
+				"Flower meadow": 3,
+				"Tundra": 2,
+				"Desert": 1
+			},
+			"diet": "herbivore",
+			"size": 2,
+			"lifespan": 6,
+			"litter": 4,
+			"migrates": false
+		},
+		{
+			"id": "fox",
+			"name": "Fox",
+			"sprite": "animals/Fox",
+			"speed": 1.3,
+			"roam": 9,
+			"natural": {
+				"Forest": 1,
+				"Taiga": 1,
+				"Grassland": 1
+			},
+			"diet": "carnivore",
+			"size": 4,
+			"lifespan": 10,
+			"litter": 3,
+			"migrates": false
+		},
+		{
+			"id": "wolf",
+			"name": "Wolf",
+			"sprite": "animals/Wolf",
+			"speed": 1.5,
+			"roam": 14,
+			"natural": {
+				"Taiga": 2,
+				"Tundra": 2,
+				"Snow": 1,
+				"Forest": 1
+			},
+			"diet": "carnivore",
+			"size": 6,
+			"lifespan": 14,
+			"litter": 3,
+			"migrates": true
+		},
+		{
+			"id": "bear",
+			"name": "Bear",
+			"sprite": "animals/Bear",
+			"speed": 0.9,
+			"roam": 10,
+			"natural": {
+				"Forest": 1,
+				"Taiga": 2,
+				"Jungle": 1
+			},
+			"diet": "omnivore",
+			"size": 8,
+			"lifespan": 25,
+			"litter": 2,
+			"migrates": false
+		},
+		{
+			"id": "crab",
+			"name": "Crab",
+			"sprite": "animals/Crab",
+			"speed": 0.5,
+			"roam": 3,
+			"natural": {
+				"Beach": 1
+			},
+			"diet": "herbivore",
+			"size": 2,
+			"lifespan": 8,
+			"litter": 4,
+			"migrates": false
+		},
+		{
+			"id": "skeleton",
+			"name": "Skeleton",
+			"sprite": "monsters/Skeleton",
+			"speed": 0.8,
+			"roam": 8,
+			"natural": {
+				"Cursed land": 2
+			},
+			"diet": "carnivore",
+			"size": 6,
+			"lifespan": 100,
+			"litter": 0,
+			"migrates": false
+		},
+		{
+			"id": "ghost",
+			"name": "Ghost",
+			"sprite": "monsters/Ghost",
+			"speed": 0.9,
+			"roam": 10,
+			"natural": {
+				"Cursed land": 1
+			},
+			"diet": "none",
+			"size": 5,
+			"lifespan": 100,
+			"litter": 0,
+			"migrates": false
+		},
+		{
+			"id": "spider",
+			"name": "Spider",
+			"sprite": "monsters/Spider",
+			"speed": 1.1,
+			"roam": 6,
+			"natural": {
+				"Cursed land": 1
+			},
+			"diet": "carnivore",
+			"size": 5,
+			"lifespan": 20,
+			"litter": 4,
+			"migrates": false
+		},
+		{
+			"id": "slime",
+			"name": "Slime",
+			"sprite": "monsters/Slime",
+			"speed": 0.5,
+			"roam": 4,
+			"natural": {
+				"Mushroom land": 2
+			},
+			"diet": "herbivore",
+			"size": 4,
+			"lifespan": 30,
+			"litter": 2,
+			"migrates": false
+		},
+		{
+			"id": "demon",
+			"name": "Demon",
+			"sprite": "monsters/Demon",
+			"speed": 1.2,
+			"roam": 12,
+			"natural": {
+				"Lava": 1,
+				"Volcanic rock": 1
+			},
+			"diet": "carnivore",
+			"size": 8,
+			"lifespan": 200,
+			"litter": 0,
+			"migrates": false
+		},
+		{
+			"id": "zombie",
+			"name": "Zombie",
+			"sprite": "monsters/Zombie",
+			"speed": 0.5,
+			"roam": 8,
+			"natural": {},
+			"diet": "carnivore",
+			"size": 6,
+			"lifespan": 100,
+			"litter": 0,
+			"migrates": false
+		},
+		{
+			"id": "golem",
+			"name": "Golem",
+			"sprite": "monsters/Golem",
+			"speed": 0.4,
+			"roam": 6,
+			"natural": {},
+			"diet": "none",
+			"size": 10,
+			"lifespan": 500,
+			"litter": 0,
+			"migrates": false
+		},
+		{
+			"id": "yeti",
+			"name": "Yeti",
+			"sprite": "monsters/Yeti",
+			"speed": 0.9,
+			"roam": 12,
+			"natural": {},
+			"diet": "carnivore",
+			"size": 9,
+			"lifespan": 60,
+			"litter": 1,
+			"migrates": false
+		},
+		{
+			"id": "dragon",
+			"name": "Dragon",
+			"sprite": "monsters/Dragon",
+			"speed": 2.0,
+			"roam": 30,
+			"natural": {},
+			"diet": "carnivore",
+			"size": 12,
+			"lifespan": 1000,
+			"litter": 0,
+			"migrates": false
+		}
 	]
 }

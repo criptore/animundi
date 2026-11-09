@@ -21,6 +21,9 @@ public sealed class Scheduler
 		public int Batches;
 		/// <summary>(first unit, end unit exclusive, seconds since this slice last ran).</summary>
 		public Action<int, int, float> Run;
+		/// <summary>A system that is not about units (fire, births over time): it runs at its rate
+		/// even when there are no units, with an empty range.</summary>
+		public bool Global;
 		internal float Clock;
 		internal int Next;
 	}
@@ -58,7 +61,9 @@ public sealed class Scheduler
 				int per = (unitCapacity + s.Batches - 1) / Math.Max(s.Batches, 1);
 				int a = s.Next * per;
 				int b = Math.Min(unitCapacity, a + per);
-				if (a < b)
+				if (s.Global)
+					s.Run(0, 0, s.Interval);
+				else if (a < b)
 					s.Run(a, b, s.Interval);
 				s.Next = (s.Next + 1) % s.Batches;
 			}

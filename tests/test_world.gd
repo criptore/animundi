@@ -43,6 +43,8 @@ func _initialize() -> void:
 	test_sprite_batch()
 	test_species_data()
 	test_simulation()
+	test_life()
+	test_nature()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -465,4 +467,143 @@ func test_simulation() -> void:
 	sim.RunSteps(30)
 	check(partial < 128 and sim.RowsVisited("test") >= 128,
 			"world processes work through the map in slices (%d rows, then %d)" % [partial, sim.RowsVisited("test")])
+	sim.queue_free()
+
+
+## A living world (plants and the simulation) for the 0.2 tests.
+func make_sim(seed_text: String, size := 128) -> Array:
+	var w := make(seed_text, size)
+	var sim: Node2D = load("res://sim/Simulation.cs").new()
+	root.add_child(sim)
+	sim.Start(w, PackedStringArray(Biomes.NAMES))
+	var flora := Flora.place(w)
+	sim.LoadPlants(flora.id, flora.pos, flora.flip, flora.scale)
+	return [w, sim]
+
+
+## First land tile of biome `b` whose 5x5 neighbourhood is land and has no water nearby (or, with
+## `near_water`, a land tile right next to water).
+func find_tile(w: WorldData, b: int, near_water := false) -> Vector2i:
+	for y in range(3, w.height - 3):
+		for x in range(3, w.width - 3):
+			var i := w.index(x, y)
+			if w.is_water(i) or (b >= 0 and w.biome[i] != b):
+				continue
+			var water := 0
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					if w.is_water(w.index(x + dx, y + dy)):
+						water += 1
+			if (near_water and w.is_water(w.index(x + 1, y))) or (not near_water and water == 0):
+				return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+
+func test_life() -> void:
+	var made := make_sim("life")
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	for law in ["animal_spawn", "natural_disasters", "old_age"]:
+		sim.SetLaw(law, false)
+
+	# Grazing: a hungry cow on fresh grass eats it.
+	var g := find_tile(w, Biomes.GRASSLAND)
+	var cow: int = sim.SpawnAt("cow", g.x + 0.5, g.y + 0.5, false)
+	sim.SetNeeds(cow, 0.9, 0.0)
+	var grass_before: float = sim.GrassAt(g.x, g.y)
+	sim.RunSteps(90)
+	check(sim.UnitHunger(cow) < 0.6 and sim.GrassAt(g.x, g.y) < grass_before,
+			"a hungry grazer eats the grass of its tile (hunger %.2f, grass %.2f -> %.2f)" % [
+			sim.UnitHunger(cow), grass_before, sim.GrassAt(g.x, g.y)])
+
+	# Drinking: a thirsty animal by the water drinks.
+	var shore := find_tile(w, -1, true)
+	var deer: int = sim.SpawnAt("deer", shore.x + 0.5, shore.y + 0.5, false)
+	sim.SetNeeds(deer, 0.0, 0.9)
+	sim.RunSteps(90)
+	check(sim.UnitThirst(deer) < 0.2, "a thirsty animal by the water drinks (thirst %.2f)" % sim.UnitThirst(deer))
+
+	# Hunting: a hungry wolf catches the rabbit next to it.
+	var f := find_tile(w, Biomes.GRASSLAND)
+	var rabbit: int = sim.SpawnAt("rabbit", f.x + 0.5, f.y + 0.5, false)
+	var wolf: int = sim.SpawnAt("wolf", f.x + 1.5, f.y + 0.5, false)
+	sim.SetNeeds(wolf, 0.9, 0.0)
+	sim.SetNeeds(rabbit, 0.0, 0.0)
+	sim.RunSteps(30 * 15)
+	check(not sim.UnitAlive(rabbit) and sim.LifeStats()["Eaten"] >= 1 and sim.UnitHunger(wolf) < 0.5,
+			"a hungry predator hunts and eats smaller prey")
+
+	# Hunters only take prey of their size or smaller: a fox never catches a bear.
+	var b := find_tile(w, Biomes.FOREST)
+	if b.x < 0:
+		b = g
+	var bear: int = sim.SpawnAt("bear", b.x + 0.5, b.y + 0.5, false)
+	var fox: int = sim.SpawnAt("fox", b.x + 1.0, b.y + 0.5, false)
+	sim.SetNeeds(fox, 0.9, 0.0)
+	sim.SetNeeds(bear, 0.0, 0.0)
+	sim.RunSteps(30 * 5)
+	check(sim.UnitAlive(bear), "a small hunter does not catch a big animal")
+	sim.queue_free()
+
+	# Years later: births happen, populations stay within what their habitat feeds, and nature
+	# never brings monsters.
+	made = make_sim("years")
+	sim = made[1]
+	sim.SpawnNatural(120)
+	sim.RunSteps(30 * 60 * 4)  # 4 years
+	var stats: Dictionary = sim.LifeStats()
+	check(stats["births"] > 0 and sim.UnitCount() > 0, "animals breed (%d births in 4 years)" % stats["births"])
+	var within := true
+	for id in ["rabbit", "sheep", "wolf", "bear", "cow"]:
+		within = within and sim.PopulationOf(id) <= sim.CapacityOf(id) + 8
+	check(within, "populations stay within what their habitat can feed")
+	check(sim.CountUnnatural() == 0 and sim.CountOnWater() == 0, "nature brings no monsters, and no one walks on water")
+	check(stats["OldAge"] + stats["Hunger"] + stats["Thirst"] + stats["Eaten"] > 0,
+			"creatures die (old age, hunger, thirst, predators): %s" % [stats])
+	sim.queue_free()
+
+
+func test_nature() -> void:
+	var made := make_sim("nature")
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+
+	# Seasons turn through the year.
+	var seasons := {}
+	var coldest := 0.0
+	for k in 8:
+		seasons[sim.SeasonName()] = true
+		coldest = maxf(coldest, sim.Coldness())
+		sim.RunSteps(30 * 8)  # 8 s
+	check(seasons.size() == 4 and coldest > 0.9 and sim.Year() == 2,
+			"a year has four seasons and a cold winter (%s)" % [seasons.keys()])
+
+	# Fire: a forest set alight burns down and leaves ash; rocks never burn.
+	var forest := find_tile(w, Biomes.FOREST)
+	var lit: int = sim.Ignite(forest.x + 0.5, forest.y + 0.5, 3.0)
+	sim.RunSteps(30 * 6)
+	var after_fire: int = sim.PlantCount()
+	var ash := 0
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			if w.in_bounds(forest.x + dx, forest.y + dy):
+				ash = maxi(ash, sim.ScorchAt(forest.x + dx, forest.y + dy))
+	var burned: int = sim.LifeStats()["plants_burned"]
+	check(lit > 0 and burned >= lit and ash > 0,
+			"fire spreads through the forest and leaves ash (%d lit, %d burned down)" % [lit, burned])
+	var changes: PackedInt32Array = sim.TakeScorchChanges()
+	check(changes.size() > 0 and changes.size() % 2 == 0, "the map is told where the ground burned")
+	check(not sim.IsFlammable("plants/Rock") and not sim.IsFlammable("plants/Boulder") and sim.IsFlammable("trees/Oak"),
+			"rocks and boulders don't catch fire, trees do")
+
+	# A year later the ash is gone and plants grow back.
+	sim.RunSteps(30 * 60)
+	var ash_left := 0
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			if w.in_bounds(forest.x + dx, forest.y + dy):
+				ash_left = maxi(ash_left, sim.ScorchAt(forest.x + dx, forest.y + dy))
+	check(ash_left == 0 and sim.PlantCount() > after_fire,
+			"a year later the ash has faded and plants have grown back (%d plants)" % sim.PlantCount())
 	sim.queue_free()

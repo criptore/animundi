@@ -66,7 +66,7 @@ func set_world(w: WorldData) -> void:
 		data[i * 4] = w.level[i] * 255 / 4
 		data[i * 4 + 1] = patterns[w.biome[i]]
 		data[i * 4 + 2] = 255 if w.water[i] != WorldData.Water.LAND else 0
-		data[i * 4 + 3] = 255
+		data[i * 4 + 3] = 0  # ash left by fire (set_scorch)
 	_data = Image.create_from_data(w.width, w.height, false, Image.FORMAT_RGBA8, data)
 	_data_tex = ImageTexture.create_from_image(_data)
 	_material.set_shader_parameter("data", _data_tex)
@@ -82,6 +82,24 @@ func show_layer(layer_name: String) -> void:
 		_build_colors()
 
 
+## Ash left by fire: `pairs` is (tile, ash 0..255), ... as given by the simulation's
+## TakeScorchChanges. Only those texels of the data texture change.
+func set_scorch(pairs: PackedInt32Array) -> void:
+	if pairs.is_empty():
+		return
+	for k in range(0, pairs.size(), 2):
+		var i := pairs[k]
+		var c := _data.get_pixel(i % world.width, i / world.width)
+		c.a = pairs[k + 1] / 255.0
+		_data.set_pixel(i % world.width, i / world.width, c)
+	_data_tex.update(_data)
+
+
+## How wintry the map looks: 0 = no frost, 1 = midwinter (frost on the cold half of the world).
+func set_frost(amount: float) -> void:
+	_material.set_shader_parameter("frost", amount)
+
+
 ## Redraws the given tiles after the world changed there (terrain powers, growth, fire...).
 func update_tiles(indices: PackedInt32Array) -> void:
 	for i in indices:
@@ -89,7 +107,8 @@ func update_tiles(indices: PackedInt32Array) -> void:
 		var y := i / world.width
 		_colors.set_pixel(x, y, tile_color(i))
 		var d := _data_texel(i)
-		_data.set_pixel(x, y, Color8(d[0], d[1], d[2], d[3]))
+		var ash := _data.get_pixel(x, y).a
+		_data.set_pixel(x, y, Color(d[0] / 255.0, d[1] / 255.0, d[2] / 255.0, ash))
 	_color_tex.update(_colors)
 	_data_tex.update(_data)
 
