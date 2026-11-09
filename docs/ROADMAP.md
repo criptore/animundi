@@ -13,7 +13,7 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 - [x] Merge the design-doc and 0.1 pull requests
 
 ## 0.15 2D core
-- [ ] Map drawn as one texture (one pixel per tile, scaled up), biome and level colours, step edges, zoom-in patterns
+- [x] Map drawn as one texture (one pixel per tile, scaled up), biome and level colours, step edges, zoom-in patterns; 2D map camera (zoom toward the mouse, pan, stays on the map)
 - [ ] Sprites drawn in batches (MultiMesh2D), sorted by screen height, drawn shadows
 - [ ] Zoom-dependent detail: dots when zoomed out, full sprites when zoomed in
 - [ ] Animated water and wind sway, cheaply

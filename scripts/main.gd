@@ -1,161 +1,69 @@
-## Entry scene: generates a world and shows it in 3D, rendered at low resolution and scaled up
-## with sharp pixels (the "3D pixel art" look), with the map camera and the HUD.
-extends Node
+## Entry scene: generates a world and shows it as a flat 2D map (one texture, one texel per tile),
+## with the map camera and the HUD.
+extends Node2D
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const WorldGenerator = preload("res://scripts/world/world_generator.gd")
 const WorldData = preload("res://scripts/world/world_data.gd")
 const Biomes = preload("res://scripts/world/biomes.gd")
-const MapRenderer = preload("res://scripts/render/map_renderer.gd")
-const TerrainBuilder = preload("res://scripts/render3d/terrain_builder.gd")
-const VegetationBuilder = preload("res://scripts/render3d/vegetation_builder.gd")
-const PixelCamera = preload("res://scripts/ui/pixel_camera.gd")
-const SceneStyle = preload("res://scripts/render3d/scene_style.gd")
+const WorldMap = preload("res://scripts/render2d/world_map.gd")
+const MapCamera = preload("res://scripts/ui/map_camera.gd")
 const Hud = preload("res://scripts/ui/hud.gd")
 
-## Render layers hidden from the reflection camera: water surfaces and the stylizer pass.
-const WATER_LAYER := 2
-const STYLIZER_LAYER := 4
+const LEVEL_NAMES := ["deep sea", "shallow water", "plain", "hill", "mountain"]
 
 var settings := WorldSettings.new()
 var world: WorldData
-var renderer := MapRenderer.new()
 var current_layer := "Biomes"
-## Size of one render pixel on screen.
-var pixel_scale := 3
 
-var _heights := PackedFloat32Array()
-var _container := SubViewportContainer.new()
-var _viewport := SubViewport.new()
-var _terrain := MeshInstance3D.new()
-var _ocean := MeshInstance3D.new()
-var _vegetation := Node3D.new()
-var _camera := PixelCamera.new()
-## Renders the scene mirrored under the water plane, for water reflections.
-var _reflection := SubViewport.new()
-var _reflection_camera := Camera3D.new()
-## Leo Peltola's pixel-art outline & highlight pass, on a quad in front of the camera.
-var _stylizer: MeshInstance3D
-var _grass := MultiMeshInstance3D.new()
+var _map := WorldMap.new()
+var _camera := MapCamera.new()
 var _hud := Hud.new()
-var _style := SceneStyle.new()
 var _dragging := false
-## Grass and flower layers, hidden when zoomed out (see GROUND_COVER_MAX_PIXEL).
-var _ground_cover: Array[Node3D] = []
-
-## Ground cover shows only when a render pixel covers less ground than this.
-const GROUND_COVER_MAX_PIXEL := 0.06
 
 
 func _ready() -> void:
-	_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_container.stretch = true
-	_container.stretch_shrink = pixel_scale
-	_container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_container)
-	_viewport.msaa_3d = Viewport.MSAA_DISABLED
-	_container.add_child(_viewport)
-
-	_style.add_lighting(_viewport)
-	_terrain.material_override = _style.terrain
-	_ocean.material_override = _style.water
-	_ocean.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for node in [_terrain, _ocean, _vegetation, _camera]:
-		_viewport.add_child(node)
-	_camera.current = true
-	_stylizer = _style.add_stylizer(_camera, STYLIZER_LAYER)
-	_grass.material_override = _style.grass
-	_grass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_vegetation.add_child(_grass)
-
-	# Reflections: a camera mirrored under the water plane renders the same world (water itself
-	# excluded through its render layer) into a transparent texture the water shader reads.
-	_ocean.layers = WATER_LAYER
-	_reflection.transparent_bg = true
-	_reflection.msaa_3d = Viewport.MSAA_DISABLED
-	_reflection.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_viewport.add_child(_reflection)
-	_reflection_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	_reflection_camera.cull_mask = 0xFFFFF & ~WATER_LAYER & ~STYLIZER_LAYER
-	_reflection_camera.current = true
-	_reflection.add_child(_reflection_camera)
-	_style.water.set_shader_parameter("reflection", _reflection.get_texture())
-	_style.water.set_shader_parameter("has_reflection", true)
-
+	RenderingServer.set_default_clear_color(Biomes.COLORS[Biomes.DEEP_WATER].darkened(0.4))
+	add_child(_map)
+	add_child(_camera)
+	_camera.make_current()
 	_hud.settings = settings
 	_hud.generate_requested.connect(generate)
 	_hud.layer_selected.connect(show_layer)
-	_hud.pixel_scale_changed.connect(set_pixel_scale)
-	_hud.effects_toggled.connect(func(on): _stylizer.visible = on)
 	add_child(_hud)
 	generate()
 
 
 func generate() -> void:
 	world = WorldGenerator.generate(settings)
-	_heights = TerrainBuilder.heights(world)
-	_style.water.set_shader_parameter("heightmap", TerrainBuilder.heightmap_texture(world, _heights))
-	_style.water.set_shader_parameter("map_size", Vector2(world.width, world.height))
-
-	var ocean := PlaneMesh.new()
-	ocean.size = Vector2(world.width, world.height) * 4.0
-	_ocean.mesh = ocean
-	_ocean.position = Vector3(world.width / 2.0, 0.0, world.height / 2.0)
-
-	for child in _vegetation.get_children():
-		if child != _grass:
-			child.queue_free()
-	_grass.multimesh = VegetationBuilder.build_grass(world, _heights)
-	var plants := VegetationBuilder.build(world, _heights)
-	_ground_cover.clear()
-	for id in plants:
-		var cover := VegetationBuilder.is_ground_cover(id)
-		var node := _style.add_sprites(_vegetation, id, plants[id], not cover)
-		if cover:
-			_ground_cover.append(node)
-
-	show_layer(current_layer)
-	_camera.frame(Vector3(world.width / 2.0, 0.0, world.height / 2.0), world.height * 0.8)
+	_map.set_world(world)
+	_map.show_layer(current_layer)
+	_camera.bounds = _map.pixel_size()
+	_camera.frame_all()
 	_hud.set_stats(world)
 
 
 func show_layer(layer: String) -> void:
 	current_layer = layer
-	_terrain.mesh = TerrainBuilder.build_terrain(world, _heights, layer, renderer)
-	_vegetation.visible = layer == "Biomes"
-
-
-func set_pixel_scale(value: int) -> void:
-	pixel_scale = value
-	_container.stretch_shrink = value
-	_camera.apply()
+	_map.show_layer(layer)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_camera.zoom_by(PixelCamera.ZOOM_STEP)
+			_camera.zoom_at(MapCamera.ZOOM_STEP, mb.position)
 		elif mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_camera.zoom_by(1.0 / PixelCamera.ZOOM_STEP)
+			_camera.zoom_at(1.0 / MapCamera.ZOOM_STEP, mb.position)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT or mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_dragging = mb.pressed
 	elif event is InputEventMouseMotion and _dragging:
-		_camera.pan_screen((event as InputEventMouseMotion).relative, get_viewport().get_visible_rect().size.y)
+		_camera.pan_screen((event as InputEventMouseMotion).relative)
 
 
 func _process(_delta: float) -> void:
 	if world == null:
 		return
-	_update_reflection()
-	var view := _viewport.size
-	_style.update_stylizer(_stylizer, _camera, float(view.x) / maxf(view.y, 1.0))
-	var close := _camera.world_per_pixel() < GROUND_COVER_MAX_PIXEL
-	for node in _ground_cover:
-		node.visible = close
-	_grass.visible = close
-	_update_display()
 	var tile := pick_tile(get_viewport().get_mouse_position())
 	if tile.x < 0:
 		_hud.set_hover_text("")
@@ -163,50 +71,11 @@ func _process(_delta: float) -> void:
 	var i := world.index(tile.x, tile.y)
 	var height_text := "%d m" % roundi(world.land_height(i) * 4000.0) if not world.is_water(i) \
 			else "-%d m" % roundi(maxf(world.sea_depth(i), 0.0) * 6000.0)
-	_hud.set_hover_text("(%d, %d)  %s  ·  height %s  ·  %d °C  ·  humidity %d%%" % [
-		tile.x, tile.y, Biomes.NAMES[world.biome[i]], height_text,
+	_hud.set_hover_text("(%d, %d)  %s  ·  %s  ·  height %s  ·  %d °C  ·  humidity %d%%" % [
+		tile.x, tile.y, Biomes.NAMES[world.biome[i]], LEVEL_NAMES[world.level[i]], height_text,
 		roundi(lerpf(-30.0, 45.0, world.temperature[i])), roundi(world.humidity[i] * 100.0)])
 
 
-## Shows the upscaled render one render pixel larger than the window on every side, shifted by the
-## camera's sub-pixel error, so the snapped render pans smoothly.
-func _update_display() -> void:
-	var pad := float(pixel_scale)
-	var shift := _camera.texel_error * pixel_scale
-	_container.offset_left = -pad + shift.x
-	_container.offset_top = -pad + shift.y
-	_container.offset_right = pad + shift.x
-	_container.offset_bottom = pad + shift.y
-
-
-## Keeps the reflection camera the mirror image of the game camera across the water plane (y = 0).
-func _update_reflection() -> void:
-	if _reflection.size != _viewport.size:
-		_reflection.size = _viewport.size
-	var p := _camera.global_position
-	_reflection_camera.global_transform = Transform3D(
-			Basis.from_euler(Vector3(deg_to_rad(-PixelCamera.PITCH), deg_to_rad(PixelCamera.YAW), 0.0)),
-			Vector3(p.x, -p.y, p.z))
-	_reflection_camera.size = _camera.size
-	_reflection_camera.h_offset = _camera.h_offset
-	_reflection_camera.v_offset = -_camera.v_offset
-	_reflection_camera.near = _camera.near
-	_reflection_camera.far = _camera.far
-
-
-## Tile under a screen position, or (-1, -1): walks the camera ray until it goes under the ground.
+## Tile under a screen position, or (-1, -1).
 func pick_tile(screen_pos: Vector2) -> Vector2i:
-	var p := (screen_pos - _container.position) / float(pixel_scale)
-	var origin := _camera.project_ray_origin(p)
-	var dir := _camera.project_ray_normal(p)
-	if dir.y >= -0.01:
-		return Vector2i(-1, -1)
-	var t := (origin.y - TerrainBuilder.TOP - 0.5) / -dir.y
-	var t_end := (origin.y - TerrainBuilder.BOTTOM + 0.5) / -dir.y
-	while t < t_end:
-		var q := origin + dir * t
-		var inside := q.x >= 0.0 and q.z >= 0.0 and q.x <= world.width - 1 and q.z <= world.height - 1
-		if inside and q.y <= maxf(TerrainBuilder.sample(world, _heights, q.x, q.z), 0.0):
-			return Vector2i(roundi(q.x), roundi(q.z))
-		t += 0.1
-	return Vector2i(-1, -1)
+	return _map.tile_at(_camera.screen_to_world(screen_pos))
