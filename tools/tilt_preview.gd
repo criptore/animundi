@@ -1,11 +1,12 @@
-## Opens the game in the tilt view (scripts/render_tilt/tilt_view.gd), over a village.
+## Opens the game over a village, to look at its tilt view (scripts/render_tilt/tilt_view.gd, the
+## game's own: main.set_tilt) and measure it against the flat map.
 ##   godot [--disable-vsync] --path . --script res://tools/tilt_preview.gd -- <mode> [out] [seed] [years] [size] [hour] [distance] [animals] [effects]
 ## `mode`:
 ## - "shot": saves <out>_tilt.png and <out>_flat.png, the same village in both views;
 ## - "perf": prints, for both views, the frame time and the CPU and GPU render time averaged
 ##   over 300 frames, and the draw calls (pass --disable-vsync for a true frame time);
 ##   "perf-flat-first" measures the flat view first;
-## - "play": stays open. Wheel: zoom, drag or WASD: move, T: next hour, V: flat or tilt view,
+## - "play": stays open, the game as it is played (V: flat or tilt view, T: next hour), plus
 ##   B: effects on or off.
 ## `out`: path without extension (default user://tilt). `years`: how long the world runs first
 ## (default 3). `size`: world size in tiles (default 256). `hour`: 0 dawn, 0.3 noon, 0.8 dusk,
@@ -74,11 +75,10 @@ func _start() -> void:
 		var v: Dictionary = _main._sim.VillageTable()[0]
 		_village = Vector2(v.x + 0.5, v.y + 0.5)
 	var started := Time.get_ticks_msec()
-	_view = TiltView.new()
-	_view.time_of_day = _hour
+	_view = _main._tilt
 	_view.effects = _effects
-	_main.add_child(_view)
-	_view.setup(_main)
+	_view.set_time(_hour)
+	_main.set_tilt(true)
 	_view.camera.look_at_tile(_village, _distance)
 	print("tilt view built in %d ms: %d units, %d plants, %d villages on a %d² world" % [
 		Time.get_ticks_msec() - started, _main._sim.UnitCount(), _main._sim.PlantCount(), _main._sim.VillageCount(), world.width])
@@ -89,7 +89,7 @@ func _start() -> void:
 
 ## The flat view of the same place, covering the same height of the world.
 func _show_flat() -> void:
-	_view.set_enabled(false)
+	_main.set_tilt(false)
 	var zoom: float = root.get_visible_rect().size.y / (_view.camera.view_height() * WorldMap.TILE)
 	_main._camera.look_at_point(_village * WorldMap.TILE, zoom)
 
@@ -164,7 +164,7 @@ func _perf() -> bool:
 		if _view.enabled:
 			_show_flat()
 		else:
-			_view.set_enabled(true)
+			_main.set_tilt(true)
 	return false
 
 
@@ -172,18 +172,5 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if _mode != "play" or _view == null or key == null or not key.pressed or key.echo:
 		return
-	match key.keycode:
-		KEY_T:
-			var hours := [0.0, 0.3, 0.58, 0.8, 1.0]
-			var next := 0
-			for i in hours.size():
-				if hours[i] <= _view.time_of_day + 0.01:
-					next = (i + 1) % hours.size()
-			print("hour: ", _view.set_time(hours[next]))
-		KEY_V:
-			if _view.enabled:
-				_show_flat()
-			else:
-				_view.set_enabled(true)
-		KEY_B:
-			_view.effects = not _view.effects
+	if key.keycode == KEY_B:
+		_view.effects = not _view.effects

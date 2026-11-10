@@ -10,10 +10,11 @@ const PITCH_FAR := 90.0
 const RISE_FROM := 40.0
 const RISE_TO := 170.0
 const MIN_DISTANCE := 12.0
-const MAX_DISTANCE := 900.0
 const ZOOM_STEP := 1.12
 ## Pan speed with the keys, in screen heights per second.
 const PAN_SPEED := 0.9
+## Share of a screen height moved per notch of a horizontal wheel.
+const WHEEL_PAN := 0.08
 
 ## Ground point at the centre of the view, in tiles (x, y of the map).
 var target := Vector2.ZERO
@@ -62,10 +63,26 @@ func view_height() -> float:
 	return 2.0 * distance * tan(deg_to_rad(FOV) / 2.0)
 
 
+## Distance from which the height of the screen covers `tiles` at the target.
+func distance_for(tiles: float) -> float:
+	return tiles / (2.0 * tan(deg_to_rad(FOV) / 2.0))
+
+
+## Furthest distance: the whole map fits in the view, with a margin.
+func max_distance() -> float:
+	var view := get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1280, 720)
+	return maxf(distance_for(maxf(bounds.y, bounds.x * view.y / maxf(view.x, 1.0)) / 0.9), RISE_TO)
+
+
 func look_at_tile(point: Vector2, dist: float) -> void:
 	target = point
-	distance = clampf(dist, MIN_DISTANCE, MAX_DISTANCE)
+	distance = clampf(dist, MIN_DISTANCE, max_distance())
 	apply()
+
+
+## Shows the whole map, from straight above.
+func frame_all() -> void:
+	look_at_tile(bounds / 2.0, max_distance())
 
 
 func apply() -> void:
@@ -87,19 +104,33 @@ func ground_at(screen_pos: Vector2) -> Vector2:
 	return Vector2(hit.x, hit.z)
 
 
-## Wheel and pinch zoom toward the pointer, drag to pan. Returns whether the event was used.
+## Wheel, pinch and + / - zoom toward the pointer; dragging with any mouse button, a two-finger
+## scroll or a horizontal wheel pans (the same gestures as the flat map's camera, ui/map_camera.gd).
+## Returns whether the event was used.
 func handle_input(event: InputEvent) -> bool:
 	var button := event as InputEventMouseButton
 	if button != null:
-		if button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			if button.pressed:
-				_zoom(1.0 / ZOOM_STEP if button.button_index == MOUSE_BUTTON_WHEEL_UP else ZOOM_STEP, button.position)
-			return true
-		if button.button_index == MOUSE_BUTTON_LEFT or button.button_index == MOUSE_BUTTON_MIDDLE:
-			_dragging = button.pressed
-			return false
+		# Trackpads send fractions of a notch in `factor` (0 when the platform doesn't say).
+		var notches := button.factor if button.factor > 0.0 else 1.0
+		match button.button_index:
+			MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
+				if button.pressed:
+					_zoom(pow(ZOOM_STEP, -notches if button.button_index == MOUSE_BUTTON_WHEEL_UP else notches), button.position)
+				return true
+			MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT:
+				if button.pressed:
+					target.x += (-1.0 if button.button_index == MOUSE_BUTTON_WHEEL_LEFT else 1.0) * notches * WHEEL_PAN * view_height()
+					apply()
+				return true
+			MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE:
+				_dragging = button.pressed
+				return true
 	var motion := event as InputEventMouseMotion
 	if motion != null and _dragging:
+		# The button was let go over the interface: the drag is over.
+		if motion.button_mask == 0:
+			_dragging = false
+			return false
 		target -= ground_at(motion.position) - ground_at(motion.position - motion.relative)
 		apply()
 		return true
@@ -112,20 +143,30 @@ func handle_input(event: InputEvent) -> bool:
 		target += pan.delta * view_height() * 0.02
 		apply()
 		return true
+	var key := event as InputEventKey
+	if key != null and key.pressed:
+		var centre := get_viewport().get_visible_rect().size / 2.0
+		if key.keycode in [KEY_EQUAL, KEY_PLUS, KEY_KP_ADD]:
+			_zoom(1.0 / ZOOM_STEP, centre)
+			return true
+		if key.keycode in [KEY_MINUS, KEY_KP_SUBTRACT]:
+			_zoom(ZOOM_STEP, centre)
+			return true
 	return false
 
 
+## WASD (wherever those keys sit on the keyboard) and the arrows pan.
 func _process(delta: float) -> void:
-	if not current:
+	if not current or not is_visible_in_tree():
 		return
 	var move := Vector2.ZERO
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
 		move.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
 		move.x += 1.0
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
 		move.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
 		move.y += 1.0
 	if move != Vector2.ZERO:
 		target += move * view_height() * PAN_SPEED * delta
@@ -134,7 +175,7 @@ func _process(delta: float) -> void:
 
 func _zoom(factor: float, toward: Vector2) -> void:
 	var before := ground_at(toward)
-	distance = clampf(distance * factor, MIN_DISTANCE, MAX_DISTANCE)
+	distance = clampf(distance * factor, MIN_DISTANCE, max_distance())
 	apply()
 	target += before - ground_at(toward)
 	apply()

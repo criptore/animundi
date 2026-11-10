@@ -12,6 +12,7 @@ var _failures := 0
 func _initialize() -> void:
 	test_heights()
 	test_areas()
+	test_ray_hit()
 	print("%d failed" % _failures)
 	quit(_failures)
 
@@ -88,3 +89,28 @@ func test_areas() -> void:
 				expected += maxf(0.0, here - there)
 	check(absf(wall - expected) < 0.01, "walls match the drops: %f against %f" % [wall, expected])
 	check(TiltTerrain.build(w).size() == 6, "build returns one mesh per chunk")
+
+
+## What the mouse points at: the ground under a ray, high ground and cliffs included.
+func test_ray_hit() -> void:
+	var w := WorldData.new(8, 8, 1)
+	for i in w.size():
+		w.level[i] = WorldData.Level.PLAIN
+	w.level[w.index(4, 4)] = WorldData.Level.MOUNTAIN
+	var h := TiltTerrain.heights(w)
+	var down := TiltTerrain.ray_hit(h, 8, 8, Vector3(2.5, 30, 2.5), Vector3.DOWN)
+	check(down.is_equal_approx(Vector2(2.5, 2.5)), "a ray straight down hits the ground under it, got %s" % down)
+	# A camera to the south, looking north and down at 45 degrees.
+	var dir := Vector3(0, -1, -1).normalized()
+	var plain := TiltTerrain.ray_hit(h, 8, 8, Vector3(2.5, 10, 12.5), dir)
+	check(plain.distance_to(Vector2(2.5, 2.5)) < 0.06, "on the plain the ray lands where it meets height 0, got %s" % plain)
+	# Aimed at the plain behind the mountain: the mountain is in the way.
+	var blocked := TiltTerrain.ray_hit(h, 8, 8, Vector3(4.5, 10, 13.5), dir)
+	check(Vector2i(blocked.floor()) == Vector2i(4, 4), "a mountain in the way is what the ray hits, got %s" % blocked)
+	# Aimed at the mountain's top from above it.
+	var top := TiltTerrain.ray_hit(h, 8, 8, Vector3(4.5, 11.5, 14.5), dir)
+	check(Vector2i(top.floor()) == Vector2i(4, 4), "the top of a mountain is hit at its own tile, got %s" % top)
+	var outside := TiltTerrain.ray_hit(h, 8, 8, Vector3(-5.5, 30, 2.5), Vector3.DOWN)
+	check(outside.is_equal_approx(Vector2(-5.5, 2.5)), "outside the map the ray reaches the sea, got %s" % outside)
+	var up := TiltTerrain.ray_hit(h, 8, 8, Vector3(1.5, 3, 1.5), Vector3.UP)
+	check(up.is_equal_approx(Vector2(1.5, 1.5)), "a ray going up gives the point under its start, got %s" % up)
