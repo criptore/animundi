@@ -35,7 +35,7 @@ TIMELINE = [
     ("shot", "dragons", 4.0, 0, "", "cut"),
     ("shot", "war", 5.0, 20, "Les royaumes complotent et se font la guerre", "black"),
     ("shot", "dawn", 5.5, 0, "...et l'histoire s'écrit toute seule", "cut"),
-    ("shot", "interface", 5.0, 20, "Animundi · en développement", "black"),
+    ("shot", "interface", 4.0, 55, "", "black"),
     ("card", "end", 6.0, 0, "", "black"),
 ]
 
@@ -86,12 +86,11 @@ def segment(i, item, shots, work, fonts, prev_out):
     if kind == "shot":
         src = os.path.join(shots, name, "f%08d.png")
         # The first frames of a shot are the game opening, before the scene is set.
-        filters = [
-            f"scale={W}:{H}:flags=lanczos",
-            GRADE.get(name, "eq=contrast=1.06:saturation=1.08"),
-            f"drawbox=x=0:y=0:w=iw:h={BARS}:color=black:t=fill",
-            f"drawbox=x=0:y=ih-{BARS}:w=iw:h={BARS}:color=black:t=fill",
-        ]
+        filters = [f"scale={W}:{H}:flags=lanczos", GRADE.get(name, "eq=contrast=1.06:saturation=1.08")]
+        # Letterbox, except over the interface (it would hide its bars).
+        if name != "interface":
+            filters += [f"drawbox=x=0:y=0:w=iw:h={BARS}:color=black:t=fill",
+                        f"drawbox=x=0:y=ih-{BARS}:w=iw:h={BARS}:color=black:t=fill"]
         filters += text_filter(text, dur, title, 64, f"h-{BARS}-text_h-40")
         if prev_out == "white":
             filters.append("fade=in:st=0:d=0.25:color=white")
@@ -112,7 +111,8 @@ def segment(i, item, shots, work, fonts, prev_out):
               f"[0:v][e]overlay=(W-w)/2:H/2-340,"
               + ",".join(text_filter("ANIMUNDI", dur, big, 230, "h/2-60", start=0.15, fade=0.3)
                          + text_filter("l'âme du monde", dur, title, 58, "h/2+150", start=0.9, fade=0.6)
-                         + text_filter("Un god game en pixel art où chaque peuple a sa propre IA", dur, title, 40, "h/2+230", start=1.6, fade=0.6)))
+                         + text_filter("Un god game en pixel art où chaque peuple a sa propre IA", dur, title, 40, "h/2+230", start=1.6, fade=0.6)
+                         + text_filter("En développement", dur, title, 40, "h/2+300", start=2.2, fade=0.6)))
     else:
         fc = "[0:v]" + ",".join(text_filter(text, dur, big, 120, "(h-text_h)/2", start=0.25, fade=0.35))
     fc += "," + ",".join(transitions(dur, out, fade_in) or ["null"]) + "[v]"

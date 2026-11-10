@@ -67,10 +67,6 @@ func _initialize() -> void:
 	_rng.seed = hash(_shot)
 	_main = load("res://scenes/main.tscn").instantiate()
 	_main.settings.seed_text = args[1] if args.size() > 1 else "anima"
-	# The interface at the size it has in a 1280×720 window (the other shots hide it, and keep
-	# the 3D view at the full resolution).
-	if _cfg.get("hud", false):
-		root.content_scale_factor = root.size.y / 720.0
 	root.add_child(_main)
 	var layer := CanvasLayer.new()
 	layer.layer = 50
@@ -101,6 +97,10 @@ func _start() -> void:
 	_main.start_peoples(PackedStringArray(PEOPLES), 12)
 	sim.RunSteps(int(_cfg.years * 60.0 * 30.0))
 	_main._hud.visible = _cfg.get("hud", false)
+	# The interface at the size it has in a 1280×720 window (the other shots hide it, and keep
+	# the 3D view at the full resolution). The window has its size only once the game runs.
+	if _cfg.get("hud", false):
+		root.content_scale_factor = root.size.y / 720.0
 	_focus = _pick_village(_cfg.get("people", ""), _cfg.get("water", false))
 	if _cfg.get("action", "") == "war":
 		var kingdoms: Array = sim.KingdomTable()
