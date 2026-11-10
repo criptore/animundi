@@ -103,6 +103,21 @@ The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.c
 - **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands.
 - **Inspector**: click a creature or a village to keep its card on screen. **Laws**: switch the rules of the world on and off.
 
+### The interface
+
+![The title screen](docs/images/interface_title.png)
+
+The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a thick ink outline, bone-white text, crimson and gold, in the mood of Cult of the Lamb, around pixel-art icons and a tabbed bar of powers as in WorldBox. The 81 icons are drawn by `art/ui_icons.py`; creatures, peoples and biomes show their own sprites. The font is Jersey (OFL, `assets/fonts/`).
+
+- **Title screen**, then the **world setup** on the left of the map: the land (seed, size, continents, water, climate: the map is redrawn as you change them) and its peoples.
+- **Top bar**: menu, date and season, speed of time and "go to year", the world's numbers (people, villages, kingdoms, animals), laws, settings.
+- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, the chronicle and its filters.
+- **Powers bar**: tabs for terrain, creatures, peoples, nature, wrath and mercy, whispers; the chosen power and the brush beside them. **Inspector** card with a portrait, the village's stores and a button to follow with the camera. **Map layers** on the right.
+- **Windows**: laws of the world (grouped, one line each), settings (game, display, sound, controls), pause menu (Esc).
+- Buttons of features to come are there already, **locked**: more powers (terrain, disasters, miracles, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
+
+![The game](docs/images/interface_game.png)
+
 Next: 0.6 Culture (AI-shaped values, laws, religions and an AI-written chronicle). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
@@ -133,14 +148,15 @@ Controls:
 |---|---|
 | Zoom (toward the mouse) | mouse wheel, trackpad pinch, + / - keys |
 | Pan | drag with any mouse button (or click and drag on a trackpad), trackpad two-finger scroll, WASD, arrow keys |
-| New random world (then choose its peoples) | R or the **Random** button |
+| New random world (then choose its peoples) | R or the dice of the world setup |
 | Who is this creature? | hover it |
-| Add 1000 wandering animals (stress test) | U or the **+1000 animals** button |
-| Pause / resume, slower / faster time | Space, comma / period, or the ×1 ×2 ×5 ×10 buttons |
-| God powers | pick one in the bar at the bottom, then click the map (drag for fire, rain, smite, bless and the biome brush); Esc goes back to Inspect |
+| Add 1000 wandering animals (stress test) | U or the **+1000 animals** button of the Life book |
+| Pause / resume, slower / faster time | Space, comma / period, or the buttons of the top bar |
+| God powers | pick a tab then a power in the bar at the bottom, then click the map (drag for fire, rain, smite, bless and the biome brush); Esc goes back to Inspect |
+| Menu (the world pauses) | Esc while inspecting, or the button at the top left |
 | Brush size | [ and ], or the − and + buttons |
 | Follow a creature or a village | with Inspect, click it: its card stays on screen |
-| Laws of the world | the **Laws** menu of the powers bar |
+| Laws of the world | the scales in the top bar |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Tile info | hover the map (bottom bar) |
 
@@ -154,7 +170,8 @@ Type any word or number as the seed: the same seed and settings always give the 
 | `scripts/render2d/` | the world map (one texture, one texel per tile), the sprite atlas and sprite batches |
 | `scripts/render/` | 2D map renderer (preview tool) and data layer colours |
 | `scripts/render3d/` | retired 0.1 3D view (terrain, water, vegetation builders), still used by the asset sheet tool |
-| `scripts/ui/` | map camera, HUD, and the 0.1 pixel camera |
+| `scripts/ui/` | the interface: its look (`ui.gd`), title screen, world setup, HUD, powers bar, inspector, windows (laws, settings, pause); map camera, and the 0.1 pixel camera |
+| `assets/ui/`, `assets/fonts/` | interface icons and emblem (drawn by `art/ui_icons.py`), the Jersey fonts (OFL) |
 | `shaders/` | `map.gdshader` (ground patterns and step edges), `sprite_batch.gdshader` (atlas sprites); the others belong to the retired 3D view |
 | `sim/` | C# simulation core: world tiles, creatures and their needs (`Life.cs`), peoples and neurons (`Peoples.cs`), villages, buildings and territory (`Villages.cs`), jobs (`Jobs.cs`), kingdoms, diplomacy and rebellions (`Kingdoms.cs`), war (`War.cs`), trade (`Trade.cs`), inventions and minds (`Inventions.cs`, `Minds.cs`), languages (`Language.cs`), seasons, grass, plants and fire (`Nature.cs`), zones, scheduler, data records, drawing (`Draw.cs`) |
 | `data/` | content as data records: `species.json` (creatures and the biomes they are born in), `races.json` (the 12 peoples), `plants.json` (plants per biome), `biomes.json` (grass fertility, burn chance and time) |

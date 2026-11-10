@@ -43,6 +43,8 @@ var _whisper_from := -1
 ## What the inspector follows: a unit or a village, or -1.
 var _pinned_unit := -1
 var _pinned_village := -1
+## Whether the camera follows what the inspector shows.
+var _following := false
 ## People a settled village starts with.
 const SETTLERS := 10
 
@@ -66,10 +68,14 @@ func _ready() -> void:
 		_whisper_from = -1
 		_stroking = false
 		_hud.notice(_hud.powers.hint(), 4.0))
-	_hud.powers.law_toggled.connect(func(law, on): _sim.SetLaw(law, on))
+	_hud.laws.law_toggled.connect(func(law, on): _sim.SetLaw(law, on))
 	_hud.inspector.closed.connect(func():
 		_pinned_unit = -1
-		_pinned_village = -1)
+		_pinned_village = -1
+		_following = false)
+	_hud.inspector.follow_toggled.connect(func(on): _following = on)
+	_hud.focus_requested.connect(func(tile):
+		_camera.look_at_point((tile + Vector2(0.5, 0.5)) * WorldMap.TILE, maxf(_camera.zoom.x, 2.0)))
 	generate()
 
 
@@ -88,7 +94,7 @@ func generate() -> void:
 	_hud.inspector.close()
 	_whisper_from = -1
 	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes())
-	_hud.powers.set_laws(_sim.LawTable())
+	_hud.laws.set_laws(_sim.LawTable())
 	# The world waits while the player chooses its peoples.
 	_sim.SetTimeScale(0.0)
 	_hud.show_setup()
@@ -112,7 +118,7 @@ func show_layer(layer: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if world != null and not _hud.setup_visible() and _power_input(event):
+	if world != null and not _hud.blocking() and _power_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	if _camera.handle_input(event):
@@ -205,6 +211,7 @@ func _whisper(kind: String, kingdom: int) -> void:
 ## Pins the creature under a screen position in the inspector, else the village owning the land.
 func _inspect(screen_pos: Vector2) -> void:
 	var at := _camera.screen_to_world(screen_pos) / WorldMap.TILE
+	_following = false
 	_pinned_unit = _sim.UnitAt(at.x, at.y, 0.9)
 	_pinned_village = _sim.VillageAt(at.x, at.y) if _pinned_unit < 0 else -1
 	if _pinned_unit < 0 and _pinned_village < 0:
@@ -240,7 +247,7 @@ func _process(_delta: float) -> void:
 		_map.update_tiles(tiles)
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
-	_brush.visible = _hud.powers.power != "inspect" and not _hud.setup_visible()
+	_brush.visible = _hud.powers.power != "inspect" and not _hud.blocking()
 	_brush.position = _camera.screen_to_world(pointer)
 	_brush.zoom = _camera.zoom.x
 	_brush.radius = (_hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor"] else 0.6) * WorldMap.TILE
@@ -262,6 +269,9 @@ func _process(_delta: float) -> void:
 				_going = false
 				_hud.show_speed(speed)
 			_hud.set_time("Year %d · %s%s" % [_sim.Year(), _sim.SeasonName(), "  (paused)" if speed == 0.0 else ""])
+		_hud.set_season(_sim.Season())
+		var people: int = _sim.PeopleCount()
+		_hud.set_counts(people, _sim.VillageCount(), _sim.KingdomCount(), _sim.UnitCount() - people)
 		_hud.set_sprite_count(_sim.PlantCount())
 		_hud.set_populations(_sim.PopulationTable())
 		_hud.set_villages(_sim.VillageTable())
@@ -270,6 +280,14 @@ func _process(_delta: float) -> void:
 		_hud.set_inventions(_sim.InventionTable())
 		_hud.set_mind(_sim.MindStatus())
 		_refresh_inspector()
+	# The camera stays on the creature or the village the player follows.
+	if _following:
+		if _pinned_unit >= 0 and _sim.UnitAlive(_pinned_unit):
+			_camera.look_at_point(_sim.UnitPosition(_pinned_unit) * WorldMap.TILE, _camera.zoom.x)
+		elif _pinned_village >= 0:
+			var followed: Dictionary = _sim.VillageInfo(_pinned_village)
+			if not followed.is_empty():
+				_camera.look_at_point(Vector2(followed.x + 0.5, followed.y + 0.5) * WorldMap.TILE, _camera.zoom.x)
 	_update_map_labels()
 	var mouse := get_viewport().get_mouse_position()
 	# A creature under the mouse: who it is.
