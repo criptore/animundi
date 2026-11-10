@@ -193,22 +193,50 @@ public static class LocalModel
 				parts.Add($"\"\\\"{w}\\\"\"");
 			return string.Join(" | ", parts);
 		}
-		var jobs = new List<string>(Simulation.WorkJobs) { "" };
-		return string.Join("\n", new[]
+		// A whole number from 1 to max (max under 100): an effect's amount within its cap.
+		static string UpTo(int max)
 		{
-			"root ::= \"{\" ws \"\\\"name\\\":\" ws name \",\" ws \"\\\"kind\\\":\" ws kind \",\" ws \"\\\"improves\\\":\" ws text \",\" ws \"\\\"description\\\":\" ws text \",\" ws \"\\\"cost\\\":\" ws cost \",\" ws \"\\\"effects\\\":\" ws effects \",\" ws \"\\\"sprite\\\":\" ws int ws \"}\"",
+			var parts = new List<string> { "[1-9]" };
+			int tens = max / 10, units = max % 10;
+			if (tens >= 2)
+				parts.Add($"[1-{tens - 1}] [0-9]");
+			if (tens >= 1)
+				parts.Add($"\"{tens}\" [0-{units}]");
+			return string.Join(" | ", parts);
+		}
+		// GBNF rule names allow letters, digits and hyphens only.
+		static string Rule(string word) => word.Replace('_', '-');
+		var lines = new List<string>();
+		// One record per kind: each kind lists only the effects it may have.
+		var records = new List<string>();
+		foreach (var kind in Simulation.InventionKinds)
+		{
+			records.Add("rec-" + kind);
+			lines.Add($"rec-{kind} ::= \"{{\" ws \"\\\"name\\\":\" ws name \",\" ws \"\\\"kind\\\":\" ws \"\\\"{kind}\\\"\" \",\" ws \"\\\"improves\\\":\" ws text \",\" ws \"\\\"description\\\":\" ws text \",\" ws \"\\\"cost\\\":\" ws cost \",\" ws \"\\\"effects\\\":\" ws \"[\" ws eff-{kind} (ws \",\" ws eff-{kind}){{0,2}} ws \"]\" \",\" ws \"\\\"sprite\\\":\" ws sprite ws \"}}\"");
+			var allowed = new List<string>();
+			foreach (var (name, block) in Simulation.EffectBlocks)
+				if (Array.IndexOf(block.kinds, kind) >= 0)
+					allowed.Add("do-" + Rule(name));
+			lines.Add($"eff-{kind} ::= {string.Join(" | ", allowed)}");
+		}
+		// Work effects (work_speed, yield) always name a job; the others never do.
+		foreach (var (name, block) in Simulation.EffectBlocks)
+			lines.Add($"do-{Rule(name)} ::= \"{{\" ws \"\\\"do\\\":\" ws \"\\\"{name}\\\"\" \",\" ws "
+				+ (block.job ? "\"\\\"job\\\":\" ws job \",\" ws " : "")
+				+ $"\"\\\"amount\\\":\" ws ({UpTo((int)block.max)}) ws \"}}\"");
+		lines.InsertRange(0, new[]
+		{
+			$"root ::= {string.Join(" | ", records)}",
 			"name ::= \"\\\"\" [A-Z] [a-zA-Z' -]{1,26} \"\\\"\"",
 			"text ::= \"\\\"\" [a-zA-Z0-9 ,.'!?-]{0,60} \"\\\"\"",
-			$"kind ::= {Alt(Simulation.InventionKinds)}",
 			"cost ::= \"{\" ws \"\\\"wood\\\":\" ws num \",\" ws \"\\\"stone\\\":\" ws num \",\" ws \"\\\"metal\\\":\" ws num \",\" ws \"\\\"gold\\\":\" ws num ws \"}\"",
-			"effects ::= \"[\" ws effect (ws \",\" ws effect){0,2} ws \"]\"",
-			"effect ::= \"{\" ws \"\\\"do\\\":\" ws do \",\" ws \"\\\"job\\\":\" ws job \",\" ws \"\\\"amount\\\":\" ws num ws \"}\"",
-			$"do ::= {Alt(Simulation.EffectBlocks.Keys)}",
-			$"job ::= {Alt(jobs)}",
-			"num ::= [0-9] [0-9]? (\".\" [0-9])?",
-			"int ::= [0-9] [0-9]?",
+			$"job ::= {Alt(Simulation.WorkJobs)}",
+			// JSON numbers: no leading zero ("09" is not JSON).
+			"num ::= (\"0\" | [1-9] [0-9]?) (\".\" [0-9])?",
+			$"sprite ::= [0-9] | [1-2] [0-9] | \"3\" [0-{Simulation.InventionSprites - 31}]",
 			"ws ::= [ ]?",
-		}) + "\n";
+		});
+		return string.Join("\n", lines) + "\n";
 	}
 
 	private static bool _preloaded;
@@ -263,19 +291,38 @@ public static class LocalModel
 				continue;
 			try
 			{
-				foreach (var lib in new[] { "ggml-base", "ggml-cpu", "ggml-blas", "ggml-metal", "ggml", "llama" })
+				var handles = new Dictionary<string, IntPtr>();
+				foreach (var lib in new[] { "ggml-base", "ggml-cpu", "ggml-blas", "ggml-metal", "ggml", "llama", "mtmd" })
 				{
 					string path = Path.Combine(folder, prefix + lib + ext);
 					if (System.IO.File.Exists(path))
-						System.Runtime.InteropServices.NativeLibrary.Load(path);
+						handles[lib] = System.Runtime.InteropServices.NativeLibrary.Load(path);
 				}
 				NativeFolder = folder;
+				UseLoadedLibraries(handles);
 				return;
 			}
 			catch (Exception)
 			{
 				// This variant does not run here (an instruction set missing): try the next one.
 			}
+		}
+	}
+
+	/// <summary>Hands LLamaSharp the libraries loaded above. Its netstandard2.0 build (the one a
+	/// net8.0 game gets) sets no resolver: .NET then looks for "llama" next to the host, which is
+	/// Godot's executable, not the game's folder. On macOS the libraries loaded by path don't
+	/// satisfy that lookup either (their install names are libllama.0.dylib…), so it fails.</summary>
+	private static void UseLoadedLibraries(Dictionary<string, IntPtr> handles)
+	{
+		try
+		{
+			System.Runtime.InteropServices.NativeLibrary.SetDllImportResolver(typeof(LLama.Native.NativeApi).Assembly,
+				(name, _, _) => handles.TryGetValue(name, out var handle) ? handle : IntPtr.Zero);
+		}
+		catch (InvalidOperationException)
+		{
+			// LLamaSharp (a newer build) already set its own resolver: it finds the libraries itself.
 		}
 	}
 

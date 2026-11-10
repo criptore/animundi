@@ -76,6 +76,9 @@ public partial class Simulation
 	/// <summary>The grammar the built-in model samples under (tests, docs).</summary>
 	public string MindGrammar() => LocalModel.Grammar();
 
+	/// <summary>The JSON schema sent to model servers (tests).</summary>
+	public string MindSchema() => InventionSchema();
+
 	private void MindsStep()
 	{
 		for (int k = 0; k < Kingdoms.Count; k++)
@@ -312,14 +315,43 @@ public partial class Simulation
 		return sb.ToString();
 	}
 
-	/// <summary>The invention language as a JSON schema (forces the model's output).</summary>
-	public static string InventionSchema() => JsonSerializer.Serialize(new Dictionary<string, object>
+	/// <summary>The invention language as a JSON schema (forces the model's output): one branch
+	/// per kind, each allowing only that kind's effects, with a job for work effects.</summary>
+	public static string InventionSchema()
+	{
+		var branches = new List<object>();
+		foreach (var kind in InventionKinds)
+		{
+			var effects = new List<object>();
+			foreach (var (name, block) in EffectBlocks)
+			{
+				if (Array.IndexOf(block.kinds, kind) < 0)
+					continue;
+				var props = new Dictionary<string, object>
+				{
+					["do"] = new Dictionary<string, object> { ["enum"] = new[] { name } },
+					["amount"] = new Dictionary<string, object> { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = (int)block.max },
+				};
+				if (block.job)
+					props["job"] = new Dictionary<string, object> { ["enum"] = WorkJobs };
+				effects.Add(new Dictionary<string, object>
+				{
+					["type"] = "object", ["properties"] = props,
+					["required"] = block.job ? new[] { "do", "job", "amount" } : new[] { "do", "amount" },
+				});
+			}
+			branches.Add(KindSchema(kind, effects));
+		}
+		return JsonSerializer.Serialize(new Dictionary<string, object> { ["anyOf"] = branches });
+	}
+
+	private static Dictionary<string, object> KindSchema(string kind, List<object> effects) => new()
 	{
 		["type"] = "object",
 		["properties"] = new Dictionary<string, object>
 		{
 			["name"] = new Dictionary<string, object> { ["type"] = "string", ["minLength"] = 2, ["maxLength"] = 28 },
-			["kind"] = new Dictionary<string, object> { ["enum"] = InventionKinds },
+			["kind"] = new Dictionary<string, object> { ["enum"] = new[] { kind } },
 			["improves"] = new Dictionary<string, object> { ["type"] = "string" },
 			["description"] = new Dictionary<string, object> { ["type"] = "string", ["maxLength"] = 160 },
 			["cost"] = new Dictionary<string, object>
@@ -334,22 +366,12 @@ public partial class Simulation
 			["effects"] = new Dictionary<string, object>
 			{
 				["type"] = "array", ["minItems"] = 1, ["maxItems"] = 3,
-				["items"] = new Dictionary<string, object>
-				{
-					["type"] = "object",
-					["properties"] = new Dictionary<string, object>
-					{
-						["do"] = new Dictionary<string, object> { ["enum"] = new List<string>(EffectBlocks.Keys) },
-						["job"] = new Dictionary<string, object> { ["enum"] = new List<string>(WorkJobs) { "" } },
-						["amount"] = new Dictionary<string, object> { ["type"] = "number" },
-					},
-					["required"] = new[] { "do", "amount" },
-				},
+				["items"] = new Dictionary<string, object> { ["anyOf"] = effects },
 			},
 			["sprite"] = new Dictionary<string, object> { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = InventionSprites - 1 },
 		},
 		["required"] = new[] { "name", "kind", "cost", "effects" },
-	});
+	};
 
 	/// <summary>Sends the prompt to the local model in the background; the task's result is the
 	/// model's JSON answer.</summary>
