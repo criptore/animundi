@@ -52,6 +52,7 @@ func _initialize() -> void:
 	test_villages()
 	test_kingdoms()
 	test_inventions()
+	test_powers()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -1051,4 +1052,60 @@ func test_peoples() -> void:
 	check(family and people_ok, "children have a mother and a father; everyone has a name and a village")
 	check(sim.CountOnWater() == 0, "no one walks on water")
 	check(sim.UnitInfo(sim.UnitAt(w.width / 2.0, w.height / 2.0, 500.0)) != "", "the HUD can describe a creature")
+	sim.queue_free()
+
+
+## God powers (sim/Powers.cs): each one a call on the simulation with a place in tiles.
+func test_powers() -> void:
+	var made := make_sim("powers", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	var land := find_tile(w, Biomes.FOREST)
+	if land.x < 0:
+		land = find_tile(w, -1)
+	var x := land.x + 0.5
+	var y := land.y + 0.5
+	var sea := Vector2i(-1, -1)
+	for i in w.size():
+		if w.level[i] == WorldData.Level.DEEP_SEA:
+			sea = Vector2i(i % w.width, i / w.width)
+			break
+
+	# Smite and bless.
+	sim.ClearUnits()
+	for k in 10:
+		sim.SpawnAt("rabbit", x, y, false)
+	var rabbits: int = sim.PopulationOf("rabbit")
+	var blessed: int = sim.SpawnAt("rabbit", x, y, false)
+	sim.SetNeeds(blessed, 0.9, 0.9)
+	check(sim.PowerBless(x, y, 3.0) >= 1 and sim.UnitHunger(blessed) == 0.0 and sim.UnitThirst(blessed) == 0.0,
+			"bless feeds and heals the creatures under the brush")
+	check(sim.PowerSmite(x, y, 3.0) == rabbits + 1 and sim.PopulationOf("rabbit") == 0,
+			"smite kills every creature under the brush (%d left)" % sim.PopulationOf("rabbit"))
+
+	# Fire, then rain.
+	var lit: int = sim.PowerFire(x, y, 2.0)
+	check(lit > 0 and sim.TileOnFire(land.x, land.y), "the fire power sets the land alight (%d tiles)" % lit)
+	var out: int = sim.PowerRain(x, y, 4.0)
+	check(out > 0 and sim.BurningCount() == 0, "rain puts the fire out (%d tiles, %d still burning)" % [out, sim.BurningCount()])
+	check(sim.GrassAt(land.x, land.y) > 0.0, "rain makes the grass grow back")
+
+	# Lightning and meteor.
+	sim.SpawnAt("wolf", x, y, false)
+	check(sim.PowerLightning(x, y) == 1 and sim.PopulationOf("wolf") == 0, "lightning kills what it strikes")
+	sim.PowerRain(x, y, 6.0)
+	for k in 4:
+		sim.SpawnAt("deer", x, y, false)
+	var plants_before: int = sim.PlantCount()
+	check(sim.PowerMeteor(x, y, 3.0) == 4 and sim.ScorchAt(land.x, land.y) == 255 and sim.PlantCount() < plants_before,
+			"a meteor kills, scorches the ground and flattens the plants")
+	check(sim.TakeScorchChanges().size() > 0, "the map is told about the scorched ground")
+
+	# Nothing happens on water or outside the map.
+	var nothing := 0
+	for p in [Vector2(-5, -5), Vector2(w.width + 9, 3), Vector2(sea.x + 0.5, sea.y + 0.5)]:
+		nothing += sim.PowerFire(p.x, p.y, 2.0) + sim.PowerLightning(p.x, p.y) + sim.PowerRain(p.x, p.y, 2.0) \
+				+ sim.PowerMeteor(p.x, p.y, 0.4) + sim.PowerSmite(p.x, p.y, 2.0) + sim.PowerBless(p.x, p.y, 2.0)
+	check(sea.x >= 0 and nothing == 0, "powers do nothing on the sea or outside the map (%d)" % nothing)
+	sim.RunSteps(120)
 	sim.queue_free()
