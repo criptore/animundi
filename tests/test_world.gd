@@ -1108,4 +1108,73 @@ func test_powers() -> void:
 				+ sim.PowerMeteor(p.x, p.y, 0.4) + sim.PowerSmite(p.x, p.y, 2.0) + sim.PowerBless(p.x, p.y, 2.0)
 	check(sea.x >= 0 and nothing == 0, "powers do nothing on the sea or outside the map (%d)" % nothing)
 	sim.RunSteps(120)
+
+	# Creatures and peoples.
+	sim.ClearUnits()
+	var wolves: int = sim.PopulationOf("wolf")
+	check(sim.PowerSpawn("wolf", x, y, 5) == 5 and sim.PopulationOf("wolf") == wolves + 5, "the spawn power brings creatures")
+	check(sim.PowerSpawn("wolf", sea.x + 0.5, sea.y + 0.5, 5) == 0 and sim.PowerSpawn("unicorn", x, y, 5) == 0 and sim.PowerSpawn("humans", x, y, 5) == 0,
+			"nothing is spawned on the sea, nor an unknown species, nor a people as a beast")
+	check("dragon" in sim.SpawnableSpecies() and "humans" in sim.RaceIds() and not ("humans" in sim.SpawnableSpecies()),
+			"the powers list creatures and peoples apart")
+	var villages: int = sim.VillageCount()
+	var people: int = sim.PeopleCount()
+	var settled: int = sim.PowerSettle("humans", x, y, 8)
+	check(settled >= 0 and sim.VillageCount() == villages + 1 and sim.PeopleCount() == people + 8,
+			"the settle power founds a village with its people (%d, %d villages, %d people)" % [settled, sim.VillageCount(), sim.PeopleCount()])
+	check(sim.PowerSettle("elves", x, y, 8) == -1 and sim.PowerSettle("elves", sea.x + 0.5, sea.y + 0.5, 8) == -1
+			and sim.PowerSettle("martians", x, y, 8) == -1 and sim.VillageCount() == villages + 1,
+			"no village on another's land, on the sea or of an unknown people")
+	check(sim.VillageAt(x, y) == settled and sim.KingdomAt(x, y) >= 0 and sim.VillageAt(sea.x + 0.5, sea.y + 0.5) == -1
+			and sim.KingdomAt(-3.0, -3.0) == -1 and sim.VillageInfo(settled).name != "" and sim.VillageInfo(999).is_empty(),
+			"the land tells which village and kingdom own it")
+
+	# Whispers: a second kingdom far enough to have its own land.
+	var far := Vector2i(-1, -1)
+	for i in w.size():
+		var p := Vector2i(i % w.width, i / w.width)
+		if not w.is_water(i) and sim.VillageAt(p.x, p.y) == -1 and absi(p.x - land.x) + absi(p.y - land.y) > 30:
+			far = p
+			break
+	var other: int = sim.PowerSettle("orcs", far.x + 0.5, far.y + 0.5, 8)
+	var ka: int = sim.KingdomAt(x, y)
+	var kb: int = sim.KingdomAt(far.x + 0.5, far.y + 0.5)
+	check(other >= 0 and ka >= 0 and kb >= 0 and ka != kb, "two peoples settled by the player are two kingdoms")
+	var war_ok: bool = sim.PowerWhisper("war", ka, kb)
+	var wars_text := ""
+	for k in sim.KingdomTable():
+		wars_text += str(k.wars)
+	check(war_ok and wars_text != "" and not sim.PowerWhisper("war", ka, kb) and not sim.PowerWhisper("alliance", ka, kb),
+			"a whisper of war starts a war, once (%s)" % wars_text)
+	var peace_ok: bool = sim.PowerWhisper("peace", ka, kb)
+	wars_text = ""
+	for k in sim.KingdomTable():
+		wars_text += str(k.wars)
+	check(peace_ok and wars_text == "" and not sim.PowerWhisper("peace", ka, kb), "a whisper of peace ends it (%s)" % wars_text)
+	check(sim.PowerWhisper("alliance", ka, kb) and not sim.PowerWhisper("alliance", ka, kb), "a whisper of friendship allies them, once")
+	check(not sim.PowerWhisper("war", ka, ka) and not sim.PowerWhisper("war", ka, 99) and not sim.PowerWhisper("war", -1, kb)
+			and not sim.PowerWhisper("gossip", ka, kb), "whispers that make no sense are refused")
+	check(sim.LawTable().has("hunger") and sim.LawTable().hunger == true, "the laws of the world are listed")
+	sim.SetLaw("hunger", false)
+	check(sim.LawTable().hunger == false, "a law can be switched off")
+	sim.SetLaw("hunger", true)
+
+	# The biome brush.
+	var spot := Vector2(far.x + 0.5, far.y + 12.5) if not w.is_water(w.index(far.x, far.y + 12)) else Vector2(x + 14.0, y)
+	sim.TakeBiomeChanges()
+	var painted: int = sim.PowerBiome("Desert", spot.x, spot.y, 2.0)
+	var changes: PackedInt32Array = sim.TakeBiomeChanges()
+	var all_desert := changes.size() == painted * 2
+	for k in range(1, changes.size(), 2):
+		all_desert = all_desert and changes[k] == Biomes.DESERT
+	check(painted > 0 and all_desert and sim.TakeBiomeChanges().is_empty(), "the biome brush paints the land and tells the map, once (%d tiles)" % painted)
+	check(sim.PowerBiome("Desert", spot.x, spot.y, 2.0) == 0 and sim.PowerBiome("Water", spot.x, spot.y, 2.0) == 0
+			and sim.PowerBiome("Candy", spot.x, spot.y, 2.0) == 0 and sim.PowerBiome("Lava", sea.x + 0.5, sea.y + 0.5, 1.0) == 0,
+			"nothing to paint: the same biome, a water biome, an unknown one, the sea")
+	sim.SpawnAt("bear", spot.x, spot.y, false)
+	var bears: int = sim.PopulationOf("bear")
+	check(sim.PowerBiome("Lava", spot.x, spot.y, 2.0) > 0 and sim.PopulationOf("bear") == bears - 1, "lava kills what stands on it")
+	check(sim.PowerBiome("Forest", x, y, 3.0) >= 0, "the brush paints over a village's land")
+	sim.RunSteps(1800)
+	check(sim.VillageCount() >= 1, "the world goes on after the powers (%d villages)" % sim.VillageCount())
 	sim.queue_free()
