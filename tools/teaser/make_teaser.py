@@ -32,12 +32,19 @@ TIMELINE = [
     ("card", "god", 3.0, 0, "Et toi ? Tu es leur dieu.", "cut"),
     ("shot", "storm", 6.5, 15, "", "white"),
     ("shot", "meteor", 4.5, 8, "", "white"),
-    ("shot", "dragons", 6.0, 30, "", "cut"),
+    ("shot", "dragons", 4.0, 0, "", "cut"),
     ("shot", "war", 5.0, 20, "Les royaumes complotent et se font la guerre", "black"),
     ("shot", "dawn", 5.5, 0, "...et l'histoire s'écrit toute seule", "cut"),
     ("shot", "interface", 5.0, 20, "Animundi · en développement", "black"),
     ("card", "end", 6.0, 0, "", "black"),
 ]
+
+
+# Colour grading per shot: many burning houses at night blow the picture out to yellow.
+GRADE = {
+    "dragons": "eq=gamma=0.78:contrast=1.12:saturation=0.9,colorbalance=rh=-0.06:bh=0.05",
+    "storm": "eq=gamma=0.9:contrast=1.08",
+}
 
 
 def run(cmd):
@@ -81,7 +88,7 @@ def segment(i, item, shots, work, fonts, prev_out):
         # The first frames of a shot are the game opening, before the scene is set.
         filters = [
             f"scale={W}:{H}:flags=lanczos",
-            "eq=contrast=1.06:saturation=1.08",
+            GRADE.get(name, "eq=contrast=1.06:saturation=1.08"),
             f"drawbox=x=0:y=0:w=iw:h={BARS}:color=black:t=fill",
             f"drawbox=x=0:y=ih-{BARS}:w=iw:h={BARS}:color=black:t=fill",
         ]
