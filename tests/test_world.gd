@@ -53,6 +53,7 @@ func _initialize() -> void:
 	test_kingdoms()
 	test_inventions()
 	test_powers()
+	test_interface()
 	test_power_bar()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
@@ -677,7 +678,9 @@ func test_nature() -> void:
 func test_scripts_load() -> void:
 	var ok := true
 	for path in ["res://scripts/ui/hud.gd", "res://scripts/main.gd", "res://scripts/ui/map_camera.gd",
-			"res://scripts/render2d/world_map.gd", "res://scripts/ui/setup_panel.gd"]:
+			"res://scripts/render2d/world_map.gd", "res://scripts/ui/setup_panel.gd", "res://scripts/ui/ui.gd",
+			"res://scripts/ui/power_bar.gd", "res://scripts/ui/inspector.gd", "res://scripts/ui/laws_window.gd",
+			"res://scripts/ui/settings_window.gd", "res://scripts/ui/pause_menu.gd", "res://scripts/ui/main_menu.gd"]:
 		var script: GDScript = load(path)
 		ok = ok and script != null and script.can_instantiate()
 	check(ok, "the HUD, main scene and map scripts compile")
@@ -1181,6 +1184,63 @@ func test_powers() -> void:
 	sim.queue_free()
 
 
+## The interface from the title screen to the game: title, world setup, the game's panels, the
+## pause menu and back.
+func test_interface() -> void:
+	var hud: CanvasLayer = load("res://scripts/ui/hud.gd").new()
+	hud.settings = load("res://scripts/world/world_settings.gd").new()
+	# Built outside the tree: nothing here needs a window.
+	hud._ready()
+	hud._setup._ready()
+	var asked := []
+	hud.generate_requested.connect(func(): asked.append("generate"))
+	hud.start_requested.connect(func(races, n, _ai): asked.append([races.size(), n]))
+	hud.speed_selected.connect(func(v): asked.append(v))
+	hud.show_setup()
+	check(hud.blocking() and hud._title.visible and not hud._setup.visible and not hud._game.visible,
+			"the game opens on the title screen, the world setup waiting behind it")
+	hud._on_title("new_world")
+	check(hud.setup_visible() and not hud._title.visible and not hud._game.visible, "New world shows the world setup")
+	hud._setup._seed_edit.text = "interface"
+	hud._setup._continents.value = 5
+	hud._setup.request()
+	check(hud.settings.seed_text == "interface" and hud.settings.continents == 5 and asked == ["generate"],
+			"the setup writes the land's settings and asks for the world")
+	hud._setup._on_start()
+	check(asked[-1] == [3, 12] and hud._game.visible and not hud.blocking(), "starting the world shows the game (%s)" % [asked])
+	for book in hud.BOOKS:
+		hud._show_book(book[0], false)
+		check(hud._dock.visible and hud._pages[book[0]].visible, "the dock opens the book of %s" % book[0])
+	hud._show_book("chronicle", true)
+	check(not hud._dock.visible, "clicking the open book's tab closes the dock")
+	hud.set_populations({"Wolf": 12, "Rabbit": 40})
+	hud.set_counts(30, 2, 1, 52)
+	hud.add_event("Year 1, spring: a test.", "wars")
+	hud.set_villages([{"rank": "village", "name": "Tolm", "people": "Humans", "population": 12, "homes": 14, "food": 5, "wood": 3,
+			"stone": 0, "metal": 0, "gold": 0, "building": "hut", "x": 10, "y": 20}])
+	var shown := []
+	hud.focus_requested.connect(func(tile): shown.append(tile))
+	hud._village_rows[0][0].pressed.emit()
+	check(shown == [Vector2(10, 20)] and hud._life_rows[0][2].text == "Rabbit" and hud._counts["people"].text == "30",
+			"the dock lists villages (a click shows one) and creatures, the top bar counts")
+	asked.clear()
+	hud._open_pause()
+	check(hud._pause.visible and hud.blocking() and asked == [0.0], "the menu pauses the world (%s)" % [asked])
+	hud._pause.close()
+	check(not hud.blocking() and asked == [0.0, 1.0], "leaving the menu lets time run as before (%s)" % [asked])
+	hud._open(hud.laws)
+	hud._open(hud._settings_window)
+	check(hud.laws.visible and hud._settings_window.visible and hud._shade.visible, "windows open over a shade")
+	hud._settings_window.close()
+	hud.laws.close()
+	hud._soon("Saved worlds", "Later.")
+	check(hud._toast.visible and "later version" in hud._toast_label.text and not hud._shade.visible, "a feature to come says so")
+	hud._open_pause()
+	hud._on_pause("title")
+	check(hud._title.visible and not hud._game.visible and asked[-1] == "generate", "back to the title makes a new world behind it")
+	hud.free()
+
+
 ## The god powers bar: a button per power, menus for what to bring or paint, a brush, the laws.
 func test_power_bar() -> void:
 	var PowerBar = load("res://scripts/ui/power_bar.gd")
@@ -1208,12 +1268,21 @@ func test_power_bar() -> void:
 	for k in 9:
 		bar.step_brush(-1)
 	check(up == 3 and top == 8 and bar.brush == 1 and bar.radius() > 0.5, "the brush steps through its sizes and stops at both ends")
+	var soon := []
+	bar.soon_requested.connect(func(power_name, _what): soon.append(power_name))
+	for child in bar._grids["nature"].get_children():
+		if child.has_meta("soon"):
+			child.pressed.emit()
+	check(soon.size() >= 5 and bar.power == "inspect", "powers to come say so and change nothing (%s)" % [soon])
 	var laws := []
-	bar.law_toggled.connect(func(law, on): laws.append([law, on]))
-	bar.set_laws({"hunger": true, "old_age": false})
-	bar._toggle_law(0)
-	bar._toggle_law(1)
-	check(laws == [["hunger", false], ["old_age", true]], "the laws menu switches laws (%s)" % [laws])
+	var laws_window: PanelContainer = load("res://scripts/ui/laws_window.gd").new()
+	root.add_child(laws_window)
+	laws_window.law_toggled.connect(func(law, on): laws.append([law, on]))
+	laws_window.set_laws({"hunger": true, "old_age": false})
+	laws_window._toggle_law(0)
+	laws_window._toggle_law(1)
+	check(laws == [["hunger", false], ["old_age", true]], "the laws window switches laws (%s)" % [laws])
+	laws_window.queue_free()
 	for id in bar.POWERS:
 		if not bar._buttons.has(id):
 			check(false, "no button for the power %s" % id)

@@ -130,6 +130,7 @@ Nothing here before the world lives on its own (see the order of work above). Sp
 - [ ] World laws: one switch per simulation rule, grouped (diplomacy, civilisations, units, nature, biomes, weather, disasters), each with a one-line description
 - [x] Whispers: war, peace or alliance between two kingdoms, by clicking their lands
 - [ ] Powers that act on minds: rain traits, make people forget their language, culture, faith or kingdom
+- [x] The whole interface in one look (`scripts/ui/ui.gd`, icons by `art/ui_icons.py`): title screen, world setup, top bar, dock of books (kingdoms, villages, life, inventions, chronicle), tabbed powers bar, inspector, map layers, laws, settings and pause windows; every feature to come already has its locked button
 - [ ] Save, load, share a seed
 
 ## 1.0 Polish
