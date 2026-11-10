@@ -795,7 +795,41 @@ func test_inventions() -> void:
 		check(record is Dictionary and record.has("kind") and record.has("effects") and not sim.LastModelError.begins_with("not valid JSON"),
 				"the built-in model answers in the background with a record of the invention language, then validated (%s)" % [
 				sim.LastModelError if sim.LastModelError != "" else "accepted"])
+		# Its grammar knows which effects each kind may have, and that work effects name a job:
+		# even a random model can't break those rules (caps, budget and cost are the engine's).
+		var broken := []
+		for i in 6:
+			var asked: int = sim.ModelAnswers + sim.ModelFailures
+			sim.AskMind(k)
+			for wait in 800:
+				sim.RunSteps(5)
+				OS.delay_msec(25)
+				if sim.ModelAnswers + sim.ModelFailures > asked:
+					break
+			var why: String = sim.LastModelError
+			if "cannot '" in why or "needs a job" in why or "amount must be" in why or why.begins_with("not valid JSON"):
+				broken.append(why)
+		check(broken.is_empty(), "the grammar only writes valid JSON, each kind with its own effects within their caps, and a job where one is needed (%s)" % [broken])
 	sim.StopMind()
+	# The JSON schema sent to model servers carries the same rules.
+	var schema: Dictionary = JSON.parse_string(sim.MindSchema())
+	var schema_ok: bool = schema.has("anyOf") and schema.anyOf.size() == 5
+	var allowed := {"tool": ["work_speed", "yield"], "weapon": ["attack"], "armour": ["defense"],
+			"technique": ["work_speed", "yield", "food", "loyalty"], "building": ["defense", "homes", "food", "loyalty"]}
+	if schema_ok:
+		for branch in schema.anyOf:
+			var kind: String = branch.properties.kind.enum[0]
+			var dos := []
+			for e in branch.properties.effects.items.anyOf:
+				dos.append(e.properties.do.enum[0])
+				if e.properties.do.enum[0] in ["work_speed", "yield"] and not ("job" in e.required):
+					schema_ok = false
+			dos.sort()
+			var want: Array = allowed[kind].duplicate()
+			want.sort()
+			if dos != want:
+				schema_ok = false
+	check(schema_ok, "the schema sent to model servers allows each kind only its own effects, and requires a job for work effects")
 	check(sim.MindStatus().status == "off", "the built-in mind can be stopped: the procedural inventor takes over")
 	sim.queue_free()
 
