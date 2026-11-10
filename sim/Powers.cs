@@ -267,10 +267,13 @@ public partial class Simulation
 	/// <summary>Biome changes since the last call, as pairs (tile, biome) for the map.</summary>
 	public int[] TakeBiomeChanges()
 	{
+		if (World == null)
+			return Array.Empty<int>();
 		var pairs = new List<int>();
 		var seen = new HashSet<int>();
 		for (int k = _biomeChanged.Count - 1; k >= 0; k--)
-			if (seen.Add(_biomeChanged[k]))
+			// (a tile of a world replaced since by a smaller one is dropped)
+			if (_biomeChanged[k] < World.Biome.Length && seen.Add(_biomeChanged[k]))
 			{
 				pairs.Add(_biomeChanged[k]);
 				pairs.Add(World.Biome[_biomeChanged[k]]);

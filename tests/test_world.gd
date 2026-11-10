@@ -53,6 +53,7 @@ func _initialize() -> void:
 	test_kingdoms()
 	test_inventions()
 	test_powers()
+	test_power_bar()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -1178,3 +1179,54 @@ func test_powers() -> void:
 	sim.RunSteps(1800)
 	check(sim.VillageCount() >= 1, "the world goes on after the powers (%d villages)" % sim.VillageCount())
 	sim.queue_free()
+
+
+## The god powers bar: a button per power, menus for what to bring or paint, a brush, the laws.
+func test_power_bar() -> void:
+	var PowerBar = load("res://scripts/ui/power_bar.gd")
+	var Inspector = load("res://scripts/ui/inspector.gd")
+	var bar: PanelContainer = PowerBar.new()
+	root.add_child(bar)
+	bar.setup(PackedStringArray(["wolf", "dragon"]), PackedStringArray(["humans", "orcs"]), PackedStringArray(["Desert", "Lava"]))
+	var got := []
+	bar.power_changed.connect(func(power, arg): got.append([power, arg]))
+	check(bar.power == "inspect" and not bar.drags(), "the bar starts on Inspect")
+	bar.select("fire")
+	check(got == [["fire", ""]] and bar.drags() and bar.hint() != "", "choosing a power tells the game (%s)" % [got])
+	bar.select("spawn")
+	check(bar.power == "spawn" and bar.arg == "wolf" and "wolf" in bar.hint(), "a power that brings something remembers what (%s)" % bar.hint())
+	bar._pick("biome", "Lava")
+	check(bar.power == "biome" and bar.arg == "Lava" and got[-1] == ["biome", "Lava"], "picking in a menu chooses the power and what it paints")
+	bar.select("nonsense")
+	check(bar.power == "inspect", "an unknown power falls back to Inspect")
+	bar.brush = 2
+	bar.step_brush(1)
+	var up: int = bar.brush
+	for k in 9:
+		bar.step_brush(1)
+	var top: int = bar.brush
+	for k in 9:
+		bar.step_brush(-1)
+	check(up == 3 and top == 8 and bar.brush == 1 and bar.radius() > 0.5, "the brush steps through its sizes and stops at both ends")
+	var laws := []
+	bar.law_toggled.connect(func(law, on): laws.append([law, on]))
+	bar.set_laws({"hunger": true, "old_age": false})
+	bar._toggle_law(0)
+	bar._toggle_law(1)
+	check(laws == [["hunger", false], ["old_age", true]], "the laws menu switches laws (%s)" % [laws])
+	for id in bar.POWERS:
+		if not bar._buttons.has(id):
+			check(false, "no button for the power %s" % id)
+	bar.queue_free()
+
+	var card: PanelContainer = Inspector.new()
+	root.add_child(card)
+	var closed := [0]
+	card.closed.connect(func(): closed[0] += 1)
+	card.show_unit("Aldo", "Aldo · Humans man, villager, 20 years · farmer of Tolm")
+	check(card.visible and card._title.text == "Aldo", "the inspector shows a creature")
+	card.show_village({})
+	check(not card.visible and closed[0] == 1, "the inspector closes when its village is gone")
+	card.close()
+	check(closed[0] == 1, "closing twice tells once")
+	card.queue_free()
