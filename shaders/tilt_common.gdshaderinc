@@ -13,9 +13,11 @@ uniform vec3 ambient = vec3(1.0);
 uniform vec3 fog_color = vec3(0.7, 0.85, 0.95);
 // Distance from the camera where the haze starts and where it is full.
 uniform vec2 fog_range = vec2(60.0, 140.0);
-// Warm lights (village fires): xyz in world space, w = reach in tiles.
+// Warm lights (fires, the windows of homes): xyz in world space, w = reach in tiles; and how
+// bright each one is.
 uniform int light_count = 0;
 uniform vec4 lights[32];
+uniform float light_gain[32];
 uniform float light_power = 0.0;
 // Strength of the drifting cloud shadows (0 = none).
 uniform float cloud = 1.0;
@@ -62,7 +64,7 @@ vec3 light_at(vec3 w) {
 		d.y *= 0.5;
 		float a = max(0.0, 1.0 - length(d) / lights[i].w);
 		float flicker = 1.0 + 0.07 * sin(TIME * 11.0 + float(i) * 2.1) + 0.05 * sin(TIME * 23.7 + float(i));
-		l += vec3(1.0, 0.60, 0.27) * a * a * light_power * flicker;
+		l += vec3(1.0, 0.60, 0.27) * a * a * light_power * light_gain[i] * flicker;
 	}
 	return l;
 }

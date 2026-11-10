@@ -5,10 +5,15 @@
 ## - Sprites: the simulation already fills MultiMeshes for the flat view (sim/Draw.cs). The same
 ##   MultiMesh resources are shown here through MultiMeshInstance3D nodes, with a shader that
 ##   stands each quad up on the ground (shaders/tilt_sprite.gdshader). Nothing is copied.
-## - Light: no engine light. A tint for the hour, cloud shadows and the villages' fires, computed
+## - Light: no engine light. A tint for the hour, cloud shadows, the villages' fires and the
+##   windows of their homes (BuildingTable, the nearest ones to the camera), computed
 ##   in the shaders. The 3D world is drawn in its own viewport, shown on screen through one
 ##   shader that adds the miniature blur, the vignette and the tint (reading the screen back
 ##   instead cost 4 ms of GPU: the copy of the whole frame).
+##
+## - Zoom: the closer the camera, the more tilted the view and the richer the picture (lights,
+##   reflections on water, blur); the further, the more it looks straight down at the plain map,
+##   and the passes that no longer show are switched off (TiltCamera.closeness).
 ##
 ## Add it to the main scene and call setup(main) once the world exists; set_enabled(false) gives
 ## the flat view back. Limits of the prototype: a regenerated world or a tile changing level needs
@@ -19,10 +24,19 @@ const TiltTerrain = preload("res://scripts/render_tilt/tilt_terrain.gd")
 const TiltCamera = preload("res://scripts/render_tilt/tilt_camera.gd")
 const SpriteAtlas = preload("res://scripts/render2d/sprite_atlas.gd")
 const SpriteBatch = preload("res://scripts/render2d/sprite_batch.gd")
+const Biomes = preload("res://scripts/world/biomes.gd")
 
 const MAX_LIGHTS := 32
-## Reach of a village fire, in tiles.
-const FIRE_REACH := 12.0
+## Lights further than this from the centre of the view are left out, in tiles.
+const LIGHTS_WITHIN := 70.0
+## Reach (tiles) and brightness of what glows: the bonfire, and the windows of finished homes
+## and great buildings (ids of data/buildings.json). A burning building glows like a big fire.
+const GLOWS := {
+	"bonfire": Vector2(11.0, 0.9), "hut": Vector2(3.0, 0.4), "house": Vector2(3.4, 0.45), "stone_house": Vector2(3.4, 0.45),
+	"big_house": Vector2(4.0, 0.5), "town_hall": Vector2(5.0, 0.55), "temple": Vector2(5.0, 0.55), "library": Vector2(4.2, 0.5),
+	"barracks": Vector2(4.2, 0.45),
+}
+const BLAZE := Vector2(9.0, 1.4)
 ## The hours of the day: tint of the light, strength of the fires, vignette, haze colour, tint of
 ## the final image, strength of the shadows and of the cloud shadows.
 const HOURS := [
@@ -45,6 +59,10 @@ var _terrain := ShaderMaterial.new()
 var _sprites := ShaderMaterial.new()
 var _shadows := ShaderMaterial.new()
 var _post := ShaderMaterial.new()
+var _reflections := ShaderMaterial.new()
+var _reflection_nodes: Array[MultiMeshInstance3D] = []
+## The look of the current hour (see HOURS), before the camera's distance tones it down.
+var _look := {}
 var _post_layer := CanvasLayer.new()
 var _container := SubViewportContainer.new()
 var _viewport := SubViewport.new()
@@ -57,8 +75,7 @@ func _init() -> void:
 	_sprites.shader = preload("res://shaders/tilt_sprite.gdshader")
 	_shadows.shader = preload("res://shaders/tilt_shadow.gdshader")
 	_post.shader = preload("res://shaders/tilt_post.gdshader")
-	# This node must run right after the main scene and before the simulation (see _process).
-	process_priority = 0
+	_reflections.shader = preload("res://shaders/tilt_reflection.gdshader")
 
 
 ## Builds the view over `main` (scripts/main.gd), which must already hold a world.
@@ -84,9 +101,11 @@ func setup(main: Node) -> void:
 	var world = main.world
 	var map = main._map
 	var size := Vector2(world.width, world.height)
-	for m in [_terrain, _sprites, _shadows]:
+	for m in [_terrain, _sprites, _shadows, _reflections]:
 		m.set_shader_parameter("map_size", size)
 		m.set_shader_parameter("data", map._data_tex)
+	_reflections.set_shader_parameter("atlas", SpriteAtlas.shared().texture)
+	_reflection_nodes.clear()
 	_terrain.set_shader_parameter("colors", map.texture)
 	_terrain.set_shader_parameter("ground", map._ground_tex)
 	_sprites.set_shader_parameter("atlas", SpriteAtlas.shared().texture)
@@ -128,6 +147,15 @@ func setup(main: Node) -> void:
 			inst.custom_aabb = everywhere
 			inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			space.add_child(inst)
+			if not pass_shadows:
+				# The same batch once more, mirrored on the water (shown close up only).
+				var mirror := MultiMeshInstance3D.new()
+				mirror.multimesh = batch.multimesh
+				mirror.material_override = _reflections
+				mirror.custom_aabb = everywhere
+				mirror.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				space.add_child(mirror)
+				_reflection_nodes.append(mirror)
 
 	_environment.background_mode = Environment.BG_COLOR
 	_environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
@@ -178,17 +206,43 @@ func set_time(t: float) -> String:
 	var a: Dictionary = HOURS[i]
 	var b: Dictionary = HOURS[i + 1]
 	var k := smoothstep(a.t, b.t, time_of_day)
-	var haze: Vector3 = a.haze.lerp(b.haze, k)
-	for m in [_terrain, _sprites, _shadows]:
-		m.set_shader_parameter("ambient", a.ambient.lerp(b.ambient, k))
-		m.set_shader_parameter("fog_color", haze)
-		m.set_shader_parameter("light_power", lerpf(a.fires, b.fires, k))
-		m.set_shader_parameter("cloud", lerpf(a.cloud, b.cloud, k))
-	_shadows.set_shader_parameter("strength", lerpf(a.shadow, b.shadow, k))
-	_post.set_shader_parameter("vignette", lerpf(a.vignette, b.vignette, k))
-	_post.set_shader_parameter("tint", a.tint.lerp(b.tint, k))
-	_environment.background_color = Color(haze.x, haze.y, haze.z)
+	_look = {
+		ambient = a.ambient.lerp(b.ambient, k), haze = a.haze.lerp(b.haze, k), tint = a.tint.lerp(b.tint, k),
+		fires = lerpf(a.fires, b.fires, k), cloud = lerpf(a.cloud, b.cloud, k), shadow = lerpf(a.shadow, b.shadow, k),
+		vignette = lerpf(a.vignette, b.vignette, k),
+	}
+	_apply_look()
 	return a.name if k < 0.5 else b.name
+
+
+## Sends the hour's look to the shaders, toned down by the camera's distance: far away, the plain
+## colours of the flat map (no tint, no fires, no clouds, no haze) and nothing over the image.
+func _apply_look() -> void:
+	if _look.is_empty():
+		return
+	var near := camera.closeness()
+	var plain := Vector3.ONE
+	var sea := Biomes.COLORS[Biomes.DEEP_WATER].darkened(0.4)
+	var haze: Vector3 = Vector3(sea.r, sea.g, sea.b).lerp(_look.haze, near)
+	# The haze starts beyond the place looked at, and moves out of sight as the camera rises.
+	var haze_from: float = camera.distance * 1.4 + 14.0 + (1.0 - near) * 5000.0
+	for m in [_terrain, _sprites, _shadows, _reflections]:
+		m.set_shader_parameter("ambient", plain.lerp(_look.ambient, near))
+		m.set_shader_parameter("fog_color", haze)
+		m.set_shader_parameter("fog_range", Vector2(haze_from, haze_from + 60.0 + camera.distance * 1.5))
+		m.set_shader_parameter("light_power", _look.fires * near)
+		m.set_shader_parameter("cloud", _look.cloud * near)
+	_shadows.set_shader_parameter("strength", lerpf(1.0, _look.shadow, near))
+	_reflections.set_shader_parameter("strength", near)
+	for node in _reflection_nodes:
+		node.visible = near > 0.03
+	# The blur belongs to the close, tilted view; far away the image is shown as it is.
+	_post.set_shader_parameter("blur", near * minf(1.3, 30.0 / camera.distance))
+	_post.set_shader_parameter("vignette", _look.vignette * near)
+	_post.set_shader_parameter("tint", plain.lerp(_look.tint, near))
+	_post.set_shader_parameter("saturation", lerpf(1.0, 1.12, near))
+	_container.material = _post if effects and near > 0.03 else null
+	_environment.background_color = Color(haze.x, haze.y, haze.z)
 
 
 func _input(event: InputEvent) -> void:
@@ -208,36 +262,44 @@ func _process(delta: float) -> void:
 	_terrain.set_shader_parameter("frost", sim.Coldness())
 	_sprites.set_shader_parameter("lean", camera.sprite_lean())
 	_sprites.set_shader_parameter("stretch", camera.sprite_stretch())
-	var range_from := camera.distance + 14.0 + camera.distance * 0.4
-	for m in [_terrain, _sprites]:
-		m.set_shader_parameter("fog_range", Vector2(range_from, range_from + 60.0 + camera.distance * 1.5))
-	# The blur belongs to the close, tilted view: none from above or from far.
-	var tilt := 1.0 - smoothstep(62.0, 86.0, camera.pitch())
-	_post.set_shader_parameter("blur", tilt * minf(1.3, 30.0 / camera.distance))
-	_container.material = _post if effects else null
+	_reflections.set_shader_parameter("reach", 1.0 / sin(deg_to_rad(camera.pitch())))
+	_apply_look()
 	_lights_wait -= delta
 	if _lights_wait <= 0.0:
-		_lights_wait = 0.5
+		_lights_wait = 1.0
 		_update_lights()
 
 
-## One warm light per village, at its fire (the nearest ones when there are too many).
+## The warm lights near the centre of the view: fires and the windows of finished homes, the
+## nearest first when there are too many. None when the camera is too far for them to show.
 func _update_lights() -> void:
-	var villages: Array = _main._sim.VillageTable()
-	villages.sort_custom(func(a, b):
-		return camera.target.distance_squared_to(Vector2(a.x, a.y)) < camera.target.distance_squared_to(Vector2(b.x, b.y)))
+	var found := []
+	if camera.closeness() > 0.03 and _look.get("fires", 0.0) > 0.0:
+		for b in _main._sim.BuildingTable():
+			var glow: Vector2 = BLAZE if b.burning else GLOWS.get(b.id, Vector2.ZERO)
+			if glow.x == 0.0 or not (b.done or b.burning):
+				continue
+			var at := Vector2(b.x + 0.5, b.y + 0.5)
+			var far := camera.target.distance_squared_to(at)
+			if far < LIGHTS_WITHIN * LIGHTS_WITHIN:
+				found.append([far, at, glow])
+		found.sort_custom(func(p, q): return p[0] < q[0])
 	var world = _main.world
 	var lights: Array[Vector4] = []
-	for v in villages:
-		if lights.size() == MAX_LIGHTS:
-			break
-		var x: int = clampi(int(v.x), 0, world.width - 1)
-		var y: int = clampi(int(v.y), 0, world.height - 1)
-		var ground: float = maxf(0.0, (world.level[world.index(x, y)] - 2) * TiltTerrain.STEP)
-		lights.append(Vector4(x + 0.5, ground + 0.6, y + 0.5, FIRE_REACH))
+	var gains := PackedFloat32Array()
+	for entry in found.slice(0, MAX_LIGHTS):
+		var at: Vector2 = entry[1]
+		var glow: Vector2 = entry[2]
+		var i: int = world.index(clampi(int(at.x), 0, world.width - 1), clampi(int(at.y), 0, world.height - 1))
+		var ground: float = maxf(0.0, (world.level[i] - 2) * TiltTerrain.STEP)
+		# A fire burns at the middle of its tile; a home lights the ground before its door.
+		lights.append(Vector4(at.x, ground + 0.6, at.y + (0.0 if glow.x > 8.0 else 0.6), glow.x))
+		gains.append(glow.y)
 	var count := lights.size()
 	while lights.size() < MAX_LIGHTS:
 		lights.append(Vector4(0, -999, 0, 1))
-	for m in [_terrain, _sprites, _shadows]:
+		gains.append(0.0)
+	for m in [_terrain, _sprites, _shadows, _reflections]:
 		m.set_shader_parameter("light_count", count)
 		m.set_shader_parameter("lights", lights)
+		m.set_shader_parameter("light_gain", gains)

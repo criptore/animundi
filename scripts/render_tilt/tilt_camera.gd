@@ -1,14 +1,14 @@
 ## The tilt view's camera: a perspective camera with a long lens looking north and down at the
-## world (the diorama look of Cult of the Lamb). It pans and zooms, never turns. Far away it rises
-## toward a top-down view, so the whole world still reads like a map.
+## world (the diorama look of Cult of the Lamb). It pans and zooms, never turns. The further it
+## is, the more it rises, until it looks straight down: far away the world is the flat map again.
 extends Camera3D
 
 const FOV := 30.0
 ## Angle under the horizon, close up and far away, and the distances between which it rises.
-const PITCH_NEAR := 52.0
-const PITCH_FAR := 82.0
-const RISE_FROM := 70.0
-const RISE_TO := 260.0
+const PITCH_NEAR := 50.0
+const PITCH_FAR := 90.0
+const RISE_FROM := 40.0
+const RISE_TO := 170.0
 const MIN_DISTANCE := 12.0
 const MAX_DISTANCE := 900.0
 const ZOOM_STEP := 1.12
@@ -33,11 +33,16 @@ func _init() -> void:
 	near = 1.0
 
 
+## 1 close up (full tilt, every effect), 0 far away (straight down, the plain map).
+func closeness() -> float:
+	return 1.0 - smoothstep(RISE_FROM, RISE_TO, distance)
+
+
 ## Degrees under the horizon at the current distance.
 func pitch() -> float:
 	if fixed_pitch >= 0.0:
 		return fixed_pitch
-	return lerpf(PITCH_NEAR, PITCH_FAR, smoothstep(RISE_FROM, RISE_TO, distance))
+	return lerpf(PITCH_FAR, PITCH_NEAR, closeness())
 
 
 ## How far standing sprites lean back from upright, in radians: partly toward the line of sight
