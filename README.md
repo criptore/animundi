@@ -94,6 +94,15 @@ Villages now do everything WorldBox villages do (the full list, and how each rul
 
 Every kingdom has a **mind** that invents, once a year, what its people need: tools, weapons, armour, techniques and buildings, written in a small **invention language** (JSON records the engine validates). Inventions change the world (faster work, bigger harvests, stronger soldiers, homes, food, loyalty), **spread** to neighbours and trade partners, are **forgotten** when useless and **evolve by descent** (most improve one the people know). Invented buildings get sprites assembled from parts in the kingdom's colour. The mind is a **language model built into the game** (llama.cpp compiled in; the model is downloaded once on first launch, or shipped with a build, see [docs/INVENTIONS.md](docs/INVENTIONS.md)); until it is ready, and without it, a procedural inventor invents: the game never waits for it.
 
+## 0.9 God powers (first part)
+
+The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.cs`, `scripts/ui/power_bar.gd`):
+- **Life**: bring any creature (animals and monsters) under the mouse, or found a village of any people on free land, which starts a kingdom of its own.
+- **Nature**: fire, lightning, rain (puts fires out, the grass grows back), and a **biome brush** that paints any land biome, mushroom land, cursed land, volcanic rock and lava included.
+- **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds).
+- **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands.
+- **Inspector**: click a creature or a village to keep its card on screen. **Laws**: switch the rules of the world on and off.
+
 Next: 0.6 Culture (AI-shaped values, laws, religions and an AI-written chronicle). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
@@ -128,7 +137,10 @@ Controls:
 | Who is this creature? | hover it |
 | Add 1000 wandering animals (stress test) | U or the **+1000 animals** button |
 | Pause / resume, slower / faster time | Space, comma / period, or the ×1 ×2 ×5 ×10 buttons |
-| Set fire under the mouse (test tool) | F |
+| God powers | pick one in the bar at the bottom, then click the map (drag for fire, rain, smite, bless and the biome brush); Esc goes back to Inspect |
+| Brush size | [ and ], or the − and + buttons |
+| Follow a creature or a village | with Inspect, click it: its card stays on screen |
+| Laws of the world | the **Laws** menu of the powers bar |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Tile info | hover the map (bottom bar) |
 

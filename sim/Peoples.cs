@@ -78,50 +78,66 @@ public partial class Simulation
 			if (rec == null)
 				continue;
 			var race = rec.Vary(_rng);
-			int s = Assets.SpeciesIndex(id);
-			if (s < 0)
-			{
-				s = Assets.AddSpecies(new SpeciesRecord
-				{
-					Id = race.Id, Name = race.Name, Sprite = $"creatures/{race.Id}", Speed = race.Speed * 0.8f,
-					Roam = 6f, Diet = "omnivore", Size = race.Size, Lifespan = race.Lifespan, Litter = 1,
-					IsPeople = true, Race = race,
-				});
-				_languages[s] = new Language(race.Language, _rng);
-				if (Population.Length < Assets.Species.Count)
-				{
-					Array.Resize(ref Population, Assets.Species.Count);
-					Array.Resize(ref Capacity, Assets.Species.Count);
-					Array.Resize(ref _established, Assets.Species.Count);
-					Capacity[s] = int.MaxValue;
-				}
-			}
+			int s = PeopleSpecies(race);
 			int tile = FindHome(race);
 			if (tile < 0)
 				continue;
-			int v = FoundVillage(s, tile % World.Width, tile / World.Width);
-			var sp = Assets.Species[s];
-			for (int k = 0; k < perRace; k++)
-			{
-				float x = Villages[v].X + 0.5f + ((float)_rng.NextDouble() * 2f - 1f) * 3f;
-				float y = Villages[v].Y + 0.5f + ((float)_rng.NextDouble() * 2f - 1f) * 3f;
-				if (!World.IsLandAt(x, y))
-				{
-					x = Villages[v].X + 0.5f;
-					y = Villages[v].Y + 0.8f;
-				}
-				bool child = k >= perRace - perRace / 5;
-				int i = SpawnPerson(s, v, x, y, child, k % 2 == 0);
-				if (!child)
-					Units.Age[i] = AdultAge(sp) + Math.Min(sp.Lifespan * 0.3f, 40f) * (float)_rng.NextDouble();
-				Units.Role[i] = (byte)(k == 0 ? Role.Chief : k == 1 ? Role.Shaman : k <= 3 ? Role.Warrior : Role.Villager);
-			}
-			int kingdom = CreateKingdom(s, v);
-			LogEvent($"the {race.Name} found the village of {Villages[v].Name}, heart of the kingdom of {Kingdoms[kingdom].Name}.", "kings");
+			SettleAt(s, tile, perRace);
 			founded++;
 		}
 		Zones.Rebuild(Units);
 		return founded;
+	}
+
+	/// <summary>The species of a people, added to the world's species the first time it comes
+	/// (with its language).</summary>
+	private int PeopleSpecies(RaceRecord race)
+	{
+		int s = Assets.SpeciesIndex(race.Id);
+		if (s >= 0)
+			return s;
+		s = Assets.AddSpecies(new SpeciesRecord
+		{
+			Id = race.Id, Name = race.Name, Sprite = $"creatures/{race.Id}", Speed = race.Speed * 0.8f,
+			Roam = 6f, Diet = "omnivore", Size = race.Size, Lifespan = race.Lifespan, Litter = 1,
+			IsPeople = true, Race = race,
+		});
+		_languages[s] = new Language(race.Language, _rng);
+		if (Population.Length < Assets.Species.Count)
+		{
+			Array.Resize(ref Population, Assets.Species.Count);
+			Array.Resize(ref Capacity, Assets.Species.Count);
+			Array.Resize(ref _established, Assets.Species.Count);
+			Capacity[s] = int.MaxValue;
+		}
+		return s;
+	}
+
+	/// <summary>`count` people of species s found a village on `tile` (a chief, a shaman, two
+	/// warriors and villagers, of both sexes, some children) and a kingdom around it. Returns
+	/// the village.</summary>
+	private int SettleAt(int s, int tile, int count)
+	{
+		int v = FoundVillage(s, tile % World.Width, tile / World.Width);
+		var sp = Assets.Species[s];
+		for (int k = 0; k < count; k++)
+		{
+			float x = Villages[v].X + 0.5f + ((float)_rng.NextDouble() * 2f - 1f) * 3f;
+			float y = Villages[v].Y + 0.5f + ((float)_rng.NextDouble() * 2f - 1f) * 3f;
+			if (!World.IsLandAt(x, y))
+			{
+				x = Villages[v].X + 0.5f;
+				y = Villages[v].Y + 0.8f;
+			}
+			bool child = k >= count - count / 5;
+			int i = SpawnPerson(s, v, x, y, child, k % 2 == 0);
+			if (!child)
+				Units.Age[i] = AdultAge(sp) + Math.Min(sp.Lifespan * 0.3f, 40f) * (float)_rng.NextDouble();
+			Units.Role[i] = (byte)(k == 0 ? Role.Chief : k == 1 ? Role.Shaman : k <= 3 ? Role.Warrior : Role.Villager);
+		}
+		int kingdom = CreateKingdom(s, v);
+		LogEvent($"the {sp.Name} found the village of {Villages[v].Name}, heart of the kingdom of {Kingdoms[kingdom].Name}.", "kings");
+		return v;
 	}
 
 	/// <summary>A tile for a people's first village: in a biome it likes, near fresh water, far from

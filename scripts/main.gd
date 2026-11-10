@@ -12,6 +12,7 @@ const Flora = preload("res://scripts/world/flora.gd")
 ## The C# simulation core (sim/): creatures, plants, seasons, fire, and their drawing.
 const SimulationScript = preload("res://sim/Simulation.cs")
 const Hud = preload("res://scripts/ui/hud.gd")
+const BrushCursor = preload("res://scripts/ui/brush_cursor.gd")
 
 ## Animals placed on a new world: one per this many tiles.
 const TILES_PER_ANIMAL := 300
@@ -30,12 +31,27 @@ var _sim: Node2D = SimulationScript.new()
 var _stats_frames := 0
 var _camera := MapCamera.new()
 var _hud := Hud.new()
+## God powers (scripts/ui/power_bar.gd picks, sim/Powers.cs acts).
+var _brush := BrushCursor.new()
+## Left button held with a power: the tile last acted on (drag powers act once per tile entered).
+var _stroking := false
+var _stroke_tile := Vector2i(-1, -1)
+## Where the left button went down while inspecting (a click inspects, a drag pans).
+var _press_at := Vector2(-1, -1)
+## First kingdom clicked for a whisper (war, peace, alliance), or -1.
+var _whisper_from := -1
+## What the inspector follows: a unit or a village, or -1.
+var _pinned_unit := -1
+var _pinned_village := -1
+## People a settled village starts with.
+const SETTLERS := 10
 
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(Biomes.COLORS[Biomes.DEEP_WATER].darkened(0.4))
 	add_child(_map)
 	add_child(_sim)
+	add_child(_brush)
 	add_child(_camera)
 	_camera.make_current()
 	_hud.settings = settings
@@ -46,6 +62,14 @@ func _ready() -> void:
 	_hud.go_to_year_requested.connect(func(year, seconds): _going = _sim.GoToYear(year, seconds))
 	_hud.start_requested.connect(start_peoples)
 	add_child(_hud)
+	_hud.powers.power_changed.connect(func(_power, _arg):
+		_whisper_from = -1
+		_stroking = false
+		_hud.notice(_hud.powers.hint(), 4.0))
+	_hud.powers.law_toggled.connect(func(law, on): _sim.SetLaw(law, on))
+	_hud.inspector.closed.connect(func():
+		_pinned_unit = -1
+		_pinned_village = -1)
 	generate()
 
 
@@ -60,6 +84,11 @@ func generate() -> void:
 	_camera.frame_all()
 	_hud.set_stats(world)
 	_hud.clear_events()
+	# A new world: nothing of the old one is followed, the powers know its creatures and laws.
+	_hud.inspector.close()
+	_whisper_from = -1
+	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes())
+	_hud.powers.set_laws(_sim.LawTable())
 	# The world waits while the player chooses its peoples.
 	_sim.SetTimeScale(0.0)
 	_hud.show_setup()
@@ -83,17 +112,114 @@ func show_layer(layer: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _camera.handle_input(event):
+	if world != null and not _hud.setup_visible() and _power_input(event):
 		get_viewport().set_input_as_handled()
 		return
-	var key := event as InputEventKey
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_F:
-		# Test tool, not a god power yet (powers come once the simulation runs on its own): set
-		# fire where the mouse points.
-		var tile := pick_tile(get_viewport().get_mouse_position())
-		if tile.x >= 0:
-			_sim.Ignite(tile.x + 0.5, tile.y + 0.5, 1.5)
+	if _camera.handle_input(event):
 		get_viewport().set_input_as_handled()
+
+
+## The left button with a power chosen acts on the world (the other buttons, the wheel and the
+## trackpad still move the camera); while inspecting, a click inspects and a drag pans.
+## Returns true when the event was used.
+func _power_input(event: InputEvent) -> bool:
+	var powers := _hud.powers
+	var mb := event as InputEventMouseButton
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
+		if powers.power == "inspect":
+			if mb.pressed:
+				_press_at = mb.position
+			elif _press_at.distance_to(mb.position) < 5.0:
+				_inspect(mb.position)
+			return false
+		_stroking = mb.pressed
+		_stroke_tile = Vector2i(-1, -1)
+		if mb.pressed:
+			_use_power(mb.position)
+		return true
+	var motion := event as InputEventMouseMotion
+	if motion != null and _stroking:
+		# The button was let go over the interface: the stroke is over.
+		if motion.button_mask & MOUSE_BUTTON_MASK_LEFT == 0:
+			_stroking = false
+			return false
+		if powers.drags():
+			_use_power(motion.position)
+		return true
+	return false
+
+
+## Applies the chosen power under a screen position.
+func _use_power(screen_pos: Vector2) -> void:
+	var powers := _hud.powers
+	var at := _camera.screen_to_world(screen_pos) / WorldMap.TILE
+	var tile := Vector2i(floori(at.x), floori(at.y))
+	if tile == _stroke_tile:
+		return
+	_stroke_tile = tile
+	var r: float = powers.radius()
+	match powers.power:
+		"fire":
+			_sim.PowerFire(at.x, at.y, r)
+		"rain":
+			_sim.PowerRain(at.x, at.y, r)
+		"smite":
+			_sim.PowerSmite(at.x, at.y, r)
+		"bless":
+			_sim.PowerBless(at.x, at.y, r)
+		"biome":
+			_sim.PowerBiome(powers.arg, at.x, at.y, r)
+		"lightning":
+			_sim.PowerLightning(at.x, at.y)
+		"meteor":
+			_sim.PowerMeteor(at.x, at.y, r)
+		"spawn":
+			if _sim.PowerSpawn(powers.arg, at.x, at.y, powers.brush) == 0:
+				_hud.notice("Creatures need land to stand on.")
+		"settle":
+			if _sim.PowerSettle(powers.arg, at.x, at.y, SETTLERS) < 0:
+				_hud.notice("A village needs free land: not the sea, not another village's ground.")
+		"war", "peace", "alliance":
+			_whisper(powers.power, _sim.KingdomAt(at.x, at.y))
+
+
+## Whispers take two clicks: the kingdom that acts, then the other one.
+func _whisper(kind: String, kingdom: int) -> void:
+	if kingdom < 0:
+		_hud.notice("No kingdom owns this land.")
+		return
+	var names := {}
+	for k in _sim.KingdomTable():
+		names[k.index] = k.name
+	if _whisper_from < 0:
+		_whisper_from = kingdom
+		_hud.notice("%s listens… now click the other kingdom's land." % names.get(kingdom, "The kingdom"), 6.0)
+		return
+	var from := _whisper_from
+	_whisper_from = -1
+	if not _sim.PowerWhisper(kind, from, kingdom):
+		_hud.notice({"war": "They are already at war, or it is the same kingdom.",
+				"peace": "They are not at war.", "alliance": "They are at war, already allies, or the same kingdom."}[kind])
+
+
+## Pins the creature under a screen position in the inspector, else the village owning the land.
+func _inspect(screen_pos: Vector2) -> void:
+	var at := _camera.screen_to_world(screen_pos) / WorldMap.TILE
+	_pinned_unit = _sim.UnitAt(at.x, at.y, 0.9)
+	_pinned_village = _sim.VillageAt(at.x, at.y) if _pinned_unit < 0 else -1
+	if _pinned_unit < 0 and _pinned_village < 0:
+		_hud.inspector.close()
+	_refresh_inspector()
+
+
+func _refresh_inspector() -> void:
+	if _pinned_unit >= 0:
+		if _sim.UnitAlive(_pinned_unit):
+			_hud.inspector.show_unit(_sim.UnitName(_pinned_unit), _sim.UnitInfo(_pinned_unit))
+		else:
+			_hud.inspector.close()
+	elif _pinned_village >= 0:
+		_hud.inspector.show_village(_sim.VillageInfo(_pinned_village))
 
 
 func _process(_delta: float) -> void:
@@ -104,6 +230,20 @@ func _process(_delta: float) -> void:
 	_map.set_scorch(_sim.TakeScorchChanges())
 	_map.set_overlay(_sim.TakeOverlayChanges())
 	_map.set_frost(_sim.Coldness())
+	# Land repainted by the biome brush.
+	var repainted: PackedInt32Array = _sim.TakeBiomeChanges()
+	if not repainted.is_empty():
+		var tiles := PackedInt32Array()
+		for k in range(0, repainted.size(), 2):
+			world.biome[repainted[k]] = repainted[k + 1]
+			tiles.append(repainted[k])
+		_map.update_tiles(tiles)
+	# The brush follows the mouse while a power is chosen.
+	var pointer := get_viewport().get_mouse_position()
+	_brush.visible = _hud.powers.power != "inspect" and not _hud.setup_visible()
+	_brush.position = _camera.screen_to_world(pointer)
+	_brush.zoom = _camera.zoom.x
+	_brush.radius = (_hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor"] else 0.6) * WorldMap.TILE
 	var tagged: PackedStringArray = _sim.TakeTaggedEvents()
 	for k in range(0, tagged.size(), 2):
 		_hud.add_event(tagged[k + 1], tagged[k])
@@ -129,6 +269,7 @@ func _process(_delta: float) -> void:
 		_hud.set_plans(_sim.PlanTable())
 		_hud.set_inventions(_sim.InventionTable())
 		_hud.set_mind(_sim.MindStatus())
+		_refresh_inspector()
 	_update_map_labels()
 	var mouse := get_viewport().get_mouse_position()
 	# A creature under the mouse: who it is.
