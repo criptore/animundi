@@ -52,6 +52,8 @@ func _initialize() -> void:
 	test_villages()
 	test_kingdoms()
 	test_inventions()
+	test_powers()
+	test_power_bar()
 	print("\n%s (%d failed)" % ["FAILED" if _failures else "ALL PASSED", _failures])
 	quit(_failures)
 
@@ -795,7 +797,41 @@ func test_inventions() -> void:
 		check(record is Dictionary and record.has("kind") and record.has("effects") and not sim.LastModelError.begins_with("not valid JSON"),
 				"the built-in model answers in the background with a record of the invention language, then validated (%s)" % [
 				sim.LastModelError if sim.LastModelError != "" else "accepted"])
+		# Its grammar knows which effects each kind may have, and that work effects name a job:
+		# even a random model can't break those rules (caps, budget and cost are the engine's).
+		var broken := []
+		for i in 6:
+			var asked: int = sim.ModelAnswers + sim.ModelFailures
+			sim.AskMind(k)
+			for wait in 800:
+				sim.RunSteps(5)
+				OS.delay_msec(25)
+				if sim.ModelAnswers + sim.ModelFailures > asked:
+					break
+			var why: String = sim.LastModelError
+			if "cannot '" in why or "needs a job" in why or "amount must be" in why or why.begins_with("not valid JSON"):
+				broken.append(why)
+		check(broken.is_empty(), "the grammar only writes valid JSON, each kind with its own effects within their caps, and a job where one is needed (%s)" % [broken])
 	sim.StopMind()
+	# The JSON schema sent to model servers carries the same rules.
+	var schema: Dictionary = JSON.parse_string(sim.MindSchema())
+	var schema_ok: bool = schema.has("anyOf") and schema.anyOf.size() == 5
+	var allowed := {"tool": ["work_speed", "yield"], "weapon": ["attack"], "armour": ["defense"],
+			"technique": ["work_speed", "yield", "food", "loyalty"], "building": ["defense", "homes", "food", "loyalty"]}
+	if schema_ok:
+		for branch in schema.anyOf:
+			var kind: String = branch.properties.kind.enum[0]
+			var dos := []
+			for e in branch.properties.effects.items.anyOf:
+				dos.append(e.properties.do.enum[0])
+				if e.properties.do.enum[0] in ["work_speed", "yield"] and not ("job" in e.required):
+					schema_ok = false
+			dos.sort()
+			var want: Array = allowed[kind].duplicate()
+			want.sort()
+			if dos != want:
+				schema_ok = false
+	check(schema_ok, "the schema sent to model servers allows each kind only its own effects, and requires a job for work effects")
 	check(sim.MindStatus().status == "off", "the built-in mind can be stopped: the procedural inventor takes over")
 	sim.queue_free()
 
@@ -1018,3 +1054,179 @@ func test_peoples() -> void:
 	check(sim.CountOnWater() == 0, "no one walks on water")
 	check(sim.UnitInfo(sim.UnitAt(w.width / 2.0, w.height / 2.0, 500.0)) != "", "the HUD can describe a creature")
 	sim.queue_free()
+
+
+## God powers (sim/Powers.cs): each one a call on the simulation with a place in tiles.
+func test_powers() -> void:
+	var made := make_sim("powers", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	var land := find_tile(w, Biomes.FOREST)
+	if land.x < 0:
+		land = find_tile(w, -1)
+	var x := land.x + 0.5
+	var y := land.y + 0.5
+	var sea := Vector2i(-1, -1)
+	for i in w.size():
+		if w.level[i] == WorldData.Level.DEEP_SEA:
+			sea = Vector2i(i % w.width, i / w.width)
+			break
+
+	# Smite and bless.
+	sim.ClearUnits()
+	for k in 10:
+		sim.SpawnAt("rabbit", x, y, false)
+	var rabbits: int = sim.PopulationOf("rabbit")
+	var blessed: int = sim.SpawnAt("rabbit", x, y, false)
+	sim.SetNeeds(blessed, 0.9, 0.9)
+	check(sim.PowerBless(x, y, 3.0) >= 1 and sim.UnitHunger(blessed) == 0.0 and sim.UnitThirst(blessed) == 0.0,
+			"bless feeds and heals the creatures under the brush")
+	check(sim.PowerSmite(x, y, 3.0) == rabbits + 1 and sim.PopulationOf("rabbit") == 0,
+			"smite kills every creature under the brush (%d left)" % sim.PopulationOf("rabbit"))
+
+	# Fire, then rain.
+	var lit: int = sim.PowerFire(x, y, 2.0)
+	check(lit > 0 and sim.TileOnFire(land.x, land.y), "the fire power sets the land alight (%d tiles)" % lit)
+	var out: int = sim.PowerRain(x, y, 4.0)
+	check(out > 0 and sim.BurningCount() == 0, "rain puts the fire out (%d tiles, %d still burning)" % [out, sim.BurningCount()])
+	check(sim.GrassAt(land.x, land.y) > 0.0, "rain makes the grass grow back")
+
+	# Lightning and meteor.
+	sim.SpawnAt("wolf", x, y, false)
+	check(sim.PowerLightning(x, y) == 1 and sim.PopulationOf("wolf") == 0, "lightning kills what it strikes")
+	sim.PowerRain(x, y, 6.0)
+	for k in 4:
+		sim.SpawnAt("deer", x, y, false)
+	var plants_before: int = sim.PlantCount()
+	check(sim.PowerMeteor(x, y, 3.0) == 4 and sim.ScorchAt(land.x, land.y) == 255 and sim.PlantCount() < plants_before,
+			"a meteor kills, scorches the ground and flattens the plants")
+	check(sim.TakeScorchChanges().size() > 0, "the map is told about the scorched ground")
+
+	# Nothing happens on water or outside the map.
+	var nothing := 0
+	for p in [Vector2(-5, -5), Vector2(w.width + 9, 3), Vector2(sea.x + 0.5, sea.y + 0.5)]:
+		nothing += sim.PowerFire(p.x, p.y, 2.0) + sim.PowerLightning(p.x, p.y) + sim.PowerRain(p.x, p.y, 2.0) \
+				+ sim.PowerMeteor(p.x, p.y, 0.4) + sim.PowerSmite(p.x, p.y, 2.0) + sim.PowerBless(p.x, p.y, 2.0)
+	check(sea.x >= 0 and nothing == 0, "powers do nothing on the sea or outside the map (%d)" % nothing)
+	sim.RunSteps(120)
+
+	# Creatures and peoples.
+	sim.ClearUnits()
+	var wolves: int = sim.PopulationOf("wolf")
+	check(sim.PowerSpawn("wolf", x, y, 5) == 5 and sim.PopulationOf("wolf") == wolves + 5, "the spawn power brings creatures")
+	check(sim.PowerSpawn("wolf", sea.x + 0.5, sea.y + 0.5, 5) == 0 and sim.PowerSpawn("unicorn", x, y, 5) == 0 and sim.PowerSpawn("humans", x, y, 5) == 0,
+			"nothing is spawned on the sea, nor an unknown species, nor a people as a beast")
+	check("dragon" in sim.SpawnableSpecies() and "humans" in sim.RaceIds() and not ("humans" in sim.SpawnableSpecies()),
+			"the powers list creatures and peoples apart")
+	var villages: int = sim.VillageCount()
+	var people: int = sim.PeopleCount()
+	var settled: int = sim.PowerSettle("humans", x, y, 8)
+	check(settled >= 0 and sim.VillageCount() == villages + 1 and sim.PeopleCount() == people + 8,
+			"the settle power founds a village with its people (%d, %d villages, %d people)" % [settled, sim.VillageCount(), sim.PeopleCount()])
+	check(sim.PowerSettle("elves", x, y, 8) == -1 and sim.PowerSettle("elves", sea.x + 0.5, sea.y + 0.5, 8) == -1
+			and sim.PowerSettle("martians", x, y, 8) == -1 and sim.VillageCount() == villages + 1,
+			"no village on another's land, on the sea or of an unknown people")
+	check(sim.VillageAt(x, y) == settled and sim.KingdomAt(x, y) >= 0 and sim.VillageAt(sea.x + 0.5, sea.y + 0.5) == -1
+			and sim.KingdomAt(-3.0, -3.0) == -1 and sim.VillageInfo(settled).name != "" and sim.VillageInfo(999).is_empty(),
+			"the land tells which village and kingdom own it")
+
+	# Whispers: a second kingdom far enough to have its own land.
+	var far := Vector2i(-1, -1)
+	for i in w.size():
+		var p := Vector2i(i % w.width, i / w.width)
+		if not w.is_water(i) and sim.VillageAt(p.x, p.y) == -1 and absi(p.x - land.x) + absi(p.y - land.y) > 30:
+			far = p
+			break
+	var other: int = sim.PowerSettle("orcs", far.x + 0.5, far.y + 0.5, 8)
+	var ka: int = sim.KingdomAt(x, y)
+	var kb: int = sim.KingdomAt(far.x + 0.5, far.y + 0.5)
+	check(other >= 0 and ka >= 0 and kb >= 0 and ka != kb, "two peoples settled by the player are two kingdoms")
+	var war_ok: bool = sim.PowerWhisper("war", ka, kb)
+	var wars_text := ""
+	for k in sim.KingdomTable():
+		wars_text += str(k.wars)
+	check(war_ok and wars_text != "" and not sim.PowerWhisper("war", ka, kb) and not sim.PowerWhisper("alliance", ka, kb),
+			"a whisper of war starts a war, once (%s)" % wars_text)
+	var peace_ok: bool = sim.PowerWhisper("peace", ka, kb)
+	wars_text = ""
+	for k in sim.KingdomTable():
+		wars_text += str(k.wars)
+	check(peace_ok and wars_text == "" and not sim.PowerWhisper("peace", ka, kb), "a whisper of peace ends it (%s)" % wars_text)
+	check(sim.PowerWhisper("alliance", ka, kb) and not sim.PowerWhisper("alliance", ka, kb), "a whisper of friendship allies them, once")
+	check(not sim.PowerWhisper("war", ka, ka) and not sim.PowerWhisper("war", ka, 99) and not sim.PowerWhisper("war", -1, kb)
+			and not sim.PowerWhisper("gossip", ka, kb), "whispers that make no sense are refused")
+	check(sim.LawTable().has("hunger") and sim.LawTable().hunger == true, "the laws of the world are listed")
+	sim.SetLaw("hunger", false)
+	check(sim.LawTable().hunger == false, "a law can be switched off")
+	sim.SetLaw("hunger", true)
+
+	# The biome brush.
+	var spot := Vector2(far.x + 0.5, far.y + 12.5) if not w.is_water(w.index(far.x, far.y + 12)) else Vector2(x + 14.0, y)
+	sim.TakeBiomeChanges()
+	var painted: int = sim.PowerBiome("Desert", spot.x, spot.y, 2.0)
+	var changes: PackedInt32Array = sim.TakeBiomeChanges()
+	var all_desert := changes.size() == painted * 2
+	for k in range(1, changes.size(), 2):
+		all_desert = all_desert and changes[k] == Biomes.DESERT
+	check(painted > 0 and all_desert and sim.TakeBiomeChanges().is_empty(), "the biome brush paints the land and tells the map, once (%d tiles)" % painted)
+	check(sim.PowerBiome("Desert", spot.x, spot.y, 2.0) == 0 and sim.PowerBiome("Water", spot.x, spot.y, 2.0) == 0
+			and sim.PowerBiome("Candy", spot.x, spot.y, 2.0) == 0 and sim.PowerBiome("Lava", sea.x + 0.5, sea.y + 0.5, 1.0) == 0,
+			"nothing to paint: the same biome, a water biome, an unknown one, the sea")
+	sim.SpawnAt("bear", spot.x, spot.y, false)
+	var bears: int = sim.PopulationOf("bear")
+	check(sim.PowerBiome("Lava", spot.x, spot.y, 2.0) > 0 and sim.PopulationOf("bear") == bears - 1, "lava kills what stands on it")
+	check(sim.PowerBiome("Forest", x, y, 3.0) >= 0, "the brush paints over a village's land")
+	sim.RunSteps(1800)
+	check(sim.VillageCount() >= 1, "the world goes on after the powers (%d villages)" % sim.VillageCount())
+	sim.queue_free()
+
+
+## The god powers bar: a button per power, menus for what to bring or paint, a brush, the laws.
+func test_power_bar() -> void:
+	var PowerBar = load("res://scripts/ui/power_bar.gd")
+	var Inspector = load("res://scripts/ui/inspector.gd")
+	var bar: PanelContainer = PowerBar.new()
+	root.add_child(bar)
+	bar.setup(PackedStringArray(["wolf", "dragon"]), PackedStringArray(["humans", "orcs"]), PackedStringArray(["Desert", "Lava"]))
+	var got := []
+	bar.power_changed.connect(func(power, arg): got.append([power, arg]))
+	check(bar.power == "inspect" and not bar.drags(), "the bar starts on Inspect")
+	bar.select("fire")
+	check(got == [["fire", ""]] and bar.drags() and bar.hint() != "", "choosing a power tells the game (%s)" % [got])
+	bar.select("spawn")
+	check(bar.power == "spawn" and bar.arg == "wolf" and "wolf" in bar.hint(), "a power that brings something remembers what (%s)" % bar.hint())
+	bar._pick("biome", "Lava")
+	check(bar.power == "biome" and bar.arg == "Lava" and got[-1] == ["biome", "Lava"], "picking in a menu chooses the power and what it paints")
+	bar.select("nonsense")
+	check(bar.power == "inspect", "an unknown power falls back to Inspect")
+	bar.brush = 2
+	bar.step_brush(1)
+	var up: int = bar.brush
+	for k in 9:
+		bar.step_brush(1)
+	var top: int = bar.brush
+	for k in 9:
+		bar.step_brush(-1)
+	check(up == 3 and top == 8 and bar.brush == 1 and bar.radius() > 0.5, "the brush steps through its sizes and stops at both ends")
+	var laws := []
+	bar.law_toggled.connect(func(law, on): laws.append([law, on]))
+	bar.set_laws({"hunger": true, "old_age": false})
+	bar._toggle_law(0)
+	bar._toggle_law(1)
+	check(laws == [["hunger", false], ["old_age", true]], "the laws menu switches laws (%s)" % [laws])
+	for id in bar.POWERS:
+		if not bar._buttons.has(id):
+			check(false, "no button for the power %s" % id)
+	bar.queue_free()
+
+	var card: PanelContainer = Inspector.new()
+	root.add_child(card)
+	var closed := [0]
+	card.closed.connect(func(): closed[0] += 1)
+	card.show_unit("Aldo", "Aldo · Humans man, villager, 20 years · farmer of Tolm")
+	check(card.visible and card._title.text == "Aldo", "the inspector shows a creature")
+	card.show_village({})
+	check(not card.visible and closed[0] == 1, "the inspector closes when its village is gone")
+	card.close()
+	check(closed[0] == 1, "closing twice tells once")
+	card.queue_free()

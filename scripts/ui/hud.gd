@@ -16,6 +16,8 @@ const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 const SetupPanel = preload("res://scripts/ui/setup_panel.gd")
 const Banner = preload("res://scripts/ui/banner.gd")
+const PowerBar = preload("res://scripts/ui/power_bar.gd")
+const Inspector = preload("res://scripts/ui/inspector.gd")
 
 var settings: WorldSettings
 
@@ -25,6 +27,12 @@ var _continents: SpinBox
 var _water: SpinBox
 var _climate: SpinBox
 var _hover_label: Label
+## The god powers bar and the inspector card (scripts/main.gd drives them).
+var powers := PowerBar.new()
+var inspector := Inspector.new()
+## A short message shown in the bottom bar instead of the hover text, until this time (ms).
+var _notice := ""
+var _notice_until := 0
 var _stats_label: Label
 var _layer_buttons := {}
 var _world_stats := ""
@@ -134,7 +142,7 @@ func _ready() -> void:
 	spawn.tooltip_text = "Spawn 1000 wandering animals: a stress test of the C# simulation"
 	spawn.pressed.connect(func(): spawn_requested.emit(1000))
 	layers.add_child(spawn)
-	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nHover a creature: who it is\nR: new world\nF: fire under the mouse (test)")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nHover a creature: who it is\nR: new world\nPowers: pick one below, click the map\nEsc: back to Inspect · [ ]: brush size")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 
@@ -249,6 +257,21 @@ func _ready() -> void:
 	_stats_label = _label("")
 	info.add_child(_stats_label)
 
+	# The god powers, just above the bottom bar, and the inspector card under the top bar.
+	powers.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	powers.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	powers.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	powers.offset_bottom = -34
+	powers.offset_top = -34
+	root.add_child(powers)
+	inspector.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	inspector.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	inspector.offset_right = -8
+	inspector.offset_left = -8
+	inspector.offset_top = 40
+	inspector.offset_bottom = 40
+	root.add_child(inspector)
+
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
@@ -258,6 +281,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		randomize_seed()
 	elif key.keycode == KEY_U:
 		spawn_requested.emit(1000)
+	elif key.keycode == KEY_ESCAPE:
+		powers.deselect()
+	elif key.keycode == KEY_BRACKETLEFT or key.keycode == KEY_BRACKETRIGHT:
+		powers.step_brush(-1 if key.keycode == KEY_BRACKETLEFT else 1)
 	elif key.keycode == KEY_SPACE:
 		_set_speed(_speed_before_pause if _speed == 0.0 else 0.0)
 	elif key.keycode == KEY_PERIOD or key.keycode == KEY_COMMA:
@@ -276,6 +303,13 @@ func randomize_seed() -> void:
 
 
 func set_hover_text(text: String) -> void:
+	_hover_label.text = _notice if Time.get_ticks_msec() < _notice_until else text
+
+
+## Says something in the bottom bar for a few seconds (what a power just did, or why it didn't).
+func notice(text: String, seconds := 3.0) -> void:
+	_notice = text
+	_notice_until = Time.get_ticks_msec() + int(seconds * 1000.0)
 	_hover_label.text = text
 
 
