@@ -1,5 +1,6 @@
-## Entry scene: generates a world and shows it as a flat 2D map (one texture, one texel per tile),
-## with the map camera and the HUD.
+## Entry scene: generates a world and shows it with the HUD, in the tilt view (the world seen at an
+## angle, scripts/render_tilt/tilt_view.gd) or as a flat 2D map (one texture, one texel per tile).
+## V goes from one to the other, looking at the same place.
 extends Node2D
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
@@ -13,6 +14,7 @@ const Flora = preload("res://scripts/world/flora.gd")
 const SimulationScript = preload("res://sim/Simulation.cs")
 const Hud = preload("res://scripts/ui/hud.gd")
 const BrushCursor = preload("res://scripts/ui/brush_cursor.gd")
+const TiltView = preload("res://scripts/render_tilt/tilt_view.gd")
 
 ## Animals placed on a new world: one per this many tiles.
 const TILES_PER_ANIMAL := 300
@@ -33,6 +35,10 @@ var _camera := MapCamera.new()
 var _hud := Hud.new()
 ## God powers (scripts/ui/power_bar.gd picks, sim/Powers.cs acts).
 var _brush := BrushCursor.new()
+## The tilt view and whether it is the one shown (set_tilt); its brush is drawn on the screen.
+var _tilt := TiltView.new()
+var tilt_on := true
+var _tilt_brush := BrushCursor.new()
 ## Left button held with a power: the tile last acted on (drag powers act once per tile entered).
 var _stroking := false
 var _stroke_tile := Vector2i(-1, -1)
@@ -54,6 +60,13 @@ func _ready() -> void:
 	add_child(_brush)
 	add_child(_camera)
 	_camera.make_current()
+	add_child(_tilt)
+	var over := CanvasLayer.new()
+	over.layer = 0
+	over.add_child(_tilt_brush)
+	add_child(over)
+	_hud.tilt_toggled.connect(set_tilt)
+	_hud.hour_requested.connect(next_hour)
 	_hud.settings = settings
 	_hud.generate_requested.connect(generate)
 	_hud.layer_selected.connect(show_layer)
@@ -82,6 +95,9 @@ func generate() -> void:
 	_sim.SpawnNatural(world.size() / TILES_PER_ANIMAL)
 	_camera.bounds = _map.pixel_size()
 	_camera.frame_all()
+	# The tilt view is built over the new world's ground and the simulation's new batches.
+	_tilt.setup(self)
+	_apply_view()
 	_hud.set_stats(world)
 	_hud.clear_events()
 	# A new world: nothing of the old one is followed, the powers know its creatures and laws.
@@ -108,14 +124,62 @@ func start_peoples(races: PackedStringArray, per_village: int, ai := false) -> v
 func show_layer(layer: String) -> void:
 	current_layer = layer
 	_map.show_layer(layer)
-	_sim.SetLifeVisible(layer == "Biomes")
+	_apply_view()
+
+
+## Shows the tilt view or the flat map, looking at the same place from as far.
+func set_tilt(on: bool) -> void:
+	if on != tilt_on and world != null:
+		if on:
+			var tiles := get_viewport().get_visible_rect().size.y / (_camera.zoom.x * WorldMap.TILE)
+			_tilt.camera.look_at_tile(_camera.position / WorldMap.TILE, _tilt.camera.distance_for(tiles))
+		else:
+			_camera.look_at_point(_tilt.camera.target * WorldMap.TILE, _view_zoom())
+	tilt_on = on
+	_apply_view()
+
+
+## The next hour of the day in the tilt view: dawn, noon, afternoon, dusk, night.
+func next_hour() -> void:
+	var hours := TiltView.HOURS
+	var next := 0
+	for i in hours.size():
+		if hours[i].t <= _tilt.time_of_day + 0.01:
+			next = (i + 1) % hours.size()
+	var hour_name := _tilt.set_time(hours[next].t)
+	_hud.notice("Hour: %s%s" % [hour_name, "" if tilt_on else " (seen in the tilt view, V)"])
+
+
+## Shows what the chosen view and layer call for: one view draws the world, the data layers
+## hide plants and creatures.
+func _apply_view() -> void:
+	var life := current_layer == "Biomes"
+	_map.visible = not tilt_on
+	_sim.SetLifeVisible(life and not tilt_on)
+	_tilt.set_enabled(tilt_on)
+	_tilt.set_plain(not life)
+	_hud.show_tilt(tilt_on)
+
+
+## Screen pixels per world pixel in the current view (in the tilt view, at the place looked at).
+func _view_zoom() -> float:
+	if tilt_on:
+		return get_viewport().get_visible_rect().size.y / (_tilt.camera.view_height() * WorldMap.TILE)
+	return _camera.zoom.x
+
+
+## The point of the world (tiles) under a screen position, in the current view.
+func _ground_at(screen_pos: Vector2) -> Vector2:
+	if tilt_on:
+		return _tilt.pick(screen_pos)
+	return _camera.screen_to_world(screen_pos) / WorldMap.TILE
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if world != null and not _hud.setup_visible() and _power_input(event):
 		get_viewport().set_input_as_handled()
 		return
-	if _camera.handle_input(event):
+	if _tilt.camera.handle_input(event) if tilt_on else _camera.handle_input(event):
 		get_viewport().set_input_as_handled()
 
 
@@ -152,7 +216,7 @@ func _power_input(event: InputEvent) -> bool:
 ## Applies the chosen power under a screen position.
 func _use_power(screen_pos: Vector2) -> void:
 	var powers := _hud.powers
-	var at := _camera.screen_to_world(screen_pos) / WorldMap.TILE
+	var at := _ground_at(screen_pos)
 	var tile := Vector2i(floori(at.x), floori(at.y))
 	if tile == _stroke_tile:
 		return
@@ -204,7 +268,7 @@ func _whisper(kind: String, kingdom: int) -> void:
 
 ## Pins the creature under a screen position in the inspector, else the village owning the land.
 func _inspect(screen_pos: Vector2) -> void:
-	var at := _camera.screen_to_world(screen_pos) / WorldMap.TILE
+	var at := _ground_at(screen_pos)
 	_pinned_unit = _sim.UnitAt(at.x, at.y, 0.9)
 	_pinned_village = _sim.VillageAt(at.x, at.y) if _pinned_unit < 0 else -1
 	if _pinned_unit < 0 and _pinned_village < 0:
@@ -225,8 +289,10 @@ func _refresh_inspector() -> void:
 func _process(_delta: float) -> void:
 	if world == null:
 		return
-	_sim.SetZoom(_camera.zoom.x)
-	_sim.SetView(_camera.position, get_viewport().get_visible_rect().size / _camera.zoom.x)
+	# What the simulation draws follows the flat camera; the tilt view asks for what it needs.
+	if not tilt_on:
+		_sim.SetZoom(_camera.zoom.x)
+		_sim.SetView(_camera.position, get_viewport().get_visible_rect().size / _camera.zoom.x)
 	_map.set_scorch(_sim.TakeScorchChanges())
 	_map.set_overlay(_sim.TakeOverlayChanges())
 	_map.set_frost(_sim.Coldness())
@@ -240,10 +306,17 @@ func _process(_delta: float) -> void:
 		_map.update_tiles(tiles)
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
-	_brush.visible = _hud.powers.power != "inspect" and not _hud.setup_visible()
-	_brush.position = _camera.screen_to_world(pointer)
-	_brush.zoom = _camera.zoom.x
-	_brush.radius = (_hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor"] else 0.6) * WorldMap.TILE
+	var brushing: bool = _hud.powers.power != "inspect" and not _hud.setup_visible()
+	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor"] else 0.6
+	var at := _ground_at(pointer)
+	_brush.visible = brushing and not tilt_on
+	_tilt_brush.visible = brushing and tilt_on
+	if tilt_on:
+		_tilt_brush.outline = _tilt.ring(at, reach)
+	else:
+		_brush.position = at * WorldMap.TILE
+		_brush.zoom = _camera.zoom.x
+		_brush.radius = reach * WorldMap.TILE
 	var tagged: PackedStringArray = _sim.TakeTaggedEvents()
 	for k in range(0, tagged.size(), 2):
 		_hud.add_event(tagged[k + 1], tagged[k])
@@ -271,9 +344,8 @@ func _process(_delta: float) -> void:
 		_hud.set_mind(_sim.MindStatus())
 		_refresh_inspector()
 	_update_map_labels()
-	var mouse := get_viewport().get_mouse_position()
+	var mouse := pointer
 	# A creature under the mouse: who it is.
-	var at := _camera.screen_to_world(mouse) / WorldMap.TILE
 	var unit: int = _sim.UnitAt(at.x, at.y, 0.9)
 	if unit >= 0:
 		_hud.set_hover_text(_sim.UnitInfo(unit))
@@ -293,10 +365,11 @@ func _process(_delta: float) -> void:
 ## Village names over their bonfires, when zoomed in enough to read them.
 func _update_map_labels() -> void:
 	var labels := []
-	if _camera.zoom.x >= 0.8 and current_layer == "Biomes":
+	if _view_zoom() >= 0.8 and current_layer == "Biomes":
 		var view := get_viewport().get_visible_rect().size
 		for v in _sim.VillageLabels():
-			var p := (Vector2(v.x + 0.5, v.y) * WorldMap.TILE - _camera.position) * _camera.zoom.x + view / 2.0
+			var p: Vector2 = _tilt.screen_of(Vector2(v.x + 0.5, v.y + 0.5), 1.0) if tilt_on \
+					else (Vector2(v.x + 0.5, v.y) * WorldMap.TILE - _camera.position) * _camera.zoom.x + view / 2.0
 			if Rect2(Vector2.ZERO, view).has_point(p):
 				# The rank (town, city), a crown on capitals, a siege under way.
 				var text: String = v.name
@@ -324,4 +397,4 @@ func _place_flora() -> void:
 
 ## Tile under a screen position, or (-1, -1).
 func pick_tile(screen_pos: Vector2) -> Vector2i:
-	return _map.tile_at(_camera.screen_to_world(screen_pos))
+	return _map.tile_at(_ground_at(screen_pos) * WorldMap.TILE)

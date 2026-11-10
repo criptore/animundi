@@ -11,6 +11,10 @@ signal start_requested(races: PackedStringArray, per_village: int, ai: bool)
 signal go_to_year_requested(year: int, seconds: float)
 ## The player asked for more animals (stress test of the simulation).
 signal spawn_requested(count: int)
+## The player chose the tilt view (true) or the flat map (false).
+signal tilt_toggled(on: bool)
+## The player asked for the next hour of the day (the tilt view's light).
+signal hour_requested
 
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
@@ -35,6 +39,7 @@ var _notice := ""
 var _notice_until := 0
 var _stats_label: Label
 var _layer_buttons := {}
+var _tilt_button: CheckButton
 var _world_stats := ""
 var _sprite_count := 0
 var _sim_stats := ""
@@ -137,12 +142,19 @@ func _ready() -> void:
 		b.pressed.connect(func(): layer_selected.emit(layer))
 		layers.add_child(b)
 		_layer_buttons[layer] = b
+	_tilt_button = CheckButton.new()
+	_tilt_button.text = "Tilt view (V)"
+	_tilt_button.tooltip_text = "The world seen at an angle, or the flat map (V) · T: next hour of the day"
+	_tilt_button.focus_mode = Control.FOCUS_NONE
+	_tilt_button.button_pressed = true
+	_tilt_button.toggled.connect(func(on): tilt_toggled.emit(on))
+	layers.add_child(_tilt_button)
 	var spawn := Button.new()
 	spawn.text = "+1000 animals (U)"
 	spawn.tooltip_text = "Spawn 1000 wandering animals: a stress test of the C# simulation"
 	spawn.pressed.connect(func(): spawn_requested.emit(1000))
 	layers.add_child(spawn)
-	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nHover a creature: who it is\nR: new world\nPowers: pick one below, click the map\nEsc: back to Inspect · [ ]: brush size")
+	var help := _label("\nWheel / pinch / + -: zoom\nDrag / two fingers / WASD: pan\nSpace: pause · , . : time speed\nHover a creature: who it is\nV: tilt view / flat map · T: hour\nR: new world\nPowers: pick one below, click the map\nEsc: back to Inspect · [ ]: brush size")
 	help.add_theme_font_size_override("font_size", 12)
 	layers.add_child(help)
 
@@ -281,6 +293,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		randomize_seed()
 	elif key.keycode == KEY_U:
 		spawn_requested.emit(1000)
+	elif key.keycode == KEY_V:
+		_tilt_button.button_pressed = not _tilt_button.button_pressed
+	elif key.keycode == KEY_T:
+		hour_requested.emit()
 	elif key.keycode == KEY_ESCAPE:
 		powers.deselect()
 	elif key.keycode == KEY_BRACKETLEFT or key.keycode == KEY_BRACKETRIGHT:
@@ -295,6 +311,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var layer: String = MapRenderer.LAYERS[key.keycode - KEY_1]
 		_layer_buttons[layer].button_pressed = true
 		layer_selected.emit(layer)
+
+
+## Shows which view is on, without asking for it again.
+func show_tilt(on: bool) -> void:
+	_tilt_button.set_pressed_no_signal(on)
 
 
 func randomize_seed() -> void:

@@ -1,5 +1,6 @@
-## The tilt view (prototype): the running game seen from a tilted perspective camera, in the
-## spirit of Cult of the Lamb, without changing the simulation.
+## The tilt view, the game's default view (scripts/main.gd owns it; V gives the flat map back): the
+## running game seen from a tilted perspective camera, in the spirit of Cult of the Lamb, without
+## changing the simulation.
 ##
 ## - Ground: a stepped mesh (tilt_terrain.gd) that reads the flat map's own textures.
 ## - Sprites: the simulation already fills MultiMeshes for the flat view (sim/Draw.cs). The same
@@ -15,9 +16,11 @@
 ##   reflections on water, blur); the further, the more it looks straight down at the plain map,
 ##   and the passes that no longer show are switched off (TiltCamera.closeness).
 ##
-## Add it to the main scene and call setup(main) once the world exists; set_enabled(false) gives
-## the flat view back. Limits of the prototype: a regenerated world or a tile changing level needs
-## setup again; picking and village banners still belong to the flat view.
+## The main scene adds it, calls setup(main) for every new world and set_enabled to show or hide
+## it. The mouse reaches the world through pick() (the ground under a screen position, cliffs
+## included) and the interface is placed over it with screen_of() and ring(). The camera's input
+## comes from the main scene, after the interface and the god powers had their say.
+## Limit: a tile changing level needs setup again (no power does that yet).
 extends Node3D
 
 const TiltTerrain = preload("res://scripts/render_tilt/tilt_terrain.gd")
@@ -49,7 +52,7 @@ const HOURS := [
 
 var camera := TiltCamera.new()
 ## 0 = dawn, 0.3 = noon, 0.8 = dusk, 1 = night (see HOURS).
-var time_of_day := 0.78
+var time_of_day := 0.8
 var enabled := true
 ## The miniature blur, the vignette and the tint (off: the raw 3D image).
 var effects := true
@@ -68,6 +71,12 @@ var _container := SubViewportContainer.new()
 var _viewport := SubViewport.new()
 var _environment := Environment.new()
 var _lights_wait := 0.0
+## Height of every tile (TiltTerrain.heights), for picking.
+var _heights := PackedFloat32Array()
+## The sprites, their shadows and their reflections: hidden on the data layers.
+var _life_nodes: Array[MultiMeshInstance3D] = []
+## A data layer is shown: plain colours, no life, no light of the hour.
+var _plain := false
 
 
 func _init() -> void:
@@ -106,12 +115,14 @@ func setup(main: Node) -> void:
 		m.set_shader_parameter("data", map._data_tex)
 	_reflections.set_shader_parameter("atlas", SpriteAtlas.shared().texture)
 	_reflection_nodes.clear()
+	_life_nodes.clear()
+	_heights = TiltTerrain.heights(world)
 	_terrain.set_shader_parameter("colors", map.texture)
 	_terrain.set_shader_parameter("ground", map._ground_tex)
 	_sprites.set_shader_parameter("atlas", SpriteAtlas.shared().texture)
 	_shadows.set_shader_parameter("shadow_texture", SpriteBatch.shadow_texture())
 
-	for mesh in TiltTerrain.build(world):
+	for mesh in TiltTerrain.build(world, _heights):
 		var inst := MeshInstance3D.new()
 		inst.mesh = mesh
 		inst.material_override = _terrain
@@ -135,7 +146,8 @@ func setup(main: Node) -> void:
 			batches.append(child)
 		else:
 			for grandchild in child.get_children():
-				if grandchild is MultiMeshInstance2D:
+				# A new world frees the old one's plant strips, which leave at the end of the frame.
+				if grandchild is MultiMeshInstance2D and not grandchild.is_queued_for_deletion():
 					batches.append(grandchild)
 	for pass_shadows in [true, false]:
 		for batch in batches:
@@ -147,6 +159,7 @@ func setup(main: Node) -> void:
 			inst.custom_aabb = everywhere
 			inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			space.add_child(inst)
+			_life_nodes.append(inst)
 			if not pass_shadows:
 				# The same batch once more, mirrored on the water (shown close up only).
 				var mirror := MultiMeshInstance3D.new()
@@ -156,6 +169,7 @@ func setup(main: Node) -> void:
 				mirror.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				space.add_child(mirror)
 				_reflection_nodes.append(mirror)
+				_life_nodes.append(mirror)
 
 	_environment.background_mode = Environment.BG_COLOR
 	_environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
@@ -166,30 +180,68 @@ func setup(main: Node) -> void:
 	camera = TiltCamera.new()
 	camera.bounds = size
 	space.add_child(camera)
-	camera.look_at_tile(size / 2.0, 34.0)
+	camera.frame_all()
 
 	# Right after the main scene in the tree: its _process runs first, then this one, then the
 	# simulation's (which fills the batches).
 	if get_parent() == main:
 		main.move_child(self, 0)
 	set_enabled(enabled)
+	set_plain(_plain)
 	set_time(time_of_day)
 
 
-## Shows the tilt view, or gives the flat view back.
+## Shows the tilt view or hides it (the main scene then shows the flat map: main.set_tilt).
 func set_enabled(on: bool) -> void:
 	enabled = on
 	_post_layer.visible = on
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
-	if _main == null:
-		return
-	_main._map.visible = not on
-	_main._sim.visible = not on
 	if on:
 		camera.make_current()
-		_container.material = _post if effects else null
-		# Village banners follow the flat camera: far enough away, the flat view draws none.
-		_main._camera.zoom = Vector2(0.05, 0.05)
+
+
+## The data layers of the map (height, temperature...): the layer's colours on the stepped
+## ground, without plants, creatures, patterns or the light of the hour.
+func set_plain(on: bool) -> void:
+	_plain = on
+	_terrain.set_shader_parameter("show_patterns", not on)
+	for node in _life_nodes:
+		node.visible = not on
+	_apply_look()
+
+
+## The ground point (tiles) under a screen position: what the mouse points at, cliffs and high
+## ground included.
+func pick(screen_pos: Vector2) -> Vector2:
+	if _main == null:
+		return Vector2.ZERO
+	var world = _main.world
+	return TiltTerrain.ray_hit(_heights, world.width, world.height,
+			camera.project_ray_origin(screen_pos), camera.project_ray_normal(screen_pos))
+
+
+## Height of the ground at a point in tiles (the sea outside the map).
+func height_at(point: Vector2) -> float:
+	var world = _main.world
+	var x := floori(point.x)
+	var y := floori(point.y)
+	return _heights[world.index(x, y)] if world.in_bounds(x, y) else TiltTerrain.SEA
+
+
+## Screen position of a ground point (tiles), `lift` tiles above the ground.
+func screen_of(point: Vector2, lift := 0.0) -> Vector2:
+	return camera.unproject_position(Vector3(point.x, height_at(point) + lift, point.y))
+
+
+## A circle of `radius` tiles lying on the ground at the height of its centre, as seen on the
+## screen: a closed line (the god powers' brush).
+func ring(center: Vector2, radius: float) -> PackedVector2Array:
+	var y := height_at(center) + 0.03
+	var points := PackedVector2Array()
+	for k in 49:
+		var a := TAU * k / 48.0
+		points.append(camera.unproject_position(Vector3(center.x + cos(a) * radius, y, center.y + sin(a) * radius)))
+	return points
 
 
 ## The viewport the 3D world is drawn in (tools: measuring its render time).
@@ -220,7 +272,7 @@ func set_time(t: float) -> String:
 func _apply_look() -> void:
 	if _look.is_empty():
 		return
-	var near := camera.closeness()
+	var near := 0.0 if _plain else camera.closeness()
 	var plain := Vector3.ONE
 	var sea := Biomes.COLORS[Biomes.DEEP_WATER].darkened(0.4)
 	var haze: Vector3 = Vector3(sea.r, sea.g, sea.b).lerp(_look.haze, near)
@@ -235,7 +287,7 @@ func _apply_look() -> void:
 	_shadows.set_shader_parameter("strength", lerpf(1.0, _look.shadow, near))
 	_reflections.set_shader_parameter("strength", near)
 	for node in _reflection_nodes:
-		node.visible = near > 0.03
+		node.visible = near > 0.03 and not _plain
 	# The blur belongs to the close, tilted view; far away the image is shown as it is.
 	_post.set_shader_parameter("blur", near * minf(1.3, 30.0 / camera.distance))
 	_post.set_shader_parameter("vignette", _look.vignette * near)
@@ -243,11 +295,6 @@ func _apply_look() -> void:
 	_post.set_shader_parameter("saturation", lerpf(1.0, 1.12, near))
 	_container.material = _post if effects and near > 0.03 else null
 	_environment.background_color = Color(haze.x, haze.y, haze.z)
-
-
-func _input(event: InputEvent) -> void:
-	if enabled and camera.handle_input(event):
-		get_viewport().set_input_as_handled()
 
 
 func _process(delta: float) -> void:
@@ -274,7 +321,7 @@ func _process(delta: float) -> void:
 ## nearest first when there are too many. None when the camera is too far for them to show.
 func _update_lights() -> void:
 	var found := []
-	if camera.closeness() > 0.03 and _look.get("fires", 0.0) > 0.0:
+	if camera.closeness() > 0.03 and not _plain and _look.get("fires", 0.0) > 0.0:
 		for b in _main._sim.BuildingTable():
 			var glow: Vector2 = BLAZE if b.burning else GLOWS.get(b.id, Vector2.ZERO)
 			if glow.x == 0.0 or not (b.done or b.burning):

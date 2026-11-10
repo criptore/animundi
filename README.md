@@ -141,6 +141,8 @@ Controls:
 | Brush size | [ and ], or the − and + buttons |
 | Follow a creature or a village | with Inspect, click it: its card stays on screen |
 | Laws of the world | the **Laws** menu of the powers bar |
+| Tilt view (the world seen at an angle, the default) or flat map | V, or the **Tilt view** switch; zoom out and the tilt view rises to look straight down |
+| Hour of the day in the tilt view (dawn, noon, afternoon, dusk, night) | T |
 | Map layers | 1 Biomes · 2 Height · 3 Temperature · 4 Humidity · 5 Rivers |
 | Tile info | hover the map (bottom bar) |
 

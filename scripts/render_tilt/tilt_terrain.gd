@@ -31,9 +31,30 @@ static func heights(world: WorldData) -> PackedFloat32Array:
 	return h
 
 
-## One mesh per chunk, row by row.
-static func build(world: WorldData) -> Array[ArrayMesh]:
-	var h := heights(world)
+## Where a ray meets the stepped ground: the (x, z) of the first point, going down from `from`
+## along `dir`, that is under the top of its tile (`h` from heights(); the sea all around the map).
+## A ray that does not go down gives the point under `from`.
+static func ray_hit(h: PackedFloat32Array, width: int, height: int, from: Vector3, dir: Vector3) -> Vector2:
+	if dir.y > -1e-4:
+		return Vector2(from.x, from.z)
+	# From the top of the mountains down to the sea, a twentieth of a tile at a time.
+	var a := from + dir * ((2.0 * STEP - from.y) / dir.y)
+	var b := from + dir * ((SEA - from.y) / dir.y)
+	var steps := maxi(1, ceili(Vector2(b.x - a.x, b.z - a.z).length() * 20.0))
+	for k in steps + 1:
+		var p := a.lerp(b, float(k) / steps)
+		var x := floori(p.x)
+		var y := floori(p.z)
+		var ground := SEA if x < 0 or y < 0 or x >= width or y >= height else h[y * width + x]
+		if p.y <= ground + 1e-4:
+			return Vector2(p.x, p.z)
+	return Vector2(b.x, b.z)
+
+
+## One mesh per chunk, row by row. `h`: the heights, when the caller already has them.
+static func build(world: WorldData, h := PackedFloat32Array()) -> Array[ArrayMesh]:
+	if h.is_empty():
+		h = heights(world)
 	var out: Array[ArrayMesh] = []
 	for cy in range(0, world.height, CHUNK):
 		for cx in range(0, world.width, CHUNK):

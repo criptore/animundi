@@ -12,6 +12,8 @@ uniform sampler2D colors : filter_nearest;
 // Ground made by people (R * 255: 0 nothing, 1 road, 2 bare field, 3-5 wheat growing to ripe).
 uniform sampler2D ground : filter_nearest;
 uniform float frost = 0.0;
+// Off for the data layers (height, temperature...): the tops show the layer's colours alone.
+uniform bool show_patterns = true;
 
 const float SUB = 8.0;
 const int GRASS = 1;
@@ -90,7 +92,9 @@ void fragment() {
 	float tile_px = 1.0 / max(length(fwidth(world_pos.xz)), 1e-5);
 	float detail = smoothstep(3.0, 7.0, tile_px);
 
-	if (top) {
+	if (top && !show_patterns) {
+		// A data layer: the colour of the tile, nothing over it.
+	} else if (top) {
 		col = mix(col, pattern(kind, col, cell, sub), detail);
 		if (water) {
 			float swell = sin(dot(t, vec2(0.35, 0.22)) - TIME * 0.6) * 0.5 + 0.5;
@@ -153,7 +157,8 @@ void fragment() {
 			face = col * (0.70 + 0.12 * r);
 		}
 		float shade = world_normal.z > 0.5 ? 0.84 : (world_normal.z < -0.5 ? 0.5 : 0.64);
-		col = mix(col * shade, face * shade * (1.0 - 0.18 * smoothstep(0.2, 0.75, depth_under_top)), smoothstep(1.5, 4.0, tile_px));
+		// On a data layer the face keeps its tile's colour, shaded.
+		col = show_patterns ? mix(col * shade, face * shade * (1.0 - 0.18 * smoothstep(0.2, 0.75, depth_under_top)), smoothstep(1.5, 4.0, tile_px)) : col * shade;
 	}
 
 	// Light falls in pattern pixels on the ground.
