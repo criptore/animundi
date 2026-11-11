@@ -73,6 +73,8 @@ public sealed class UnitManager
 	public int[] ArmyStep = Array.Empty<int>();
 	/// <summary>A person's health in fights (War.cs); dies at 0.</summary>
 	public float[] Health = Array.Empty<float>();
+	/// <summary>Foes slain in war (heroes, Chronicle.cs).</summary>
+	public int[] Kills = Array.Empty<int>();
 
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
@@ -120,6 +122,7 @@ public sealed class UnitManager
 		Army[i] = -1;
 		ArmyStep[i] = -1;
 		Health[i] = 100f;
+		Kills[i] = 0;
 		Count++;
 		return i;
 	}
@@ -177,6 +180,7 @@ public sealed class UnitManager
 		Array.Resize(ref Army, size);
 		Array.Resize(ref ArmyStep, size);
 		Array.Resize(ref Health, size);
+		Array.Resize(ref Kills, size);
 		Array.Resize(ref _free, size);
 	}
 }

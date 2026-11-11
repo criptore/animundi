@@ -146,6 +146,49 @@ public partial class Simulation
 			Godot.GD.PushWarning($"procedural invention rejected: {error}");
 	}
 
+	/// <summary>Asks whichever model there is (the player's server first, else the one built
+	/// into the game) for a record other than an invention: `schema` for servers, `grammar` for
+	/// the built-in model. Null when there is no model: the procedural writers answer.</summary>
+	private static System.Threading.Tasks.Task<string> AskAnyMind(string prompt, string grammar, string schema, string system)
+	{
+		if (_llmUrl != "")
+			return AskModel(prompt, schema);
+		if (LocalModel.Status == LocalModel.State.Ready)
+			return LocalModel.Generate(prompt, grammar, system);
+		return null;
+	}
+
+	/// <summary>A question to a model and when it was asked. Take() gives the answer once: the
+	/// JSON, or null with why (no answer, too slow); it returns false while still waiting.</summary>
+	public sealed class Question
+	{
+		public System.Threading.Tasks.Task<string> Pending;
+		public double Asked;
+
+		public bool Take(double now, out string json, out string why)
+		{
+			json = why = null;
+			if (Pending == null)
+				return false;
+			if (Pending.IsCompleted)
+			{
+				if (Pending.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+					json = Pending.Result;
+				else
+					why = "no answer: " + Pending.Exception?.GetBaseException().Message;
+				Pending = null;
+				return true;
+			}
+			if (now - Asked > ModelTimeout)
+			{
+				Pending = null;
+				why = "no answer in time";
+				return true;
+			}
+			return false;
+		}
+	}
+
 	// ------------------------------------------------------------------ the procedural inventor
 
 	private static readonly Dictionary<string, string[]> Nouns = new()
@@ -258,7 +301,7 @@ public partial class Simulation
 		return new InventionDraft
 		{
 			Name = name, Kind = kind, Improves = parent?.Name ?? "", Cost = cost, Effects = effects,
-			Sprite = kind == "building" ? _rng.Next(InventionSprites) : 0,
+			Sprite = kind == "building" ? StyleSprite(k) : 0,
 			Description = parent != null ? $"A better {parent.Name}." : "",
 		};
 	}
@@ -311,7 +354,7 @@ public partial class Simulation
 			sb.Append($"{name} (kinds {string.Join("/", block.kinds)}, amount up to {block.max}{(block.job ? ", with a job" : "")}); ");
 		sb.Append($"jobs: {string.Join(", ", WorkJobs)}. 1 to 3 effects; the sum of amount/max must stay under {Budget(k):0.0}. ");
 		sb.Append("Cost in wood, stone, metal, gold: wood counts 1, metal 2, gold 4, and the total must be at least 12 times that sum. ");
-		sb.Append($"sprite: 0-{InventionSprites - 1} (buildings only). Name in their language's spirit, 2-28 letters. Answer with the JSON record only.\n");
+		sb.Append($"sprite: 0-{InventionSprites - 1} (buildings only; their builders like {Walls[kingdom.Culture.Wall]} walls and {Roofs[kingdom.Culture.Roof]} roofs: sprite {kingdom.Culture.Roof * Walls.Length + kingdom.Culture.Wall}). Name in their language's spirit, 2-28 letters. Answer with the JSON record only.\n");
 		return sb.ToString();
 	}
 
@@ -375,15 +418,16 @@ public partial class Simulation
 
 	/// <summary>Sends the prompt to the local model in the background; the task's result is the
 	/// model's JSON answer.</summary>
-	private static System.Threading.Tasks.Task<string> AskModel(string prompt)
+	private static System.Threading.Tasks.Task<string> AskModel(string prompt, string jsonSchema = null)
 	{
+		jsonSchema ??= InventionSchema();
 		_http ??= new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(ModelTimeout) };
 		string url = _llmUrl.TrimEnd('/');
 		string mode = _llmMode;
 		string model = _llmModel;
 		return System.Threading.Tasks.Task.Run(async () =>
 		{
-			var schema = JsonDocument.Parse(InventionSchema()).RootElement;
+			var schema = JsonDocument.Parse(jsonSchema).RootElement;
 			string body;
 			string endpoint;
 			if (mode == "ollama")

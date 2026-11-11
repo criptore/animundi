@@ -62,6 +62,7 @@ public partial class Simulation
 		SetupVillages();
 		SetupKingdoms();
 		SetupInventions();
+		SetupCulture();
 		_names = Array.Empty<string>();
 		_languages.Clear();
 	}
@@ -208,6 +209,7 @@ public partial class Simulation
 		if (p >= 0 && p < Units.Capacity && Units.Partner[p] == i)
 			Units.Partner[p] = -1;
 		RulerDied(i);
+		HeroDied(i);
 		int v = Units.Village[i];
 		if (v >= 0)
 		{

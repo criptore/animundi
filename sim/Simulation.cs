@@ -50,6 +50,8 @@ public partial class Simulation : Node2D
 		World = SimWorld.FromWorldData(worldData);
 		_biomeNames = biomeNames;
 		_rng = new Random(worldData.Get("seed_value").AsInt32());
+		// Cultures have their own dice, so that they don't change how the rest of a seeded world unfolds.
+		_cultureRng = new Random(worldData.Get("seed_value").AsInt32() ^ 0x5eed);
 		Units.Clear();
 		Zones = new ZoneGrid(World.Width, World.Height);
 		Scheduler.UnitSystems.Clear();

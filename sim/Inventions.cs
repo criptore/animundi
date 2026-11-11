@@ -272,14 +272,16 @@ public partial class Simulation
 			if (bld.Alive && bld.Done && Assets.Buildings[bld.Type].Invention >= 0)
 				ApplyEffects(village, Inventions[Assets.Buildings[bld.Type].Invention], 1f);
 		}
-		// Bonuses of the same kind don't stack without limit.
+		// The kingdom's customs (Culture.cs): they give and they take.
+		ApplyCustoms(village);
+		// Bonuses of the same kind don't stack without limit, and customs can't cripple.
 		for (int j = 0; j < village.JobSpeed.Length; j++)
 		{
-			village.JobSpeed[j] = Math.Min(village.JobSpeed[j], 80f);
-			village.JobYield[j] = Math.Min(village.JobYield[j], 100f);
+			village.JobSpeed[j] = Math.Clamp(village.JobSpeed[j], -40f, 80f);
+			village.JobYield[j] = Math.Clamp(village.JobYield[j], -50f, 100f);
 		}
-		village.Attack = Math.Min(village.Attack, 80f);
-		village.Defense = Math.Min(village.Defense, 60f);
+		village.Attack = Math.Clamp(village.Attack, -40f, 80f);
+		village.Defense = Math.Clamp(village.Defense, -40f, 60f);
 	}
 
 	private static void ApplyEffects(Village village, Invention inv, float f)

@@ -362,7 +362,7 @@ func _process(_delta: float) -> void:
 			if _going:
 				_going = false
 				_hud.show_speed(speed)
-			_hud.set_time("Year %d · %s%s" % [_sim.Year(), _sim.SeasonName(), "  (paused)" if speed == 0.0 else ""])
+			_hud.set_time("Year %d · %s · %s%s" % [_sim.Year(), _sim.SeasonName(), _sim.AgeName().trim_prefix("The "), "  (paused)" if speed == 0.0 else ""])
 		_hud.set_season(_sim.Season())
 		var people: int = _sim.PeopleCount()
 		_hud.set_counts(people, _sim.VillageCount(), _sim.KingdomCount(), _sim.UnitCount() - people)
@@ -373,6 +373,8 @@ func _process(_delta: float) -> void:
 		_hud.set_plans(_sim.PlanTable())
 		_hud.set_inventions(_sim.InventionTable())
 		_hud.set_mind(_sim.MindStatus())
+		_hud.set_cultures(_sim.CultureTable())
+		_hud.set_chronicle(_sim.AgeName(), _sim.ChronicleTable())
 		_refresh_inspector()
 	# The camera stays on the creature or the village the player follows.
 	if _following:
