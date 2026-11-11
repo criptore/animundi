@@ -105,7 +105,7 @@ func show_village(info: Dictionary) -> void:
 	var lines := [
 		"%s of the %s%s" % [String(info.rank).capitalize(), info.people, ", kingdom of %s" % info.kingdom if info.kingdom != "" else ""],
 		"Founded in year %d" % info.founded,
-		"%d people in %d homes · loyalty %d" % [info.population, info.homes, info.loyalty],
+		"%d people in %d homes · loyalty %d · faith %d" % [info.population, info.homes, info.loyalty, info.get("faith", 0)],
 	]
 	for store in STORES:
 		_store_labels[store[0]].text = str(int(info.get(store[0], 0)))

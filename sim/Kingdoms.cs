@@ -38,6 +38,13 @@ public partial class Simulation
 		/// <summary>Tiredness of war, 0..1: grows with the dead, fades in peace.</summary>
 		public float Weariness;
 		public int Kings;
+		/// <summary>Its culture and faith (Cultures.cs, Faiths.cs), or -1.</summary>
+		public int Culture = -1, Faith = -1;
+		/// <summary>How it feels about the god in the sky (the player), 0..100, and whether it
+		/// knows there is one.</summary>
+		public float Love, Fear, Hate;
+		public bool Aware;
+		public string LastAttitude = "";
 	}
 
 	public sealed class KingPlan
@@ -81,7 +88,7 @@ public partial class Simulation
 	// ------------------------------------------------------------------ founding
 
 	/// <summary>A new kingdom with village `v` as its capital and its chief as ruler.</summary>
-	private int CreateKingdom(int species, int v, Color? colour = null)
+	private int CreateKingdom(int species, int v, Color? colour = null, int parent = -1)
 	{
 		var lang = _languages[species];
 		var race = Assets.Species[species].Race;
@@ -95,6 +102,23 @@ public partial class Simulation
 		};
 		Kingdoms.Add(k);
 		int id = Kingdoms.Count - 1;
+		// Its ways and its gods: its own, or those of the kingdom it breaks away from.
+		if (parent >= 0 && Kingdoms[parent].Culture >= 0)
+		{
+			var old = Kingdoms[parent];
+			k.Culture = CreateCulture(species, old.Culture);
+			k.Faith = old.Faith;
+			k.Love = old.Love;
+			k.Fear = old.Fear;
+			k.Hate = old.Hate;
+			k.Aware = old.Aware;
+			LogEvent($"the ways of {k.Name} part from those of {old.Name}: the {Cultures[k.Culture].Name} culture is born.", "culture");
+		}
+		else
+		{
+			k.Culture = CreateCulture(species, -1);
+			k.Faith = CreateFaith(k.Culture, v);
+		}
 		JoinKingdom(v, id);
 		CrownNewKing(id, -1);
 		return id;
@@ -106,6 +130,7 @@ public partial class Simulation
 	{
 		var village = Villages[v];
 		village.Kingdom = k;
+		village.ModsDirty = true;
 		var kingdom = Kingdoms[k];
 		int shade = 0;
 		foreach (var o in Villages)
@@ -163,6 +188,7 @@ public partial class Simulation
 			if (Kingdoms[k].Alive && Kingdoms[k].King == i)
 			{
 				LogEvent($"{NameOf(i)} {Kingdoms[k].Dynasty}, {(Units.Female[i] ? "queen" : "king")} of {Kingdoms[k].Name}, has died.", "kings");
+				Witness("king_death", -1f, -1f, $"{(Units.Female[i] ? "queen" : "king")} {NameOf(i)} {Kingdoms[k].Dynasty} died", k);
 				Kingdoms[k].King = -1;
 				_pendingSuccession.Add((k, i));
 			}
@@ -216,6 +242,9 @@ public partial class Simulation
 		WarStep(dt);
 		TradeStep(dt);
 		InventionStep(dt);
+		CultureStep();
+		FaithStep();
+		ChronicleStep();
 	}
 
 	private void Fall(int k)
@@ -231,6 +260,7 @@ public partial class Simulation
 			if (p.Kingdom == k || p.Kind != "rebellion" && p.Target == k)
 				p.Alive = false;
 		LogEvent($"the kingdom of {kingdom.Name} has fallen.", "kings");
+		Witness("fall", -1f, -1f, $"the kingdom of {kingdom.Name} fell", k);
 	}
 
 	// ------------------------------------------------------------------ ranks
@@ -255,7 +285,11 @@ public partial class Simulation
 				continue;
 			int rank = RankOf(v);
 			if (rank > village.Rank && rank >= 2)
+			{
 				LogEvent($"{village.Name} becomes a {RankNames[rank]}.", "cities");
+				if (rank == 3)
+					Witness("city", village.X, village.Y, $"{village.Name} grew into a great city", village.Kingdom);
+			}
 			village.Rank = rank;
 		}
 	}
@@ -280,6 +314,7 @@ public partial class Simulation
 			o -= 50f;
 		if (ka.Memory.TryGetValue(b, out float m))
 			o += m;
+		o += FaithOpinion(a, b);
 		return Math.Clamp(o, -100f, 100f);
 	}
 
@@ -356,8 +391,12 @@ public partial class Simulation
 				int wars = Wars.FindAll(w => w.A == a || w.B == a).Count;
 				if (o < -20f && wars == 0 && !kingKind && !Plotting("war", a, b)
 					&& Strength(a) >= Strength(b) * 0.8f && Strength(a) >= 3
-					&& _rng.NextDouble() < 0.12 + 0.35 * aggression && CanReach(a, b))
+					&& _rng.NextDouble() < (0.12 + 0.35 * aggression) * WarLean(a) * (HolyWar(a, b) ? 1.3 : 1.0) && CanReach(a, b))
+				{
 					StartPlan("war", a, b, YearSeconds * (0.6f + 0.6f * (float)_rng.NextDouble()));
+					if (HolyWar(a, b))
+						LogEvent($"the priests of {Kingdoms[a].Name} call for a holy war on the unbelievers of {Kingdoms[b].Name}.", "faith");
+				}
 				else if (o > 30f && !Plotting("alliance", a, b) && !Plotting("alliance", b, a) && _rng.NextDouble() < 0.3)
 					StartPlan("alliance", a, b, YearSeconds * 0.5f);
 			}
@@ -479,7 +518,8 @@ public partial class Simulation
 			var capital = Villages[kingdom.Capital];
 			float dist = MathF.Sqrt((capital.X - village.X) * (capital.X - village.X) + (capital.Y - village.Y) * (capital.Y - village.Y));
 			float l = 50f - dist / 2.5f - village.Population / 3.5f + (village.Species == kingdom.Species ? 10f : -20f)
-				- kingdom.Weariness * 35f - (kingdom.King < 0 ? 10f : 0f) - village.Conquered * 30f + village.LoyaltyBonus;
+				- kingdom.Weariness * 35f - (kingdom.King < 0 ? 10f : 0f) - village.Conquered * 30f + village.LoyaltyBonus
+				+ village.Faith * 0.06f + (Attitude(village.Kingdom) == "worship" ? 4f : 0f);
 			village.Conquered = Math.Max(0f, village.Conquered - 0.05f);
 			village.Loyalty = Math.Clamp(village.Loyalty * 0.5f + l * 0.5f + (float)(_rng.NextDouble() * 10 - 5), -100f, 100f);
 			// Big disloyal villages plot to break away, at most once every eight years.
@@ -498,7 +538,7 @@ public partial class Simulation
 		if (!village.Alive || old < 0 || Kingdoms[old].Capital == v)
 			return;
 		village.CalmUntil = Scheduler.Time + YearSeconds * 8;
-		int k = CreateKingdom(village.Species, v);
+		int k = CreateKingdom(village.Species, v, null, old);
 		var rebels = Kingdoms[k];
 		int joined = 0;
 		for (int o = 0; o < Villages.Count; o++)
@@ -555,6 +595,9 @@ public partial class Simulation
 				["wars"] = string.Join(", ", wars), ["allies"] = string.Join(", ", allies), ["color"] = kingdom.Color,
 				["banner2"] = kingdom.Banner2, ["division"] = kingdom.Division, ["symbol"] = kingdom.Symbol,
 				["kings"] = kingdom.Kings,
+				["culture"] = kingdom.Culture >= 0 ? Cultures[kingdom.Culture].Name : "", ["society"] = kingdom.Culture >= 0 ? Cultures[kingdom.Culture].Society : "",
+				["faith"] = kingdom.Faith >= 0 ? Faiths[kingdom.Faith].Name : "", ["fervour"] = Math.Round(KingdomFaith(k)),
+				["attitude"] = Attitude(k),
 			});
 		}
 		return list;

@@ -62,6 +62,9 @@ public partial class Simulation
 		SetupVillages();
 		SetupKingdoms();
 		SetupInventions();
+		SetupCultures();
+		SetupFaiths();
+		SetupChronicle();
 		_names = Array.Empty<string>();
 		_languages.Clear();
 	}
@@ -208,6 +211,7 @@ public partial class Simulation
 		if (p >= 0 && p < Units.Capacity && Units.Partner[p] == i)
 			Units.Partner[p] = -1;
 		RulerDied(i);
+		HeroDied(i);
 		int v = Units.Village[i];
 		if (v >= 0)
 		{
@@ -531,7 +535,7 @@ public partial class Simulation
 		// Plenty of food and room: children come sooner.
 		var village = Villages[v];
 		float plenty = village.Food > village.Population * 5f && Homes(v) > village.Population + 4 ? 0.5f : 1f;
-		float wait = YearSeconds * plenty * (0.5f + 0.4f * (float)_rng.NextDouble());
+		float wait = YearSeconds * plenty * (0.5f + 0.4f * (float)_rng.NextDouble()) * (1f - village.Fertility / 100f);
 		Units.BreedWait[i] = wait;
 		Units.BreedWait[p] = wait;
 		Births++;
@@ -579,6 +583,7 @@ public partial class Simulation
 				["buildings"] = BuildingSummary(k), ["jobs"] = JobCounts(v), ["founded"] = v.Founded, ["mother"] = v.Mother,
 				["rank"] = RankNames[v.Rank], ["kingdom"] = v.Kingdom >= 0 ? Kingdoms[v.Kingdom].Name : "",
 				["capital"] = v.Kingdom >= 0 && Kingdoms[v.Kingdom].Capital == k, ["siege"] = v.Siege, ["loyalty"] = (int)v.Loyalty,
+				["faith"] = (int)v.Faith,
 			});
 		}
 		return list;

@@ -44,7 +44,15 @@ public partial class Simulation
 	// ------------------------------------------------------------------ fire and water
 
 	/// <summary>Sets the land alight under the brush. Returns the tiles that caught fire.</summary>
-	public int PowerFire(float x, float y, float radius) => World == null ? 0 : Ignite(x, y, radius);
+	public int PowerFire(float x, float y, float radius)
+	{
+		if (World == null)
+			return 0;
+		int lit = Ignite(x, y, radius);
+		if (lit > 0)
+			PlayerActed("fire", x, y, radius, mercy: false);
+		return lit;
+	}
 
 	/// <summary>A bolt of lightning: kills what stands there and lights the land. Returns the
 	/// creatures killed.</summary>
@@ -55,11 +63,14 @@ public partial class Simulation
 		int killed = 0;
 		foreach (int i in UnitsWithin(x, y, 1.5f).ToArray())
 		{
+			NoteVictim(i);
 			KillUnit(i, Death.Other);
 			killed++;
 		}
 		Ignite(x, y, 1.5f);
 		LogEvent($"lightning strikes near ({(int)x}, {(int)y}).", "disasters");
+		PlayerActed("lightning", x, y, 1.5f, mercy: false);
+		Witness("lightning", x, y, $"lightning fell from a clear sky {PlaceNear(x, y)}");
 		return killed;
 	}
 
@@ -91,6 +102,8 @@ public partial class Simulation
 		});
 		_burningTiles.RemoveAll(t => TileBurn[t] == 0f);
 		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
+		if (doused > 0)
+			PlayerActed("rain", x, y, radius, mercy: true);
 		return doused;
 	}
 
@@ -102,7 +115,7 @@ public partial class Simulation
 	{
 		if (!OnLand(x, y))
 			return 0;
-		int killed = PowerSmite(x, y, radius);
+		int killed = Smite(x, y, radius);
 		TilesWithin(x, y, radius, t =>
 		{
 			if (World.Water[t] != SimWorld.WaterLand)
@@ -124,15 +137,26 @@ public partial class Simulation
 		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
 		Ignite(x, y, radius + 1.5f);
 		LogEvent($"a meteor falls near ({(int)x}, {(int)y}).", "disasters");
+		PlayerActed("meteor", x, y, radius, mercy: false);
+		Witness("meteor", x, y, $"a burning star fell {PlaceNear(x, y)}");
 		return killed;
 	}
 
 	/// <summary>Kills every creature under the brush. Returns how many.</summary>
 	public int PowerSmite(float x, float y, float radius)
 	{
+		int killed = Smite(x, y, radius);
+		if (killed > 0)
+			PlayerActed("smite", x, y, radius, mercy: false);
+		return killed;
+	}
+
+	private int Smite(float x, float y, float radius)
+	{
 		int killed = 0;
 		foreach (int i in UnitsWithin(x, y, radius).ToArray())
 		{
+			NoteVictim(i);
 			KillUnit(i, Death.Other);
 			killed++;
 		}
@@ -150,7 +174,43 @@ public partial class Simulation
 			Units.Thirst[i] = 0f;
 			blessed++;
 		}
+		if (blessed > 0)
+			PlayerActed("bless", x, y, radius, mercy: true);
 		return blessed;
+	}
+
+	/// <summary>A miracle (0.6): a sign from the sky over the brush. It heals and feeds those under
+	/// it, and the villages that see it (within 20 tiles) grow in faith and love the god who sent
+	/// it. Returns the creatures healed plus the villages that saw it (0 on the sea).</summary>
+	public int PowerMiracle(float x, float y, float radius)
+	{
+		if (!OnLand(x, y))
+			return 0;
+		int healed = 0;
+		foreach (int i in UnitsWithin(x, y, radius))
+		{
+			Units.Health[i] = Math.Max(Units.Health[i], MaxHealth(i));
+			Units.Hunger[i] = 0f;
+			Units.Thirst[i] = 0f;
+			healed++;
+		}
+		int saw = 0;
+		string where = "";
+		foreach (var v in Villages)
+		{
+			if (!v.Alive)
+				continue;
+			float d = MathF.Sqrt((v.X + 0.5f - x) * (v.X + 0.5f - x) + (v.Y + 0.5f - y) * (v.Y + 0.5f - y));
+			if (d > radius + 20f)
+				continue;
+			v.Faith = Math.Min(100f, v.Faith + 25f * (1f - d / (radius + 25f)));
+			if (saw == 0)
+				where = v.Name;
+			saw++;
+		}
+		PlayerActed("miracle", x, y, radius, mercy: true);
+		LogEvent(saw > 0 ? $"a miracle shines over {where}: the faithful fall to their knees." : $"a miracle shines over the wilds near ({(int)x}, {(int)y}).", "faith");
+		return healed + saw;
 	}
 
 	// ------------------------------------------------------------------ life
@@ -187,6 +247,9 @@ public partial class Simulation
 			if (SpawnAt(id, px, py, false) >= 0)
 				spawned++;
 		}
+		// Monsters from the sky frighten the peoples who see them come.
+		if (spawned > 0 && !Assets.Species[s].IsNatural)
+			PlayerActed("spawn", x, y, 2f, mercy: false);
 		return spawned;
 	}
 
@@ -258,8 +321,13 @@ public partial class Simulation
 		{
 			foreach (int i in UnitsWithin(x, y, radius).ToArray())
 				if (World.Biome[World.Index((int)Units.X[i], (int)Units.Y[i])] == b)
+				{
+					NoteVictim(i);
 					KillUnit(i, Death.Fire);
+				}
 			Ignite(x, y, radius + 1.5f);
+			PlayerActed("lava", x, y, radius, mercy: false);
+			Witness("lava", x, y, $"fire rose from the ground {PlaceNear(x, y)}");
 		}
 		return changed;
 	}

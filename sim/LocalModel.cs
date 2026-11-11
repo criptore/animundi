@@ -154,8 +154,14 @@ public static class LocalModel
 
 	/// <summary>Asks the model, in the background; the answer is forced into the invention
 	/// language by its grammar. One question at a time.</summary>
-	public static System.Threading.Tasks.Task<string> Generate(string prompt)
+	public static System.Threading.Tasks.Task<string> Generate(string prompt) => Generate(prompt, null, null, 600);
+
+	/// <summary>Asks the model under any grammar (cultures, myths, the chronicle: 0.6), with its
+	/// own system line; null grammar and system: the invention language.</summary>
+	public static System.Threading.Tasks.Task<string> Generate(string prompt, string grammar, string system, int maxTokens)
 	{
+		grammar ??= Grammar();
+		system ??= "You invent things for a people in a world simulation. Answer with one JSON record.";
 		return System.Threading.Tasks.Task.Run(async () =>
 		{
 			await _busy.WaitAsync();
@@ -164,10 +170,10 @@ public static class LocalModel
 				var executor = new StatelessExecutor(_weights, _params);
 				var inference = new InferenceParams
 				{
-					MaxTokens = 600,
-					SamplingPipeline = new DefaultSamplingPipeline { Temperature = 0.8f, Grammar = new Grammar(Grammar(), "root") },
+					MaxTokens = maxTokens,
+					SamplingPipeline = new DefaultSamplingPipeline { Temperature = 0.8f, Grammar = new Grammar(grammar, "root") },
 				};
-				string chat = "<|im_start|>system\nYou invent things for a people in a world simulation. Answer with one JSON record.<|im_end|>\n"
+				string chat = $"<|im_start|>system\n{system}<|im_end|>\n"
 					+ $"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n";
 				var sb = new StringBuilder();
 				await foreach (var piece in executor.InferAsync(chat, inference))

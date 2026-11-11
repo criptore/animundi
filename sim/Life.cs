@@ -39,6 +39,8 @@ public partial class Simulation
 		["old_age"] = true,       // creatures die of old age
 		["natural_disasters"] = true,  // lightning sets forests on fire
 		["trees_growth"] = true,  // plants grow and spread
+		["cultures"] = true,      // cultures drift and their minds write laws, rituals and taboos
+		["faiths"] = true,        // peoples make myths and gods of what they witness; faiths convert and split
 	};
 
 	/// <summary>Living units per species.</summary>
@@ -196,6 +198,8 @@ public partial class Simulation
 		{
 			_established[s] = false;
 			LogEvent($"The last {Assets.Species[s].Name.ToLower()} has died: the species is extinct.");
+			if (!Assets.Species[s].IsPeople)
+				Witness("extinction", Units.X[i], Units.Y[i], $"the last {Assets.Species[s].Name.ToLower()} died");
 		}
 	}
 

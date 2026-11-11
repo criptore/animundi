@@ -259,6 +259,7 @@ public partial class Simulation
 		Array.Clear(village.JobSpeed);
 		Array.Clear(village.JobYield);
 		village.Attack = village.Defense = village.FoodBonus = village.LoyaltyBonus = 0f;
+		village.Fertility = village.FaithBonus = 0f;
 		foreach (int id in village.Known)
 		{
 			var inv = Inventions[id];
@@ -272,6 +273,7 @@ public partial class Simulation
 			if (bld.Alive && bld.Done && Assets.Buildings[bld.Type].Invention >= 0)
 				ApplyEffects(village, Inventions[Assets.Buildings[bld.Type].Invention], 1f);
 		}
+		ApplyCulture(village);
 		// Bonuses of the same kind don't stack without limit.
 		for (int j = 0; j < village.JobSpeed.Length; j++)
 		{
@@ -460,7 +462,7 @@ public partial class Simulation
 		var d = new Godot.Collections.Dictionary
 		{
 			["attack"] = village.Attack, ["defense"] = village.Defense, ["food"] = village.FoodBonus,
-			["loyalty"] = village.LoyaltyBonus, ["known"] = village.Known.Count,
+			["loyalty"] = village.LoyaltyBonus, ["known"] = village.Known.Count, ["fertility"] = village.Fertility, ["faith"] = village.FaithBonus,
 		};
 		for (int j = 0; j < JobNames.Length; j++)
 			if (village.JobSpeed[j] > 0f || village.JobYield[j] > 0f)

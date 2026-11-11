@@ -93,11 +93,12 @@ public partial class Simulation
 	// ------------------------------------------------------------------ events
 
 	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life.</summary>
-	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "disasters", "life" };
+	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "culture", "faith", "disasters", "life" };
 
 	private void LogEvent(string text, string cat = "life")
 	{
 		_events.Add((cat, $"Year {Year()}, {SeasonName().ToLower()}: {text}"));
+		NoteAnnal(cat, text);
 		if (_events.Count > 2000)
 			_events.RemoveRange(0, 1000);
 	}
@@ -532,7 +533,10 @@ public partial class Simulation
 				continue;
 			int x = t % World.Width, y = t / World.Width;
 			if (Ignite(x + 0.5f, y + 0.5f, 1.2f) > 0)
+			{
 				LogEvent($"lightning sets the {_biomeNames[b].ToLower()} ablaze near ({x}, {y}).", "disasters");
+				Witness("wildfire", x, y, $"lightning set the {_biomeNames[b].ToLower()} ablaze {PlaceNear(x, y)}");
+			}
 			return;
 		}
 	}

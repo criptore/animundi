@@ -258,6 +258,8 @@ func _use_power(screen_pos: Vector2) -> void:
 			_sim.PowerSmite(at.x, at.y, r)
 		"bless":
 			_sim.PowerBless(at.x, at.y, r)
+		"miracle":
+			_sim.PowerMiracle(at.x, at.y, r)
 		"biome":
 			_sim.PowerBiome(powers.arg, at.x, at.y, r)
 		"lightning":
@@ -335,7 +337,7 @@ func _process(_delta: float) -> void:
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
 	var brushing: bool = _hud.powers.power != "inspect" and not _hud.blocking()
-	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor"] else 0.6
+	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle"] else 0.6
 	var at := _ground_at(pointer)
 	_brush.visible = brushing and not tilt_on
 	_tilt_brush.visible = brushing and tilt_on
@@ -372,6 +374,9 @@ func _process(_delta: float) -> void:
 		_hud.set_kingdoms(_sim.KingdomTable())
 		_hud.set_plans(_sim.PlanTable())
 		_hud.set_inventions(_sim.InventionTable())
+		_hud.set_cultures(_sim.CultureTable())
+		_hud.set_faiths(_sim.FaithTable(), _sim.PlayerStanding())
+		_hud.set_chronicle(_sim.ChronicleTable(), _sim.AgeTable(), _sim.HeroTable())
 		_hud.set_mind(_sim.MindStatus())
 		_refresh_inspector()
 	# The camera stays on the creature or the village the player follows.

@@ -130,7 +130,7 @@ public partial class Simulation
 		{
 			// A model server the player runs (overrides the built-in model).
 			mind.Asked = Scheduler.Time;
-			mind.Pending = AskModel(Prompt(k));
+			mind.Pending = AskModel(Prompt(k), InventionSchema(), 400);
 			return;
 		}
 		if (LocalModel.Status == LocalModel.State.Ready && !force)
@@ -295,6 +295,11 @@ public partial class Simulation
 		var sb = new StringBuilder();
 		sb.Append($"You are the collective mind of the {Assets.Species[kingdom.Species].Name} of the kingdom of {kingdom.Name}, ");
 		sb.Append($"in year {Year()} of their world. Temperament: aggression {race?.Temper("aggression") ?? 0.5f:0.0}, curiosity {race?.Temper("curiosity") ?? 0.5f:0.0}.\n");
+		if (kingdom.Culture >= 0)
+		{
+			var c = Cultures[kingdom.Culture];
+			sb.Append($"Their culture, the {c.Name} ways, values {TopValues(c, 3)}; their homes have {c.Roof} roofs, {c.Wall} walls and {c.Ornament}.\n");
+		}
 		sb.Append($"Their capital {village.Name} has {village.Population} people, {Homes(kingdom.Capital)} homes, food {village.Food:0}, wood {village.Wood:0}, stone {village.Stone:0}, metal {village.Metal:0}, gold {village.Gold:0}.\n");
 		bool atWar = Wars.Exists(w => w.A == k || w.B == k);
 		sb.Append(atWar ? "They are at war.\n" : "They are at peace.\n");
@@ -375,7 +380,7 @@ public partial class Simulation
 
 	/// <summary>Sends the prompt to the local model in the background; the task's result is the
 	/// model's JSON answer.</summary>
-	private static System.Threading.Tasks.Task<string> AskModel(string prompt)
+	private static System.Threading.Tasks.Task<string> AskModel(string prompt, string schemaJson, int tokens)
 	{
 		_http ??= new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(ModelTimeout) };
 		string url = _llmUrl.TrimEnd('/');
@@ -383,7 +388,7 @@ public partial class Simulation
 		string model = _llmModel;
 		return System.Threading.Tasks.Task.Run(async () =>
 		{
-			var schema = JsonDocument.Parse(InventionSchema()).RootElement;
+			var schema = JsonDocument.Parse(schemaJson).RootElement;
 			string body;
 			string endpoint;
 			if (mode == "ollama")
@@ -400,7 +405,7 @@ public partial class Simulation
 				endpoint = url + "/completion";
 				body = JsonSerializer.Serialize(new Dictionary<string, object>
 				{
-					["prompt"] = prompt, ["json_schema"] = schema, ["n_predict"] = 400, ["temperature"] = 0.8,
+					["prompt"] = prompt, ["json_schema"] = schema, ["n_predict"] = tokens, ["temperature"] = 0.8,
 				});
 			}
 			using var response = await _http.PostAsync(endpoint, new StringContent(body, Encoding.UTF8, "application/json"));

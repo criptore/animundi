@@ -2,7 +2,8 @@
 ## - the title screen, then the world setup, over a new world;
 ## - a top bar: menu, date and season, speed of time, the world's numbers, laws and settings;
 ## - a dock on the left with the world's books: kingdoms and plots, villages, living creatures,
-##   inventions and the chronicle;
+##   inventions, cultures, faiths (and how the peoples see the player), and the chronicle with
+##   its written pages and named ages;
 ## - the map layers on the right, the inspector card under the top bar;
 ## - the god powers at the bottom (scripts/ui/power_bar.gd) over a line telling what is under
 ##   the mouse;
@@ -45,13 +46,15 @@ const EVENTS_SHOWN := 14
 const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 ## The dock's books: id, name, icon.
 const BOOKS := [["kingdoms", "Kingdoms", "crown"], ["villages", "Villages", "house"], ["life", "Life", "paw"],
-		["inventions", "Inventions", "bulb"], ["chronicle", "Chronicle", "scroll"]]
+		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["faiths", "Faiths", "ankh"],
+		["chronicle", "Chronicle", "scroll"]]
 const LAYER_ICONS := {"Biomes": "biome", "Height": "height", "Temperature": "thermo", "Humidity": "humidity", "Rivers": "river"}
 ## Map layers to come (docs/ROADMAP.md, 0.9): name, icon.
 const LAYERS_SOON := [["Kingdoms", "crown"], ["Cultures", "book"], ["Religions", "ankh"], ["Armies", "swords"]]
 const SEASON_ICONS := ["spring", "summer", "autumn", "winter"]
 const EVENT_FILTERS := [["", "All", "scroll"], ["kings", "Kings", "crown"], ["wars", "Wars", "swords"], ["cities", "Cities", "house"],
-		["inventions", "Inventions", "bulb"], ["disasters", "Disasters", "fire"]]
+		["inventions", "Inventions", "bulb"], ["culture", "Culture", "book"], ["faith", "Faith", "ankh"],
+		["disasters", "Disasters", "fire"]]
 const DOCK_WIDTH := 330
 const DOCK_MAX_HEIGHT := 360.0
 
@@ -97,6 +100,12 @@ var _kingdoms_box: VBoxContainer
 var _plans_label: Label
 var _inventions_label: Label
 var _mind_label: Label
+var _cultures_label: Label
+var _standing_label: Label
+var _faiths_label: Label
+var _age_label: Label
+var _written_label: Label
+var _heroes_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
 var _kingdom_rows := {}
 var _village_rows: Array = []
@@ -377,6 +386,26 @@ func _build_dock() -> void:
 	_pages["inventions"].add_child(_mind_label)
 	_inventions_label = _text("Nothing invented yet.", UI.BLUE)
 	_pages["inventions"].add_child(_inventions_label)
+
+	# Cultures (0.6): values, society, laws, rituals, taboos and legends of each.
+	_cultures_label = _text("No culture yet.", UI.CREAM)
+	_pages["cultures"].add_child(_cultures_label)
+
+	# Faiths (0.6): how the peoples see the player, then each faith's gods and myths.
+	_pages["faiths"].add_child(UI.label("You, the god in the sky", "Heading"))
+	_standing_label = _text("No people knows of you yet.", UI.GOLD)
+	_pages["faiths"].add_child(_standing_label)
+	_faiths_label = _text("No faith yet.", UI.CREAM)
+	_pages["faiths"].add_child(_faiths_label)
+
+	# The chronicle: the age, the pages written by the chronicler, the heroes, then the events.
+	_age_label = UI.label("", "Heading")
+	_pages["chronicle"].add_child(_age_label)
+	_written_label = _text("The chronicler has not written yet.", UI.CREAM)
+	_pages["chronicle"].add_child(_written_label)
+	_heroes_label = _text("", UI.GOLD)
+	_pages["chronicle"].add_child(_heroes_label)
+	_pages["chronicle"].add_child(UI.label("Events", "Heading"))
 
 	var filters := HFlowContainer.new()
 	filters.add_theme_constant_override("h_separation", 3)
@@ -730,6 +759,10 @@ func set_kingdoms(kingdoms: Array) -> void:
 			row = [card, name_label, about, state]
 			_kingdom_rows[k.name] = row
 		row[1].text = "%s · %s" % [k.name, k.people]
+		var faith_line := ""
+		if k.get("faith", "") != "":
+			faith_line = "\n%s, %s · %s" % [k.get("culture", ""), k.get("society", ""), k.faith]
+		var seen_you: String = {"worship": "\nThey worship you", "fear": "\nThey fear you", "hate": "\nThey hate you"}.get(k.get("attitude", ""), "")
 		row[2].text = "%d villages · %d people · %d soldiers" % [k.villages, k.population, k.soldiers]
 		if k.wars != "":
 			row[3].text = "At war with " + k.wars
@@ -740,7 +773,7 @@ func set_kingdoms(kingdoms: Array) -> void:
 		else:
 			row[3].text = k.ruler
 			row[3].add_theme_color_override("font_color", UI.MUTED)
-		row[0].tooltip_text = "%s\ncapital %s · %d soldiers · founded year %d" % [k.ruler, k.capital, k.soldiers, k.founded]
+		row[0].tooltip_text = "%s\ncapital %s · %d soldiers · founded year %d%s%s" % [k.ruler, k.capital, k.soldiers, k.founded, faith_line, seen_you]
 	for name in _kingdom_rows.keys():
 		if not seen.has(name):
 			_kingdom_rows[name][0].queue_free()
@@ -771,6 +804,66 @@ func set_inventions(inventions: Array) -> void:
 			line += " · from the " + inv.parent
 		lines.append(line)
 	_inventions_label.text = "\n\n".join(lines) if not lines.is_empty() else "Nothing invented yet."
+
+
+## Cultures (0.6): one entry per living culture, its values, society, customs and legends.
+func set_cultures(cultures: Array) -> void:
+	var parts := PackedStringArray()
+	for c in cultures:
+		var text := "%s ways · %s (%s)\n" % [c.name, c.people, c.kingdoms]
+		text += "A %s that values %s, and would %s nature.\n" % [c.society, c.top, c.nature]
+		text += "Homes: %s." % c.architecture
+		if c.parent != "":
+			text += " Born of the %s ways." % c.parent
+		for kind in ["law", "ritual", "taboo"]:
+			for x in c.customs:
+				if x.kind != kind:
+					continue
+				text += "\n• %s%s: %s (%s)" % [x.name, " (at %s)" % String(x.occasion).replace("_", " ") if x.occasion != "" else "", x.text, x.effects]
+		if c.legends != "":
+			text += "\nLegends: " + ", ".join(String(c.legends).split("\n"))
+		parts.append(text)
+	_cultures_label.text = "\n\n".join(parts) if not parts.is_empty() else "No culture yet."
+
+
+## Faiths (0.6): how each kingdom sees the player, and each faith's gods and newest myths.
+func set_faiths(faiths: Array, standing: Array) -> void:
+	var lines := PackedStringArray()
+	for s in standing:
+		if s.attitude == "unaware":
+			continue
+		var how: String = {"worship": "worship", "fear": "fear", "hate": "hate"}.get(s.attitude, s.attitude)
+		lines.append("%s %s you as %s (love %d, fear %d, hate %d)" % [s.kingdom, how, s.god if s.god != "" else "a nameless god", s.love, s.fear, s.hate])
+	_standing_label.text = "\n".join(lines) if not lines.is_empty() else "No people knows of you yet. Act on the world where they can see."
+	var parts := PackedStringArray()
+	for f in faiths:
+		var text := "%s · %s\n%s · %d faithful · fervour %d%%" % [_cap(f.name), f.people, f.kingdoms, f.followers, f.fervour]
+		var gods := PackedStringArray()
+		for g in f.gods:
+			gods.append("%s (%s%s)" % [g.name, g.domain, ", you" if g.player else ""])
+		text += "\nGods: " + ", ".join(gods)
+		for m in f.myths.slice(0, 3):
+			text += "\n• %s (year %d): %s" % [m.title, m.year, m.text]
+		parts.append(text)
+	_faiths_label.text = "\n\n".join(parts) if not parts.is_empty() else "No faith yet."
+
+
+## The written chronicle (0.6): the current age, the newest pages, the heroes.
+func set_chronicle(pages: Array, ages: Array, heroes: Array) -> void:
+	if ages.is_empty():
+		_age_label.text = "Before history"
+	else:
+		var age: Dictionary = ages[-1]
+		_age_label.text = "%s, since year %d" % [_cap(age.name), age.from]
+	var parts := PackedStringArray()
+	for p in pages.slice(0, 3):
+		parts.append("%s (years %d–%d)\n%s" % [p.title, p.from, p.to, p.text])
+	_written_label.text = "\n\n".join(parts) if not parts.is_empty() else "The chronicler writes a page every five years."
+	var names := PackedStringArray()
+	for h in heroes.slice(0, 5):
+		names.append("%s of %s, %d victories%s" % [h.name, h.kingdom, h.kills, "" if h.alive else " (fell in year %d)" % h.died])
+	_heroes_label.text = "Heroes: " + "; ".join(names) if not names.is_empty() else ""
+	_heroes_label.visible = not names.is_empty()
 
 
 ## Plots under way, shown before they happen.
@@ -929,6 +1022,11 @@ func _show_book(id: String, from_click: bool) -> void:
 		if book[0] == id:
 			_dock_title.text = book[1]
 			_dock_icon.texture = UI.icon(book[2])
+
+
+## A name with its first letter up ("the Age of Swords" → "The Age of Swords").
+static func _cap(text: String) -> String:
+	return text.substr(0, 1).to_upper() + text.substr(1)
 
 
 ## Text of a book's page: small, wrapped to the dock's width.

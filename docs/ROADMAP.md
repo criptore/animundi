@@ -94,13 +94,17 @@ See [INVENTIONS.md](INVENTIONS.md).
 - [x] Cultures invent **objects and buildings**: each kingdom's mind once a year, from its situation (war, hunger, crowding, restlessness, its busiest job); invented buildings get sprites assembled from parts with the kingdom's colour (`art/homes.py`, 32 shapes)
 - [x] Inventions spread (kingdom, trade partners, neighbours, by usefulness), are forgotten when useless or replaced, and evolve by descent (parent, generation), traced in the chronicle (event filter "inventions")
 - [x] Procedural fallback when no model is available (and when it is slow or wrong)
-- [ ] Inventions with new effect blocks unlocked by ages (0.8), monster and nature minds (0.7), the culture mind writing laws, rituals and myths (0.6)
+- [x] The culture mind writing laws, rituals and taboos, and myths (0.6, [CULTURES.md](CULTURES.md))
+- [ ] Inventions with new effect blocks unlocked by ages (0.8), monster and nature minds (0.7)
 
 ## 0.6 Culture
-- [ ] AI-shaped cultures: values, laws, rituals, taboos, architecture style
-- [ ] Religions: gods and myths drawn from real world events
-- [ ] The player recognised as a god: worshipped, feared or hated
-- [ ] Chronicle written by the AI (wars, heroes, disasters, named ages)
+See [CULTURES.md](CULTURES.md).
+- [x] AI-shaped cultures (`sim/Cultures.cs`): values, society, way with nature, architecture style; laws, rituals and taboos written in the **culture language** (validated JSON records with effect blocks: loyalty, faith, fertility, food, attack, defence, warlike, peaceful) by the local model or a procedural mind; cultures drift with what they live and split when a village breaks away
+- [x] Religions (`sim/Faiths.cs`): gods with domains, tempers and demands; myths and new gods drawn from real world events (lightning, meteors, wildfires, wars, conquests, deaths of rulers, falls of kingdoms, extinctions); faith in every village, holy wars, conversions, schisms
+- [x] The player recognised as a god: worshipped, feared or hated from what the peoples see, named in their faith, with effects on faith, loyalty and war; a Miracle power
+- [x] Chronicle written by the AI (`sim/Chronicle.cs`): a page every five years (local model or procedural), named ages, heroes and their legends
+- [ ] Legends become songs and stories in the people's language; rituals and festivals seen on the map
+- [ ] Clothing per culture (palette and items per role) on the sprites
 
 ## 0.7 Monsters and nature
 - [ ] Monster species with AI minds: mutations, new abilities, lairs

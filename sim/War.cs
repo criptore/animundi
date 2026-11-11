@@ -57,6 +57,7 @@ public partial class Simulation
 		Kingdoms[b].Allies.Remove(a);
 		if (announce)
 			LogEvent($"{Kingdoms[a].Name} declares war on {Kingdoms[b].Name}!", "wars");
+		Witness("war", -1f, -1f, $"{Kingdoms[a].Name} went to war with {Kingdoms[b].Name}", a, b);
 		// Allies of the attacked join in.
 		foreach (int al in Kingdoms[b].Allies)
 			if (al != a && Kingdoms[al].Alive && !AtWar(al, a))
@@ -331,6 +332,9 @@ public partial class Simulation
 		JoinKingdom(v, k);
 		Conquests++;
 		LogEvent($"{Kingdoms[k].Name} takes {village.Name} from {Kingdoms[old].Name}{(capital ? ", its capital" : "")}!", "wars");
+		Witness("conquest", village.X, village.Y, $"{Kingdoms[k].Name} took {village.Name}", k, old);
+		if (capital || village.Rank >= 2)
+			AddLegend(k, $"the Taking of {village.Name}");
 		if (capital)
 			Kingdoms[old].Capital = -1;
 		for (int i = 0; i < Units.Capacity; i++)
@@ -463,6 +467,7 @@ public partial class Simulation
 		Units.Health[j] -= BlowDamage(i) * Through(j);
 		if (Units.Health[j] <= 0f)
 		{
+			CountKill(i, j);
 			WarDied(j);
 			KillUnit(j, Death.War);
 			Units.Prey[i] = -1;
@@ -473,6 +478,7 @@ public partial class Simulation
 		Units.Health[i] -= BlowDamage(j) * (Units.Role[j] == (byte)Role.Warrior ? 1f : 0.5f) * Through(i);
 		if (Units.Health[i] <= 0f)
 		{
+			CountKill(j, i);
 			WarDied(i);
 			KillUnit(i, Death.War);
 			return false;

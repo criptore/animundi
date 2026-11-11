@@ -64,6 +64,9 @@ public partial class Simulation
 		public readonly float[] JobSpeed = new float[JobNames.Length];
 		public readonly float[] JobYield = new float[JobNames.Length];
 		public float Attack, Defense, FoodBonus, LoyaltyBonus;
+		/// <summary>Faith of its people, 0..100 (Faiths.cs), and what its culture adds to it and
+		/// to births (Cultures.cs).</summary>
+		public float Faith = 30f, FaithBonus, Fertility;
 		/// <summary>Its standing buildings by type, refreshed every two seconds (fast lookups:
 		/// the nearest store, well, mine...).</summary>
 		public readonly Dictionary<int, List<int>> ByType = new();
@@ -147,6 +150,7 @@ public partial class Simulation
 		_tMine = T("mine");
 		_tDock = T("dock");
 		_tTownHall = T("town_hall");
+		_tTemple = T("temple");
 		_tBarracks = T("barracks");
 		_tTower = T("watch_tower");
 		_tDummy = T("dummy");

@@ -52,6 +52,7 @@ func _initialize() -> void:
 	test_villages()
 	test_kingdoms()
 	test_inventions()
+	test_cultures()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -836,6 +837,204 @@ func test_inventions() -> void:
 				schema_ok = false
 	check(schema_ok, "the schema sent to model servers allows each kind only its own effects, and requires a job for work effects")
 	check(sim.MindStatus().status == "off", "the built-in mind can be stopped: the procedural inventor takes over")
+	sim.queue_free()
+
+
+## 0.6 Culture: cultures and their language (laws, rituals, taboos), drift, faiths and myths
+## drawn from what the peoples witness, the player seen as a god, the written chronicle and its
+## ages, heroes.
+func test_cultures() -> void:
+	var made := make_sim("cultures", 160)
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.SetMindEndpoint("")
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	var cultures: Array = sim.CultureTable()
+	var faiths: Array = sim.FaithTable()
+	check(cultures.size() == 2 and faiths.size() == 2, "each people starts with a culture and a faith (%d, %d)" % [cultures.size(), faiths.size()])
+	var shaped := true
+	for c in cultures:
+		shaped = shaped and c.society != "" and c.values.size() == 8 and c.architecture != "" and c.nature in ["exploit", "coexist", "worship"]
+	for f in faiths:
+		shaped = shaped and f.gods.size() >= 1 and f.myths.size() >= 1
+	check(shaped, "cultures have values, a society, a way with nature and an architecture; faiths have gods and a myth of the beginning")
+	var kingdoms: Array = sim.KingdomTable()
+	var k: int = kingdoms[0].index
+	var other: int = kingdoms[1].index
+	check(kingdoms[0].culture != "" and kingdoms[0].faith != "" and kingdoms[0].attitude == "unaware",
+			"a kingdom knows its culture and faith, and nothing of the player yet (%s)" % [kingdoms[0]])
+	var laws: Dictionary = sim.LawTable()
+	check(laws.get("cultures", false) and laws.get("faiths", false), "cultures and faiths are laws of the world that can be switched")
+	var capital := {}
+	for v in sim.VillageTable():
+		if v.capital and v.kingdom == kingdoms[0].name:
+			capital = v
+
+	# The culture language: the engine rejects what breaks its rules.
+	var bad := {
+		"unknown kind": '{"kind": "edict", "name": "Iron Edict", "text": "Obey.", "occasion": "", "effects": [{"do": "loyalty", "amount": 5}]}',
+		"effect not for this kind": '{"kind": "taboo", "name": "Taboo of War", "text": "No war.", "occasion": "", "effects": [{"do": "attack", "amount": 5}]}',
+		"ritual without occasion": '{"kind": "ritual", "name": "Sun Dance", "text": "They dance.", "occasion": "", "effects": [{"do": "faith", "amount": 5}]}',
+		"too strong": '{"kind": "law", "name": "Law of All", "text": "Everything.", "occasion": "", "effects": [{"do": "loyalty", "amount": 10}, {"do": "attack", "amount": 15}]}',
+		"warlike and peaceful": '{"kind": "law", "name": "Odd Law", "text": "Both.", "occasion": "", "effects": [{"do": "warlike", "amount": 5}, {"do": "peaceful", "amount": 5}]}',
+		"bad text": '{"kind": "law", "name": "Law of Code", "text": "<script>", "occasion": "", "effects": [{"do": "loyalty", "amount": 5}]}',
+		"not JSON": 'a law, please',
+	}
+	var rejected := 0
+	for why in bad:
+		if sim.SubmitCustomJson(k, bad[why], "model") != "":
+			rejected += 1
+	check(rejected == bad.size() and sim.CustomsRejected == bad.size(), "invalid customs are rejected (%d of %d)" % [rejected, bad.size()])
+	var fertility_before: float = sim.VillageMods(capital.index).fertility
+	var dance := '{"kind": "ritual", "name": "Cradle Dance", "text": "At each birth, they dance until dawn.", "occasion": "birth", "effects": [{"do": "fertility", "amount": 20}]}'
+	check(sim.SubmitCustomJson(k, dance, "model") == "", "a valid ritual is adopted")
+	check(sim.VillageMods(capital.index).fertility >= minf(fertility_before + 20.0, 50.0) - 0.01,
+			"a culture's customs change its villages (births: %s)" % sim.VillageMods(capital.index).fertility)
+	for n in 5:
+		var law := '{"kind": "law", "name": "Law of Stone %d", "text": "Rule %d.", "occasion": "", "effects": [{"do": "defense", "amount": 5}]}'
+		sim.SubmitCustomJson(k, law.replace("%d", ["One", "Two", "Three", "Four", "Five"][n]), "model")
+	var kept := 0
+	for c in sim.CultureTable():
+		if c.index == sim.CultureTable()[0].index:
+			for x in c.customs:
+				kept += 1 if x.kind == "law" else 0
+	check(kept == 4, "a culture keeps four laws at most: a new one replaces the oldest (%d kept)" % kept)
+
+	# The procedural mind writes valid customs from the kingdom's situation and values.
+	var count_customs := func() -> int:
+		var n := 0
+		for c in sim.CultureTable():
+			n += c.customs.size()
+		return n
+	var before: int = count_customs.call()
+	var rejected_before: int = sim.CustomsRejected
+	for n in 8:
+		sim.CultureNow(k)
+		sim.CultureNow(other)
+	check(sim.CustomsRejected == rejected_before and count_customs.call() > before,
+			"the procedural mind's customs are all valid (%d more)" % (count_customs.call() - before))
+
+	# Cultures drift with what they live: war makes them warlike.
+	var war_before: float = sim.CultureTable()[0].values.war
+	if not sim.AtWar(k, other):
+		sim.ForcePlan(sim.Plot("war", k, other))
+	for n in 6:
+		sim.DriftNow()
+	check(sim.CultureTable()[0].values.war > war_before or war_before >= 0.97, "a culture at war comes to value war more (%.2f → %.2f)" % [war_before, sim.CultureTable()[0].values.war])
+	sim.ForcePlan(sim.Plot("peace", k, other))
+
+	# Myths from what the peoples witness: a falling star gives birth to a god of the sky.
+	var sky := false
+	for n in 12:
+		sim.WitnessNow("meteor", capital.x, capital.y, "a burning star fell near " + capital.name, k, -1)
+		for f in sim.FaithTable():
+			for g in f.gods:
+				sky = sky or g.domain == "sky"
+		if sky:
+			break
+	check(sky, "a new god is born of what a people witnesses (a star falls: a god of the sky)")
+	var told := false
+	for f in sim.FaithTable():
+		for m in f.myths:
+			told = told or ("burning star" in m.text)
+	check(told, "the myth tells of the real event")
+	var myth := '{"god": "Orrun", "domain": "storm", "title": "The Anger of Orrun", "text": "When the sky cracked, Orrun walked among the clouds."}'
+	var fi: int = sim.FaithTable()[0].index
+	check(sim.SubmitMythJson(fi, myth, "lightning", "storm", -1) == "" and sim.SubmitMythJson(fi, '{"god": "X", "domain": "candy", "title": "T", "text": "t"}', "", "", -1) != "",
+			"a mind's myth is validated: a valid one is told, a broken one refused")
+
+	# The player as a god: a miracle over a capital, and the people worship; wrath, and they fear or hate.
+	sim.PowerMiracle(capital.x + 0.5, capital.y + 0.5, 2.0)
+	sim.PowerMiracle(capital.x + 0.5, capital.y + 0.5, 2.0)
+	var standing := {}
+	for s in sim.PlayerStanding():
+		standing[s.index] = s
+	check(standing[k].attitude == "worship" and standing[k].god != "", "a people that sees a miracle worships the player and names the god (%s)" % [standing[k]])
+	var player_god := false
+	for f in sim.FaithTable():
+		for g in f.gods:
+			player_god = player_god or g.player
+	check(player_god, "the player enters a people's faith as a god")
+	var far := {}
+	for v in sim.VillageTable():
+		if v.capital and v.kingdom == kingdoms[1].name:
+			far = v
+	for n in 3:
+		sim.PowerSmite(far.x + 0.5, far.y + 0.5, 3.0)
+		sim.PowerLightning(far.x + 0.5, far.y + 0.5)
+	for s in sim.PlayerStanding():
+		standing[s.index] = s
+	check(standing[other].attitude in ["fear", "hate"], "a people struck by the player fears or hates the god in the sky (%s)" % [standing[other]])
+
+	# Faith in the villages.
+	sim.FaithYearNow()
+	var fervour := true
+	for v in sim.VillageTable():
+		fervour = fervour and v.faith >= 0 and v.faith <= 100
+	check(fervour and sim.FaithTable()[0].fervour >= 0, "villages have a faith between 0 and 100")
+
+	# Heroes: five victories make a hero, sung in the legends of the culture.
+	var hero: int = sim.UnitAt(capital.x + 0.5, capital.y + 0.5, 8.0)
+	if hero >= 0 and "Humans" in sim.UnitInfo(hero) or hero >= 0 and "Orcs" in sim.UnitInfo(hero):
+		for n in 5:
+			sim.CountKillNow(hero, -1)
+		check(sim.HeroTable().size() == 1 and sim.HeroTable()[0].kills == 5, "a warrior with five victories becomes a hero (%s)" % [sim.HeroTable()])
+
+	# The chronicle: a page every five years, ages with names.
+	sim.RunSteps(30 * 60 * 6)
+	var pages: Array = sim.ChronicleTable()
+	check(pages.size() >= 1 and pages[0].text.length() > 20 and pages[0].title != "", "the chronicler writes a page of history every five years (%s)" % [pages.slice(0, 1)])
+	check(sim.AgeTable().size() >= 1 and sim.CurrentAge() != "", "history is cut into named ages (%s)" % sim.CurrentAge())
+	var page := '{"title": "The Years of the Star", "text": "In those years a star fell from the sky and the peoples built temples to the new god of the heavens.", "age": ""}'
+	check(sim.SubmitChronicleJson(page) == "" and sim.ChronicleTable()[0].mind == "model" and sim.SubmitChronicleJson('{"title": "", "text": "x"}') != "",
+			"a mind's page of the chronicle is validated, then replaces the procedural one")
+
+	# A village that breaks away takes a culture born of the old one.
+	var rebel := -1
+	for v in sim.VillageTable():
+		if not v.capital and v.kingdom != "":
+			rebel = v.index
+	if rebel >= 0:
+		var old_kingdom: int = sim.KingdomOf(rebel)
+		sim.ForcePlan(sim.Plot("rebellion", old_kingdom, rebel))
+		var child := false
+		for c in sim.CultureTable():
+			child = child or c.parent != ""
+		check(child, "a kingdom born of a rebellion has a culture born of the old one")
+
+	# A local model (a fake llama.cpp server): asked in the background with the culture language's schema.
+	var server := TCPServer.new()
+	if server.listen(18088, "127.0.0.1") == OK:
+		sim.SetMindEndpoint("http://127.0.0.1:18088")
+		sim.AskCulture(k)
+		var answered := false
+		var answer := '{"kind": "taboo", "name": "Taboo of the Moon", "text": "None may look at the full moon.", "occasion": "", "effects": [{"do": "faith", "amount": 6}]}'
+		var adopted := false
+		for step in 600:
+			if server.is_connection_available():
+				var peer := server.take_connection()
+				var request := ""
+				for wait in 200:
+					peer.poll()
+					if peer.get_available_bytes() > 0:
+						request += peer.get_utf8_string(peer.get_available_bytes())
+						if "json_schema" in request and request.ends_with("}"):
+							break
+					OS.delay_msec(5)
+				var body := JSON.stringify({"content": answer if "culture" in request else '{}'})
+				peer.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s" % [body.to_utf8_buffer().size(), body]).to_utf8_buffer())
+				answered = answered or "law, ritual or taboo" in request
+				peer.disconnect_from_host()
+			sim.RunSteps(15)
+			OS.delay_msec(5)
+			for c in sim.CultureTable():
+				for x in c.customs:
+					adopted = adopted or (x.name == "Taboo of the Moon" and x.mind == "model")
+			if adopted:
+				break
+		check(answered and adopted, "a local model writes a culture's custom in the background, validated like any other (%s, %s)" % [answered, adopted])
+		server.stop()
+	sim.SetMindEndpoint("")
 	sim.queue_free()
 
 

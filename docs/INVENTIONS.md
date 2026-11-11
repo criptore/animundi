@@ -63,10 +63,11 @@ Jobs: gatherer, woodcutter, hunter, builder, farmer, miner, fisher, blacksmith.
 
   Half the time it improves something known. It names the invention in the people's language.
 - **Local language model** (optional).
-  - It gets a summary of the kingdom (people, temperament, stores, war, busiest job, what it knows) and the rules.
+  - It gets a summary of the kingdom (people, temperament, culture and architecture, stores, war, busiest job, what it knows) and the rules.
   - Its output is forced to the language's **JSON schema** (`Simulation.InventionSchema()`), then validated like any other record.
   - The request runs in the background; the world never waits.
   - If the model is slow (90 s), absent or wrong, the procedural inventor answers instead.
+  - The same model also writes cultures' customs, myths and the chronicle (0.6, [CULTURES.md](CULTURES.md)), each under its own grammar.
 
 ### The model built into the game
 
