@@ -45,14 +45,15 @@ const EVENTS_SHOWN := 14
 const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 ## The dock's books: id, name, icon.
 const BOOKS := [["kingdoms", "Kingdoms", "crown"], ["villages", "Villages", "house"], ["life", "Life", "paw"],
-		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["chronicle", "Chronicle", "scroll"]]
+		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["legends", "Legends", "legend"],
+		["chronicle", "Chronicle", "scroll"]]
 const LAYER_ICONS := {"Biomes": "biome", "Height": "height", "Temperature": "thermo", "Humidity": "humidity", "Rivers": "river"}
 ## Map layers to come (docs/ROADMAP.md, 0.9): name, icon.
 const LAYERS_SOON := [["Kingdoms", "crown"], ["Cultures", "book"], ["Religions", "ankh"], ["Armies", "swords"]]
 const SEASON_ICONS := ["spring", "summer", "autumn", "winter"]
 const EVENT_FILTERS := [["", "All", "scroll"], ["kings", "Kings", "crown"], ["wars", "Wars", "swords"], ["cities", "Cities", "house"],
 		["inventions", "Inventions", "bulb"], ["culture", "Gods and customs", "ankh"], ["heroes", "Heroes", "star"],
-		["disasters", "Disasters", "fire"]]
+		["legends", "Legends", "legend"], ["disasters", "Disasters", "fire"]]
 const DOCK_WIDTH := 330
 const DOCK_MAX_HEIGHT := 360.0
 
@@ -99,6 +100,7 @@ var _plans_label: Label
 var _inventions_label: Label
 var _mind_label: Label
 var _cultures_label: Label
+var _legends_label: Label
 var _age_label: Label
 var _chapters_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
@@ -384,6 +386,10 @@ func _build_dock() -> void:
 
 	_cultures_label = _text("No people has a culture yet.", UI.CREAM)
 	_pages["cultures"].add_child(_cultures_label)
+
+	# Legendary monsters: those that walk the world, those slain, and rumours of the sleepers.
+	_legends_label = _text("No legend walks this world yet.", UI.CREAM)
+	_pages["legends"].add_child(_legends_label)
 
 	# The chronicle: the age, the chapters the chronicler wrote, then the events as they come.
 	_age_label = UI.label("The Age of Dawn", "Heading")
@@ -788,6 +794,32 @@ func set_inventions(inventions: Array) -> void:
 
 ## The cultures of the kingdoms (0.6): what they value, how they rule and build, their customs,
 ## their gods and myths, and what they make of the player.
+## The legendary monsters of this world: who walks it, what it does and says, its deeds; who
+## was slain and by whom; and only rumours of those still asleep.
+func set_legends(legends: Array) -> void:
+	var parts := PackedStringArray()
+	var rumours := PackedStringArray()
+	for l in legends:
+		match String(l.state):
+			"awake":
+				var doing: String = {"slumber": "slumbers in its lair", "roam": "roams its lands", "hunt": "hunts",
+						"raid": "raids %s" % l.target, "tribute": "demands tribute of %s" % l.target}.get(l.goal, l.goal)
+				var text := "%s\n%s · strength %d%% · %d slain · hoard %d gold" % [l.full_name, doing, int(l.health * 100.0), l.kills, l.hoard]
+				if l.words != "":
+					text += "\n\"%s\"" % l.words
+				if l.deeds != "":
+					text += "\n" + "\n".join(String(l.deeds).split("\n").slice(-3))
+				parts.append(text)
+			"slain":
+				parts.append("%s\nslain in year %d%s · %d slain in its life" % [l.full_name, l.slain,
+						" by " + l.slayer if l.slayer != "" else "", l.kills])
+			"dormant":
+				rumours.append("Something sleeps in the %s…" % String(l.lair).split(", ")[0].to_lower())
+	if not rumours.is_empty():
+		parts.append("Rumours\n" + "\n".join(rumours))
+	_legends_label.text = "\n\n".join(parts) if not parts.is_empty() else "No legend walks this world. Call one with the creatures' power, if you dare."
+
+
 func set_cultures(cultures: Array) -> void:
 	var blocks := PackedStringArray()
 	for c in cultures.slice(0, 8):

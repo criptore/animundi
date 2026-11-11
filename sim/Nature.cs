@@ -93,7 +93,7 @@ public partial class Simulation
 	// ------------------------------------------------------------------ events
 
 	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life.</summary>
-	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "culture", "heroes", "disasters", "life" };
+	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "culture", "heroes", "legends", "disasters", "life" };
 
 	private void LogEvent(string text, string cat = "life")
 	{
@@ -507,7 +507,8 @@ public partial class Simulation
 			_found.Clear();
 			Zones.Query(Units, x + 0.5f, y + 0.5f, 0.75f, _found);
 			foreach (int u in _found)
-				if (Units.Alive[u] && _rng.NextDouble() < 4.0 * dt)
+				// (legends walk through flames: only blades, the player or lava end them)
+				if (Units.Alive[u] && !Assets.Species[Units.Species[u]].IsLegend && _rng.NextDouble() < 4.0 * dt)
 					KillUnit(u, Death.Fire);
 			if (TileBurn[t] >= _burnTime[World.Biome[t]])
 			{

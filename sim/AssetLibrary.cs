@@ -36,6 +36,8 @@ public sealed class SpeciesRecord
 
 	/// <summary>A people (data/races.json) rather than an animal: it lives in villages.</summary>
 	public bool IsPeople { get; set; }
+	/// <summary>A legendary monster (data/legends.json): unique, with a mind (Legends.cs).</summary>
+	public bool IsLegend { get; set; }
 	/// <summary>For a people: its race record and this world's variation of it.</summary>
 	public RaceRecord Race { get; set; }
 
@@ -77,6 +79,37 @@ public sealed class RaceRecord
 			r.Stats[k] = Math.Clamp(MathF.Round(Shift(v, 0.2f)), 1f, 10f);
 		return r;
 	}
+}
+
+/// <summary>A legendary monster (data/legends.json): unique in a world, with a mind.</summary>
+public sealed class LegendRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	[JsonPropertyName("title")] public string Title { get; set; }
+	[JsonPropertyName("sprite")] public string Sprite { get; set; }
+	/// <summary>Biomes where it sleeps and wakes.</summary>
+	[JsonPropertyName("lair")] public List<string> Lair { get; set; } = new();
+	/// <summary>Odds that a world holds it.</summary>
+	[JsonPropertyName("chance")] public float Chance { get; set; } = 0.5f;
+	/// <summary>The years between which it wakes: [from, to].</summary>
+	[JsonPropertyName("wake")] public List<int> Wake { get; set; } = new() { 5, 30 };
+	[JsonPropertyName("health")] public float Health { get; set; } = 3000f;
+	/// <summary>How many it can strike down at once.</summary>
+	[JsonPropertyName("strength")] public int Strength { get; set; } = 3;
+	[JsonPropertyName("speed")] public float Speed { get; set; } = 1f;
+	[JsonPropertyName("roam")] public float Roam { get; set; } = 20f;
+	/// <summary>What its strikes do: fire, stomp, roots, raise_dead, quake, lightning.</summary>
+	[JsonPropertyName("power")] public string Power { get; set; } = "stomp";
+	/// <summary>The domain of the god its deeds give a people, and the myth's deed.</summary>
+	[JsonPropertyName("domain")] public string Domain { get; set; } = "the beasts";
+	[JsonPropertyName("deed")] public string Deed { get; set; } = "Loosed the Beast";
+	/// <summary>wrath, greed, cunning, pride, 0..1.</summary>
+	[JsonPropertyName("temper")] public Dictionary<string, float> Temper { get; set; } = new();
+	/// <summary>Syllables of its name: one from the first half, one from the second.</summary>
+	[JsonPropertyName("names")] public List<string> Names { get; set; } = new();
+	[JsonPropertyName("lore")] public string Lore { get; set; } = "";
+
+	public float T(string key) => Temper.TryGetValue(key, out float v) ? v : 0.5f;
 }
 
 /// <summary>The sounds a people's language draws from.</summary>
@@ -143,6 +176,11 @@ public sealed class AssetLibrary
 		[JsonPropertyName("species")] public List<SpeciesRecord> Species { get; set; } = new();
 	}
 
+	private sealed class LegendsFile
+	{
+		[JsonPropertyName("legends")] public List<LegendRecord> Legends { get; set; } = new();
+	}
+
 	private sealed class BuildingsFile
 	{
 		[JsonPropertyName("buildings")] public List<BuildingRecord> Buildings { get; set; } = new();
@@ -173,6 +211,8 @@ public sealed class AssetLibrary
 	public List<BuildingRecord> Buildings = new();
 	/// <summary>Biome name -> its properties.</summary>
 	public Dictionary<string, BiomeRecord> Biomes = new();
+	/// <summary>The legendary monsters (data/legends.json); each is also a species.</summary>
+	public List<LegendRecord> Legends = new();
 
 	public static AssetLibrary Load(string speciesPath = "res://data/species.json",
 		string plantsPath = "res://data/plants.json", string biomesPath = "res://data/biomes.json")
@@ -188,6 +228,19 @@ public sealed class AssetLibrary
 		lib.Biomes = JsonSerializer.Deserialize<BiomesFile>(FileAccess.GetFileAsString(biomesPath)).Biomes;
 		lib.Races = JsonSerializer.Deserialize<RacesFile>(FileAccess.GetFileAsString("res://data/races.json")).Races;
 		lib.Buildings = JsonSerializer.Deserialize<BuildingsFile>(FileAccess.GetFileAsString("res://data/buildings.json")).Buildings;
+		if (FileAccess.FileExists("res://data/legends.json"))
+			lib.Legends = JsonSerializer.Deserialize<LegendsFile>(FileAccess.GetFileAsString("res://data/legends.json")).Legends;
+		// Each legend is a species too (drawn, moved, inspected like any creature), born of no
+		// biome: nature never spawns it; Legends.cs wakes it.
+		foreach (var l in lib.Legends)
+		{
+			lib._speciesIndex[l.Id] = lib.Species.Count;
+			lib.Species.Add(new SpeciesRecord
+			{
+				Id = l.Id, Name = l.Title, Sprite = l.Sprite, Speed = l.Speed, Roam = l.Roam, Diet = "none",
+				Size = 14, Lifespan = 100000f, Litter = 0, IsLegend = true,
+			});
+		}
 		return lib;
 	}
 

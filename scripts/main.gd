@@ -268,7 +268,8 @@ func _use_power(screen_pos: Vector2) -> void:
 			_sim.PowerMeteor(at.x, at.y, r)
 		"spawn":
 			if _sim.PowerSpawn(powers.arg, at.x, at.y, powers.brush) == 0:
-				_hud.notice("Creatures need land to stand on.")
+				_hud.notice("A legend is unique: it already walks this world, or it needs land to stand on." if _sim.IsLegend(powers.arg) \
+						else "Creatures need land to stand on.")
 		"settle":
 			if _sim.PowerSettle(powers.arg, at.x, at.y, SETTLERS) < 0:
 				_hud.notice("A village needs free land: not the sea, not another village's ground.")
@@ -377,6 +378,7 @@ func _process(_delta: float) -> void:
 		_hud.set_inventions(_sim.InventionTable())
 		_hud.set_mind(_sim.MindStatus())
 		_hud.set_cultures(_sim.CultureTable())
+		_hud.set_legends(_sim.LegendTable())
 		_hud.set_chronicle(_sim.AgeName(), _sim.ChronicleTable())
 		_refresh_inspector()
 	# The camera stays on the creature or the village the player follows.
@@ -424,6 +426,12 @@ func _update_map_labels() -> void:
 				if v.siege > 0.0:
 					text += "  ⚔ siege %d%%" % int(v.siege * 100.0)
 				labels.append([text, p])
+		# The legends that walk the world, named over their heads.
+		for l in _sim.LegendLabels():
+			var p: Vector2 = _tilt.screen_of(Vector2(l.x, l.y), 1.0) if tilt_on \
+					else (Vector2(l.x, l.y - 3.0) * WorldMap.TILE - _camera.position) * _camera.zoom.x + view / 2.0
+			if Rect2(Vector2.ZERO, view).has_point(p):
+				labels.append([String(l.name), p])
 	_hud.set_map_labels(labels)
 
 

@@ -219,7 +219,8 @@ public partial class Simulation
 		}
 	}
 
-	public string NameOf(int i) => Units.Name[i] >= 0 ? _names[Units.Name[i]] : Assets.Species[Units.Species[i]].Name;
+	public string NameOf(int i) => Units.Name[i] >= 0 ? _names[Units.Name[i]]
+		: Assets.Species[Units.Species[i]].IsLegend ? LegendName(i) ?? Assets.Species[Units.Species[i]].Name : Assets.Species[Units.Species[i]].Name;
 
 	// ------------------------------------------------------------------ people (1 / s)
 
@@ -637,6 +638,8 @@ public partial class Simulation
 		if (i < 0 || !Units.Alive[i])
 			return "";
 		var sp = Assets.Species[Units.Species[i]];
+		if (sp.IsLegend)
+			return LegendInfo(i);
 		string needs = $"hunger {(int)(Units.Hunger[i] * 100)}% · thirst {(int)(Units.Thirst[i] * 100)}%";
 		if (!sp.IsPeople)
 			return $"{sp.Name}, {(int)Units.Age[i]} years · {needs}";

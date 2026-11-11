@@ -39,6 +39,7 @@ public partial class Simulation
 		["old_age"] = true,       // creatures die of old age
 		["natural_disasters"] = true,  // lightning sets forests on fire
 		["trees_growth"] = true,  // plants grow and spread
+		["legends"] = true,       // legendary monsters wake in their lairs (data/legends.json)
 		["faiths"] = true,        // kingdoms convert to their neighbours' faiths, and faiths split in heresies
 	};
 
@@ -166,6 +167,8 @@ public partial class Simulation
 		if (!Units.Alive[i])
 			return;
 		int s = Units.Species[i];
+		if (Assets.Species[s].IsLegend)
+			LegendDied(i, cause);
 		if (Assets.Species[s].IsPeople)
 		{
 			if (cause == Death.Thirst || cause == Death.Hunger)
@@ -218,6 +221,9 @@ public partial class Simulation
 			if (!Units.Alive[i])
 				continue;
 			var sp = Assets.Species[Units.Species[i]];
+			// A legend neither ages, hungers nor wanders: its mind leads it (Legends.cs).
+			if (sp.IsLegend)
+				continue;
 			Units.Age[i] += dt / YearSeconds;
 			if (oldAge && sp.Lifespan < 500f && Units.Age[i] > sp.Lifespan * (0.85f + 0.3f * Hash01(i)))
 			{

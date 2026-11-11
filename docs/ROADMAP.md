@@ -107,7 +107,8 @@ See [CULTURE.md](CULTURE.md).
 - [ ] Later: clothing by culture; map layers for cultures and religions (0.9); the chronicle per kingdom, person and place, and its export as text
 
 ## 0.7 Monsters and nature
-- [ ] Monster species with AI minds: mutations, new abilities, lairs
+- [x] Legendary monsters (`sim/Legends.cs`, [LEGENDS.md](LEGENDS.md)): six unique legends (Ash Wyrm, Frost Titan, Elder Treant, Hollow King, Sand Colossus, Storm Roc), each world drawing which sleep in it and when they wake, or called by the player (once); a mind (local model or procedural) that slumbers, roams, hunts, raids or demands tribute; their deeds in the chronicle, the peoples' memories and myths; heroes who slay them; detailed sprites (`art/legends.py`). Common monsters keep no mind.
+- [ ] Monster species that change: mutations, new abilities, lairs of common monsters
 - [ ] Nature spirits (forests, volcanoes, seas) with moods
 - [ ] Disasters: earthquakes, eruptions, floods, tornadoes, droughts, wildfires
 - [ ] Generated diseases and plagues

@@ -52,7 +52,7 @@ public partial class Simulation
 	/// <summary>How much each kind of event weighs when an age is named.</summary>
 	private static readonly Dictionary<string, float> ThemeWeights = new()
 	{
-		["wars"] = 4f, ["disasters"] = 3f, ["heroes"] = 3f, ["kings"] = 2f, ["cities"] = 2f, ["inventions"] = 1f, ["culture"] = 0.75f, ["life"] = 1f,
+		["wars"] = 4f, ["disasters"] = 3f, ["heroes"] = 3f, ["legends"] = 3.5f, ["kings"] = 2f, ["cities"] = 2f, ["inventions"] = 1f, ["culture"] = 0.75f, ["life"] = 1f,
 	};
 
 	/// <summary>What an event weighs: its kind's weight; a wildfire far from anyone and the
@@ -69,6 +69,7 @@ public partial class Simulation
 		["wars"] = (new[] { "Blades", "Banners", "Blood", "Iron" }, "Blades and Banners"),
 		["disasters"] = (new[] { "Ash", "Storms", "Embers", "Ruin" }, "Fire and Ruin"),
 		["heroes"] = (new[] { "Heroes", "Songs", "Champions" }, "Songs of the Brave"),
+		["legends"] = (new[] { "the Beast", "Legends", "Giants", "the Wyrm" }, "When Legends Walked"),
 		["culture"] = (new[] { "Gods", "Omens", "Prayers", "Customs" }, "Gods and Customs"),
 		["kings"] = (new[] { "Crowns", "Thrones", "Heirs" }, "Crowns Passing"),
 		["cities"] = (new[] { "Stone", "Hearths", "Walls" }, "Walls Rising"),

@@ -61,6 +61,7 @@ public partial class Simulation : Node2D
 		SetupPeoples();
 		SetupLife();
 		SetupNature();
+		SetupLegends(worldData.Get("seed_value").AsInt32());
 		ClearDrawing();
 
 		// Walking and chasing: every step, every unit.
@@ -77,6 +78,8 @@ public partial class Simulation : Node2D
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "vehicles", Global = true, Interval = Scheduler.Step, Batches = 1, Run = MoveVehicles });
 		// Villages hand out work and plan houses every two seconds.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "villages", Global = true, Interval = 2f, Batches = 1, Run = VillageStep });
+		// Legendary monsters: they wake, think and act four times a second.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "legends", Global = true, Interval = 0.25f, Batches = 1, Run = (_, _, dt) => LegendStep(dt) });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}
