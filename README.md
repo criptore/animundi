@@ -114,7 +114,7 @@ Common monsters stay simple creatures. A few **legendary monsters** are unique, 
 - Each world draws which of them sleep in it, and when each wakes in its lair. The player can also call one with the creatures' power, but there is never more than one of each.
 - Twice a year its mind (the local model, or a procedural mind from its wrath, greed, cunning and pride) decides to slumber, roam, hunt, **raid** a village or **demand tribute** of a kingdom, and says so.
 - Its deeds enter the lore: the chronicle tells them, the peoples who live through them make myths and gods of them, and the warrior who slays one becomes a hero.
-- They are drawn larger and with more detail than the common creatures: shaded materials, dithering, glowing eyes and runes, an attack pose each (`art/legends.py`).
+- Their sprites are open-source pixel art, larger and more detailed than the common creatures: CC0 tiles of Dungeon Crawl Stone Soup ([sources](art/reference/legends/README.md)), with every pose made by `art/legends.py`.
 
 ## 0.9 God powers (first part)
 

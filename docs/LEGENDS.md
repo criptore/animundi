@@ -1,6 +1,6 @@
 # Legendary monsters (0.7 Monsters and nature)
 
-Common monsters (skeletons, spiders, demons, golems…) are creatures like any other: they are born, hunt and die, and have no mind. A **legend** is different. It is **unique** in its world, has a **name**, a **mind**, and a place in the peoples' lore. Code: `sim/Legends.cs`. Data: `data/legends.json`. Sprites: `art/legends.py`.
+Common monsters (skeletons, spiders, demons, golems…) are creatures like any other: they are born, hunt and die, and have no mind. A **legend** is different. It is **unique** in its world, has a **name**, a **mind**, and a place in the peoples' lore. Code: `sim/Legends.cs`. Data: `data/legends.json`. Sprites: `art/legends.py`, from CC0 tiles of Dungeon Crawl Stone Soup.
 
 ![The legends and their poses](images/legends.png)
 
@@ -56,13 +56,24 @@ Its words for raids and tributes are told in the chronicle.
 
 ## Sprites
 
-`art/legends.py` draws them at 20–54 × 26–36 pixels (3 to 7 tiles), with much more detail than the 8–19 pixel creatures of `art/creatures.py`:
-- every part is drawn from shapes in a material: a ramp of four or five shades, lit from the top left;
-- mid-tones are dithered;
-- the outline takes the darkest shade of what it surrounds;
-- eyes, runes, lava, lightning and soul-fire glow.
+The legends are **open-source pixel art**: 32×32 tiles from **Dungeon Crawl Stone Soup**, released under **CC0** (public domain) and published on OpenGameArt. They are much more detailed than the 8–19 pixel creatures of `art/creatures.py`, and about four tiles tall in the game. Sources, changes and thanks are in `art/reference/legends/README.md`.
 
-Each legend has its own attack pose: fire breath, an ice fist, thorns, soul-fire, a boulder fist, a bolt.
+| Legend | Tile |
+|---|---|
+| Ash Wyrm | the dragon, recoloured in embers |
+| Frost Titan | the frost giant |
+| Elder Treant | the treant |
+| Hollow King | the ancient lich, crowned |
+| Sand Colossus | the stone giant, warmed to sandstone |
+| Storm Roc | the griffon, recoloured in storm blue |
+
+`art/legends.py` makes every pose from the single tile:
+- walking: the lower part steps one way, then the other;
+- attack: it lunges forward, brighter;
+- swim: cut at the waterline;
+- death: fallen on its side, darkened.
+
+`python3 art/legends.py --drawn` draws the legends from shapes instead (shaded materials, dithering, glowing eyes and runes).
 
 ```bash
 python3 art/legends.py

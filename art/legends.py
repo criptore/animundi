@@ -1,5 +1,9 @@
-"""Draws the legendary monsters of Animundi (data/legends.json): unique beings, several tiles
-tall, drawn with more detail than the common creatures of art/creatures.py.
+"""Makes the sprites of the legendary monsters of Animundi (data/legends.json): unique beings,
+several tiles tall, with more detail than the common creatures of art/creatures.py.
+
+By default the legends are open-source pixel art: 32x32 tiles of Dungeon Crawl Stone Soup
+(CC0, art/reference/legends/README.md), recoloured where their lore asks for it, from which every
+pose is made (see from_tile). With --drawn, they are drawn from shapes instead, as follows.
 
 Where a common creature is a small text template with one colour per part, a legend is drawn
 from shapes (ellipses, polygons, thick lines), each in a material: a ramp of four to five
@@ -15,9 +19,11 @@ without the editor still loads them) and a preview sheet docs/images/legends.png
     python3 art/legends.py
 """
 
+import colorsys
 import hashlib
 import math
 import random
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -545,15 +551,113 @@ def write_import(name):
     path.write_text(IMPORT.format(uid=uid or "a", name=name, md5=md5))
 
 
+# ---------------------------------------------------------------------------------- open-source tiles
+
+TILES = ROOT / "art" / "reference" / "legends"
+
+
+def recolour(img, hues, to_hue, sat=None, val=1.0):
+    """Moves the pixels whose hue (degrees) is within `hues` to `to_hue`, keeping their shading."""
+    out = img.copy()
+    px = out.load()
+    lo, hi = hues
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if not a:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if s < 0.15 or not (lo <= h * 360 <= hi):
+                continue
+            nr, ng, nb = colorsys.hsv_to_rgb(to_hue / 360, s if sat is None else min(1.0, s * sat), min(1.0, v * val))
+            px[x, y] = (int(nr * 255), int(ng * 255), int(nb * 255), a)
+    return out
+
+
+def warm(img, amount):
+    """A warm, sandy tint over the whole sprite."""
+    out = img.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = px[x, y]
+            if a:
+                px[x, y] = (min(255, int(r * (1 + amount))), min(255, int(g * (1 + amount * 0.5))), int(b * (1 - amount)), a)
+    return out
+
+
+def trimmed(img):
+    """Cut to its opaque pixels."""
+    return img.crop(img.getbbox())
+
+
+# Each legend's tile and what is changed: the lore of the Ash Wyrm is embers, the Storm Roc's a storm.
+SOURCES = {
+    "ash_wyrm": lambda im: recolour(recolour(im.transpose(Image.FLIP_LEFT_RIGHT), (60, 170), 12, sat=1.1), (340, 360), 350, val=0.55),
+    "frost_titan": lambda im: im,
+    "elder_treant": lambda im: im,
+    "hollow_king": lambda im: im,
+    "sand_colossus": lambda im: warm(im, 0.12),
+    "storm_roc": lambda im: recolour(im.transpose(Image.FLIP_LEFT_RIGHT), (15, 50), 222, sat=0.8, val=0.85),
+}
+
+
+def from_tile(name):
+    """Every pose of a legend from its single tile: idle; walking (it bobs and its lower part
+    steps one way then the other); attack (it lunges forward, brighter); swim (cut at the
+    waterline); death (lying down, darkened)."""
+    src = trimmed(SOURCES[name](Image.open(TILES / f"{name}.png").convert("RGBA")))
+    w, h = src.width + 4, src.height + 1
+
+    def place(img, dx=0, dy=0):
+        out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        out.alpha_composite(img, (2 + dx, 1 + dy))
+        return out
+
+    def step(sign):
+        # The lower third steps to one side, the body above sways half as far.
+        legs_from = int(src.height * 0.7)
+        top = src.crop((0, 0, src.width, legs_from))
+        legs = src.crop((0, legs_from, src.width, src.height))
+        out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        out.alpha_composite(legs, (2 + sign, 1 + legs_from))
+        out.alpha_composite(top, (2 + (sign if sign > 0 else 0), 1))
+        return out
+
+    def attack():
+        bright = src.copy()
+        px = bright.load()
+        for y in range(bright.height):
+            for x in range(bright.width):
+                r, g, b, a = px[x, y]
+                if a:
+                    px[x, y] = (min(255, int(r * 1.18 + 12)), min(255, int(g * 1.18 + 12)), min(255, int(b * 1.18 + 12)), a)
+        return place(bright, dx=2, dy=-1)
+
+    idle = place(src)
+    # Dead, it falls on its side.
+    dead = idle.rotate(-90, expand=True)
+    px = dead.load()
+    for y in range(dead.height):
+        for x in range(dead.width):
+            r, g, b, a = px[x, y]
+            if a:
+                px[x, y] = (int(r * 0.75), int(g * 0.75), int(b * 0.75), a)
+    return {"idle": idle, "walk1": step(-1), "walk2": step(1), "attack": attack(), "swim": swim(idle), "death": trimmed(dead)}
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    frames = {name: poses(draw) for name, draw in LEGENDS.items()}
+    if "--drawn" in sys.argv:
+        frames = {name: poses(draw) for name, draw in LEGENDS.items()}
+    else:
+        frames = {name: from_tile(name) for name in SOURCES}
     for name, fs in frames.items():
         for pose, img in fs.items():
             img.save(OUT / f"{name}_{pose}.png")
             write_import(f"{name}_{pose}.png")
     # Preview: one row per legend, its poses side by side, scaled up 4x, over grass.
-    scale, cw, ch = 4, 58, 40
+    scale, cw, ch = 4, max(58, max(f["idle"].width for f in frames.values()) + 6), 40
     sheet = Image.new("RGBA", (len(POSES) * cw * scale, len(frames) * ch * scale), (74, 120, 62, 255))
     for row, (name, fs) in enumerate(frames.items()):
         for col, pose in enumerate(POSES):
