@@ -73,8 +73,8 @@ The mind writes the title and the text. The engine ties the myth to what really 
 Code: `sim/Faiths.cs`. Conversions and heresies happen once a year, and the law **Faiths spread and split** switches them off.
 
 - **Holy wars.** A devout kingdom (faith above 55, and faith among its dearest values) calls a war on a kingdom of another faith holy: its rulers are half again as quick to plot it, and the chronicle says the priests call it a holy war on the unbelievers.
-- **Conversions.** A kingdom takes up the faith of a neighbour, ally or trade partner whose faith burns at least 15 points hotter than its own, if it does not hate it and is not at war with it. The closer the bond and the wider the gap, the likelier. It takes the other's creed and gods (the god it makes of the player stays its own), keeps telling its old myths, and its faith is shaken a little.
-- **Heresies.** When a faith is kept by several kingdoms (rebels keep their mother's), one that values things far from the others, and still cares for its gods, breaks away: it keeps the old gods, finds a new god in what it holds dearest (war, glory, the forest, gold, wisdom, the sky, the wind, the ancestors), and names its faith after it ("the Way of Urun").
+- **Conversions.** A kingdom takes up the faith of a neighbour, ally or trade partner whose faith burns at least 10 points hotter than its own, if it is not at war with it and its opinion of it is not below -30 (a border alone costs 15). The closer the bond and the wider the gap, the likelier: a fifth of the gap in 40 a year for a neighbour, twice that for an ally or trade partner, never more than one in two (`ConversionChance`). It takes the other's creed and gods (the god it makes of the player stays its own), keeps telling its old myths, and its faith is shaken a little.
+- **Heresies.** When a faith is kept by several kingdoms (rebels keep their mother's), one that values things far from the others, and still cares for its gods, breaks away. A kingdom and its rebels start a few points apart (kinship about 0.93) and may split a few times in a hundred each year; twin cultures (kinship above 0.97) never do (`HeresyChance`). Only a kingdom that came to the faith after (or with) the others breaks from it, and not in its first 10 years: a people that converts does not drive out the old faithful. The heretics keep the old gods, find a new god in what they hold dearest (war, glory, the forest, gold, wisdom, the sky, the wind, the ancestors), and name their faith after it ("the Way of Urun").
 
 Each step is told in the chronicle (event filter "Gods and customs") and remembered by the kingdom, so it may become a myth.
 
@@ -124,4 +124,4 @@ Every event of the log is kept in the **annals**. Every five years the chronicle
 godot --headless --path . --script res://tools/run_test.gd -- test_culture
 ```
 
-`test_faiths` checks holy wars, the Convert whisper, heresies, conversions and the Miracle.
+`test_faiths` checks holy wars, the Convert whisper, heresies (including between a kingdom and its rebels, and that converts never drive out the elder faith), conversions and their odds, and the Miracle.
