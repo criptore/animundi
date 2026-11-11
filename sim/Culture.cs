@@ -69,6 +69,8 @@ public partial class Simulation
 
 		// Religion (Religion.cs).
 		public int Religion;
+		/// <summary>Years (of Faiths.cs) since the kingdom took up its faith.</summary>
+		public int FaithYears;
 		public string Creed = "";
 		public readonly List<God> Gods = new();
 		public readonly List<Myth> Myths = new();
@@ -133,6 +135,7 @@ public partial class Simulation
 		c.Customs.Clear();
 		c.Customs.AddRange(a.Customs);
 		c.Religion = a.Religion;
+		c.FaithYears = 0;
 		c.Creed = a.Creed;
 		c.Gods.Clear();
 		c.Gods.AddRange(a.Gods.FindAll(g => !g.Player));

@@ -1561,6 +1561,52 @@ func test_faiths() -> void:
 	check(split[0].religion != split[1].religion and split[0].creed != split[1].creed,
 			"a faith splits in a heresy when its kingdoms value different things (%s / %s)" % [split[0].creed, split[1].creed])
 
+	# In a real game, kingdoms that share a faith are mostly a kingdom and its rebels: values a
+	# few points apart (kinship ~0.93). Their faith must still split now and then.
+	check(sim.PowerWhisper("convert", b, a), "the rebels' kingdom shares its old faith again")
+	for value in ["war", "honour", "nature", "wealth", "knowledge", "faith", "freedom", "tradition"]:
+		sim.SetCultureValue(a, value, 0.5)
+		sim.SetCultureValue(b, value, 0.55)
+	sim.SetCultureValue(b, "freedom", 0.65)
+	sim.SetFaith(a, 60.0)
+	sim.SetFaith(b, 60.0)
+	var years := 0
+	while years < 100 and sim.CultureTable()[0].religion == sim.CultureTable()[1].religion:
+		sim.ReligionYearNow()
+		years += 1
+	check(years >= 10 and sim.CultureTable()[0].religion != sim.CultureTable()[1].religion,
+			"a faith shared by a kingdom and its rebels splits within a lifetime, not in its first years (%d years)" % years)
+
+	# A people that converts does not drive out the old faithful: when a faith splits, the
+	# newcomers are the heretics, and the kingdom that held it first keeps it.
+	for value in ["war", "honour", "nature", "wealth", "knowledge", "faith", "freedom", "tradition"]:
+		sim.SetCultureValue(a, value, 0.05)
+		sim.SetCultureValue(b, value, 0.95)
+	sim.SetFaith(a, 60.0)
+	sim.SetFaith(b, 60.0)
+	for n in 12:
+		sim.ReligionYearNow()
+	var elder_creed: String = sim.CultureTable()[0].creed
+	check(sim.PowerWhisper("convert", b, a), "the stranger people takes up the elder's faith")
+	for n in 9:
+		sim.ReligionYearNow()
+	check(sim.CultureTable()[0].religion == sim.CultureTable()[1].religion, "a faith newly taken up holds for its first years")
+	for n in 40:
+		sim.ReligionYearNow()
+	check(sim.CultureTable()[0].creed == elder_creed and sim.CultureTable()[1].religion != sim.CultureTable()[0].religion
+			and sim.CultureTable()[1].creed != elder_creed,
+			"then the newcomers break from it, and the elder keeps it (%s / %s)" % [sim.CultureTable()[0].creed, sim.CultureTable()[1].creed])
+	check(sim.HeresyChance(0.99) == 0.0 and sim.HeresyChance(0.94) > 0.03 and sim.HeresyChance(0.5) <= 1.0,
+			"twin faiths never split; drifted ones do, a few in a hundred each year (%.3f)" % sim.HeresyChance(0.94))
+
+	# Conversions in a real game: a hostile-ish neighbour (opinion -25: the border alone costs 15)
+	# a dozen points less devout still may turn; one hated, at war or as devout does not.
+	check(sim.ConversionChance(12.0, -25.0, false) > 0.03 and sim.ConversionChance(12.0, -25.0, true) > sim.ConversionChance(12.0, -25.0, false),
+			"a neighbour a dozen points cooler in faith may take up the other's (%.3f a year)" % sim.ConversionChance(12.0, -25.0, false))
+	check(sim.ConversionChance(5.0, 0.0, true) == 0.0 and sim.ConversionChance(30.0, -60.0, true) == 0.0
+			and sim.ConversionChance(90.0, 50.0, true) <= 0.5,
+			"no conversion for a small gap or a hated neighbour, and never a sure one")
+
 	# Conversion: a lukewarm kingdom takes up the faith of a fervent ally.
 	for value in ["war", "honour", "nature", "wealth", "knowledge", "faith", "freedom", "tradition"]:
 		sim.SetCultureValue(a, value, 0.5)

@@ -44,13 +44,49 @@ public partial class Simulation
 
 	private void ReligionYear()
 	{
+		foreach (var k in Kingdoms)
+			if (k.Alive)
+				k.Culture.FaithYears++;
 		Conversions();
 		Heresies();
 	}
 
+	/// <summary>How much hotter a neighbour's faith must burn for a kingdom to take it up.</summary>
+	public const float ConversionGap = 10f;
+	/// <summary>Below this opinion of the other, a kingdom will not take up its faith. A border
+	/// alone costs 15 (Opinion), so a stranger next door is around -15 to -30.</summary>
+	public const float ConversionHatred = -30f;
+	/// <summary>Kingdoms sharing a faith whose values are this close (Kinship) never split. A
+	/// kingdom and its rebels start around 0.93.</summary>
+	public const float HeresyKinship = 0.97f;
+	/// <summary>Years a kingdom keeps a faith it took up before it may break from it.</summary>
+	public const int HeresyGrace = 10;
+
+	/// <summary>The yearly odds that a kingdom takes up the faith of another whose faith burns
+	/// `gap` points hotter, given its opinion of it and whether they are allies or trade partners;
+	/// 0 for a small gap or a hated kingdom, never more than one in two. (Measured over 25 years
+	/// with two peoples: neighbours of different faiths rarely pass the other gates, so the odds
+	/// of those that do are high.)</summary>
+	public static double ConversionChance(float gap, float opinion, bool close)
+	{
+		if (gap < ConversionGap || opinion < ConversionHatred)
+			return 0.0;
+		return Math.Min(0.5, (close ? 0.4 : 0.2) * gap / 40.0);
+	}
+
+	/// <summary>The yearly odds that a kingdom breaks from the faith it shares with others, given
+	/// its mean kinship with them: none for twin cultures, a few in a hundred for a kingdom and its
+	/// rebels, near certain for strangers.</summary>
+	public static double HeresyChance(float kinship)
+	{
+		if (kinship > HeresyKinship)
+			return 0.0;
+		return Math.Min(1.0, 0.02 + (HeresyKinship - kinship) * 1.5);
+	}
+
 	/// <summary>A kingdom may take up the faith of a neighbour, ally or trade partner whose faith
-	/// burns 15 points hotter than its own and that it does not hate; the closer the bond and
-	/// the wider the gap, the likelier.</summary>
+	/// burns hotter than its own and that it does not hate (ConversionChance); the closer the bond
+	/// and the wider the gap, the likelier.</summary>
 	private void Conversions()
 	{
 		for (int a = 0; a < Kingdoms.Count; a++)
@@ -67,9 +103,8 @@ public partial class Simulation
 				if (!close && !Bordering(a, b))
 					continue;
 				float gap = kb.Culture.Faith - ka.Culture.Faith;
-				if (gap < 15f || Opinion(a, b) < -15f)
-					continue;
-				if (_cultureRng.NextDouble() < (close ? 0.1 : 0.05) * gap / 40.0)
+				double chance = gap < ConversionGap ? 0.0 : ConversionChance(gap, Opinion(a, b), close);
+				if (chance > 0.0 && _cultureRng.NextDouble() < chance)
 				{
 					Convert(a, b, whispered: false);
 					break;
@@ -93,6 +128,7 @@ public partial class Simulation
 		if (player != null)
 			ca.Gods.Add(player);
 		ca.Faith *= 0.75f;
+		ca.FaithYears = 0;
 		foreach (var v in Villages)
 			if (v.Alive && v.Kingdom == a)
 				v.ModsDirty = true;
@@ -113,17 +149,20 @@ public partial class Simulation
 			if (!kingdom.Alive)
 				continue;
 			var c = kingdom.Culture;
+			// Only those who came to the faith after (or with) their brothers break from it, and
+			// not in their first years: a people that converts does not drive out the old faithful.
 			var brothers = new List<int>();
 			for (int o = 0; o < Kingdoms.Count; o++)
-				if (o != k && Kingdoms[o].Alive && Kingdoms[o].Culture.Religion == c.Religion)
+				if (o != k && Kingdoms[o].Alive && Kingdoms[o].Culture.Religion == c.Religion
+					&& Kingdoms[o].Culture.FaithYears >= c.FaithYears)
 					brothers.Add(o);
-			if (brothers.Count == 0 || c.Faith < 25f)
+			if (brothers.Count == 0 || c.Faith < 25f || c.FaithYears < HeresyGrace)
 				continue;
 			float kinship = 0f;
 			foreach (int o in brothers)
 				kinship += Kinship(c, Kingdoms[o].Culture);
 			kinship /= brothers.Count;
-			if (kinship > 0.85f || _cultureRng.NextDouble() > 0.04 + (0.85f - kinship) * 0.6)
+			if (_cultureRng.NextDouble() >= HeresyChance(kinship))
 				continue;
 			int dearest = 0;
 			for (int n = 1; n < c.Values.Length; n++)
@@ -131,7 +170,7 @@ public partial class Simulation
 					dearest = n;
 			string domain = HeresyDomains[dearest];
 			string old = c.Creed;
-			var prophet = c.Gods.Find(g => !g.Player && g.Domain == domain);
+			var prophet = c.Gods.Find(g => !g.Player && g.Domain == domain && "the Way of " + g.Name != old);
 			if (prophet == null)
 			{
 				prophet = new God
@@ -144,6 +183,7 @@ public partial class Simulation
 				c.Gods.Add(prophet);
 			}
 			c.Religion = _nextReligion++;
+			c.FaithYears = 0;
 			c.Creed = "the Way of " + prophet.Name;
 			string people = Assets.Species[kingdom.Species].Name;
 			LogEvent($"heresy: the {people} of {kingdom.Name} break from {old} and follow {c.Creed}, god of {domain}.", "culture");
