@@ -174,6 +174,38 @@ public partial class Simulation
 		return blessed;
 	}
 
+	/// <summary>A miracle: a sign from the sky over the brush. It heals and feeds what stands
+	/// under it, and the kingdoms whose villages see it (the brush and 14 tiles) grow in faith
+	/// and gratitude, and will make a myth of it. Returns the creatures healed plus the kingdoms
+	/// that saw it (0 on the sea).</summary>
+	public int PowerMiracle(float x, float y, float radius)
+	{
+		if (!OnLand(x, y))
+			return 0;
+		int healed = 0;
+		foreach (int i in UnitsWithin(x, y, radius))
+		{
+			Units.Health[i] = Math.Max(Units.Health[i], MaxHealth(i));
+			Units.Hunger[i] = 0f;
+			Units.Thirst[i] = 0f;
+			healed++;
+		}
+		float reach = radius + 14f;
+		var saw = new HashSet<int>();
+		foreach (var v in Villages)
+			if (v.Alive && v.Kingdom >= 0 && Kingdoms[v.Kingdom].Alive && (v.X - x) * (v.X - x) + (v.Y - y) * (v.Y - y) <= reach * reach)
+				saw.Add(v.Kingdom);
+		foreach (int k in saw)
+		{
+			var c = Kingdoms[k].Culture;
+			c.Faith = Math.Min(100f, c.Faith + 12f);
+		}
+		GodActs("miracle", x, y, radius, 1);
+		if (saw.Count > 0)
+			LogEvent($"a miracle shines over the land near ({(int)x}, {(int)y}): the faithful fall to their knees.", "culture");
+		return healed + saw.Count;
+	}
+
 	// ------------------------------------------------------------------ life
 
 	/// <summary>Ids of the creatures the player can bring into the world (data/species.json).</summary>
@@ -321,12 +353,14 @@ public partial class Simulation
 	}
 
 	/// <summary>Whispers in a ruler's ear: kingdom a goes to "war" with b, makes "peace" or an
-	/// "alliance", at once. False when it makes no sense (the same kingdom, a fallen one, war on
+	/// "alliance", or "convert"s to b's faith, at once. False when it makes no sense (the same kingdom, a fallen one, war on
 	/// an enemy, peace or alliance the wrong way round).</summary>
 	public bool PowerWhisper(string kind, int a, int b)
 	{
 		if (a == b || a < 0 || b < 0 || a >= Kingdoms.Count || b >= Kingdoms.Count || !Kingdoms[a].Alive || !Kingdoms[b].Alive)
 			return false;
+		if (kind == "convert")
+			return ConvertKingdom(a, b);
 		bool atWar = AtWar(a, b);
 		if (kind == "war" ? atWar : kind == "peace" ? !atWar : kind == "alliance" ? atWar || Kingdoms[a].Allies.Contains(b) : true)
 			return false;

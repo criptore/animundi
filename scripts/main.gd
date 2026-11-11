@@ -44,7 +44,7 @@ var _stroking := false
 var _stroke_tile := Vector2i(-1, -1)
 ## Where the left button went down while inspecting (a click inspects, a drag pans).
 var _press_at := Vector2(-1, -1)
-## First kingdom clicked for a whisper (war, peace, alliance), or -1.
+## First kingdom clicked for a whisper (war, peace, alliance, convert), or -1.
 var _whisper_from := -1
 ## What the inspector follows: a unit or a village, or -1.
 var _pinned_unit := -1
@@ -258,6 +258,8 @@ func _use_power(screen_pos: Vector2) -> void:
 			_sim.PowerSmite(at.x, at.y, r)
 		"bless":
 			_sim.PowerBless(at.x, at.y, r)
+		"miracle":
+			_sim.PowerMiracle(at.x, at.y, r)
 		"biome":
 			_sim.PowerBiome(powers.arg, at.x, at.y, r)
 		"lightning":
@@ -270,7 +272,7 @@ func _use_power(screen_pos: Vector2) -> void:
 		"settle":
 			if _sim.PowerSettle(powers.arg, at.x, at.y, SETTLERS) < 0:
 				_hud.notice("A village needs free land: not the sea, not another village's ground.")
-		"war", "peace", "alliance":
+		"war", "peace", "alliance", "convert":
 			_whisper(powers.power, _sim.KingdomAt(at.x, at.y))
 
 
@@ -290,7 +292,8 @@ func _whisper(kind: String, kingdom: int) -> void:
 	_whisper_from = -1
 	if not _sim.PowerWhisper(kind, from, kingdom):
 		_hud.notice({"war": "They are already at war, or it is the same kingdom.",
-				"peace": "They are not at war.", "alliance": "They are at war, already allies, or the same kingdom."}[kind])
+				"peace": "They are not at war.", "alliance": "They are at war, already allies, or the same kingdom.",
+				"convert": "They already share a faith, or it is the same kingdom."}[kind])
 
 
 ## Pins the creature under a screen position in the inspector, else the village owning the land.
@@ -335,7 +338,7 @@ func _process(_delta: float) -> void:
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
 	var brushing: bool = _hud.powers.power != "inspect" and not _hud.blocking()
-	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor"] else 0.6
+	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle"] else 0.6
 	var at := _ground_at(pointer)
 	_brush.visible = brushing and not tilt_on
 	_tilt_brush.visible = brushing and tilt_on

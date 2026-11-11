@@ -53,6 +53,7 @@ func _initialize() -> void:
 	test_kingdoms()
 	test_inventions()
 	test_culture()
+	test_faiths()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -1519,4 +1520,71 @@ func test_culture() -> void:
 	var grammar: String = sim.CultureGrammar()
 	check("do-work-speed" in grammar and "\\\"taboo\\\"" in grammar and JSON.parse_string(sim.CultureSchema()).properties.effects.maxItems == 2,
 			"the custom language has a grammar and a schema")
+	sim.queue_free()
+
+
+## Faiths between kingdoms: holy wars, conversions, heresies, the Miracle power and the Convert whisper.
+func test_faiths() -> void:
+	var made := make_sim("faiths", 160)
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.SetMindEndpoint("")
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	var rows: Array = sim.CultureTable()
+	var a: int = rows[0].index
+	var b: int = rows[1].index
+	check(rows[0].religion != rows[1].religion and sim.LawTable().get("faiths", false), "each people starts with its own faith; faiths are a law of the world")
+
+	# Holy wars: a devout kingdom calls a war on unbelievers holy.
+	sim.SetFaith(a, 80.0)
+	sim.SetCultureValue(a, "faith", 0.9)
+	sim.SetFaith(b, 20.0)
+	check(sim.HolyWar(a, b) and not sim.HolyWar(b, a), "a devout kingdom calls a war on another faith holy, a lukewarm one does not")
+
+	# The Convert whisper: a kingdom takes up another's faith at once.
+	check(sim.PowerWhisper("convert", b, a) and sim.CultureTable()[1].religion == sim.CultureTable()[0].religion
+			and sim.CultureTable()[1].creed == sim.CultureTable()[0].creed and not sim.PowerWhisper("convert", b, a),
+			"the Convert whisper turns a kingdom to another's faith, once")
+	check(not sim.HolyWar(a, b), "no holy war between kingdoms of the same faith")
+
+	# Heresy: a kingdom of the same faith that values other things breaks away from it.
+	for value in ["war", "honour", "nature", "wealth", "knowledge", "faith", "freedom", "tradition"]:
+		sim.SetCultureValue(a, value, 0.05)
+		sim.SetCultureValue(b, value, 0.95)
+	sim.SetFaith(a, 60.0)
+	sim.SetFaith(b, 60.0)
+	for n in 300:
+		sim.ReligionYearNow()
+		if sim.CultureTable()[0].religion != sim.CultureTable()[1].religion:
+			break
+	var split: Array = sim.CultureTable()
+	check(split[0].religion != split[1].religion and split[0].creed != split[1].creed,
+			"a faith splits in a heresy when its kingdoms value different things (%s / %s)" % [split[0].creed, split[1].creed])
+
+	# Conversion: a lukewarm kingdom takes up the faith of a fervent ally.
+	for value in ["war", "honour", "nature", "wealth", "knowledge", "faith", "freedom", "tradition"]:
+		sim.SetCultureValue(a, value, 0.5)
+		sim.SetCultureValue(b, value, 0.5)
+	if sim.AtWar(a, b):
+		sim.PowerWhisper("peace", a, b)
+	sim.PowerWhisper("alliance", a, b)
+	sim.SetFaith(a, 5.0)
+	sim.SetFaith(b, 95.0)
+	for n in 300:
+		sim.ReligionYearNow()
+		if sim.CultureTable()[0].religion == sim.CultureTable()[1].religion:
+			break
+	check(sim.CultureTable()[0].religion == sim.CultureTable()[1].religion, "a lukewarm kingdom takes up the faith of a fervent ally")
+
+	# The Miracle: it heals, and the people who see it grow in faith and worship the player.
+	var capital := {}
+	for v in sim.VillageTable():
+		if v.capital and v.kingdom == sim.CultureTable()[0].kingdom:
+			capital = v
+	sim.SetFaith(a, 20.0)
+	var seen: int = sim.PowerMiracle(capital.x + 0.5, capital.y + 0.5, 2.0)
+	var after: Dictionary = sim.CultureTable()[0]
+	check(seen > 0 and after.faith > 20.0 and after.gratitude > 0.0 and after.stance == "worshipped" and after.god_name != "",
+			"a miracle heals and makes the people who see it worship the player (%s, faith %d)" % [after.stance, after.faith])
+	check(sim.PowerMiracle(-50.0, -50.0, 2.0) == 0, "no miracle off the map")
 	sim.queue_free()

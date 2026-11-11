@@ -20,6 +20,7 @@ const LAWS := [
 	["Civilisations", "rebellions", "Rebellions", "Disloyal villages break away from their kingdom."],
 	["Civilisations", "settlers", "Settlers", "Crowded villages send people to found new ones."],
 	["Civilisations", "inventions", "Minds invent", "Each people's mind invents tools, weapons and buildings."],
+	["Civilisations", "faiths", "Faiths spread and split", "Kingdoms take up the faith of fervent neighbours; faiths split in heresies."],
 ]
 
 var _law_ids: Array = []

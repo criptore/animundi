@@ -39,6 +39,7 @@ public partial class Simulation
 		["old_age"] = true,       // creatures die of old age
 		["natural_disasters"] = true,  // lightning sets forests on fire
 		["trees_growth"] = true,  // plants grow and spread
+		["faiths"] = true,        // kingdoms convert to their neighbours' faiths, and faiths split in heresies
 	};
 
 	/// <summary>Living units per species.</summary>

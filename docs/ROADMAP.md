@@ -103,7 +103,8 @@ See [CULTURE.md](CULTURE.md).
 - [x] Religions (`sim/Religion.cs`): gods with a domain and a temperament; kingdoms remember what they lived through (wars, conquests, rulers' deaths, cities, lightning, heroes, rebellions) and their minds turn it into myths; an event no god answers for gives birth to a god; faith changes loyalty and opinions
 - [x] The player recognised as a god: powers near a village leave gratitude or dread; the people names the unseen hand, then worships, fears or hates it (faith, loyalty, eagerness for war); miracles and wrath become myths
 - [x] Chronicle written by the AI (`sim/Chronicle.cs`): annals of every event, a chapter every five years by the model or the procedural chronicler, heroes (four foes slain in war), ages named after what filled the last ten years; the Cultures book and the written chronicle in the dock, the age beside the date
-- [ ] Later: holy wars, conversions and heresies; clothing by culture; map layers for cultures and religions (0.9); the chronicle per kingdom, person and place, and its export as text
+- [x] Faiths between kingdoms (`sim/Faiths.cs`): holy wars, conversions to a fervent neighbour's or ally's faith, heresies when a shared faith's kingdoms drift apart; the Miracle power and the Convert whisper
+- [ ] Later: clothing by culture; map layers for cultures and religions (0.9); the chronicle per kingdom, person and place, and its export as text
 
 ## 0.7 Monsters and nature
 - [ ] Monster species with AI minds: mutations, new abilities, lairs
@@ -125,7 +126,8 @@ Nothing here before the world lives on its own (see the order of work above). Sp
 - [x] Plants and the map texture update only where the terrain changed
 - [ ] Fire power drops sparks (particles) that set alight the tiles they land on, as in WorldBox (the fire power lights the tiles under the brush for now; the F test key is gone)
 - [x] The powers bar (`scripts/ui/power_bar.gd`, `sim/Powers.cs`): a power and a brush size, then click or drag on the map; first powers: bring creatures, settle a people (a new village and kingdom), fire, lightning, rain, meteor, smite, bless
-- [ ] More powers: terrain (raise, lower, water), weather, disasters, miracles, curses, faith mode, avatar, gestures, storyteller
+- [x] Miracle (Wrath & Mercy) and Convert (Whispers) powers
+- [ ] More powers: terrain (raise, lower, water), weather, disasters, curses, faith mode, avatar, gestures, storyteller
 - [x] Inspector cards for a creature and a village: click to pin, refreshed while it lives
 - [ ] Inspector cards: kingdom, species, spirit, invention (with its script and lineage)
 - [ ] Map layers (kingdoms, cultures, languages, religions, clans, families, species, alliances, armies), war lines, plot and task icons, unit arrows, and statistics
