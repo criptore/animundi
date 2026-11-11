@@ -327,14 +327,14 @@ public partial class Simulation
 		{
 			var c = Kingdoms[k].Culture;
 			string place = Villages[v].Name;
-			bool kindly = kind == "bless" || kind == "rain";
+			bool kindly = kind == "bless" || kind == "rain" || kind == "miracle";
 			ulong now = Godot.Time.GetTicksMsec();
 			if (c.LastFelt.TryGetValue(kind, out ulong felted) && now - felted < 400)
 				continue;
 			c.LastFelt[kind] = now;
 			float felt = kind switch
 			{
-				"bless" => Math.Min(12f, 2f * amount), "rain" => 6f, "fire" => 5f, "lightning" => 10f, "meteor" => 25f,
+				"bless" => Math.Min(12f, 2f * amount), "rain" => 6f, "miracle" => 20f, "fire" => 5f, "lightning" => 10f, "meteor" => 25f,
 				_ => Math.Min(20f, 4f * amount),
 			};
 			if (kindly)
@@ -348,11 +348,12 @@ public partial class Simulation
 				{
 					"bless" => $"a great healing came over the people of {place}",
 					"rain" => $"rain fell from a clear sky and put out the fires of {place}",
+					"miracle" => $"light poured from the sky over {place} and the sick rose healed",
 					"fire" => $"fire sprang from nowhere near {place}",
 					"lightning" => $"a bolt from a clear sky struck near {place}",
 					"meteor" => $"a star fell on the land of {place}",
 					_ => $"people of {place} fell dead where they stood",
-				}, kindly ? 2f : kind == "meteor" ? 3f : 2f);
+				}, kind == "miracle" || kind == "meteor" ? 3f : 2f);
 			}
 			UpdateStance(k);
 		}

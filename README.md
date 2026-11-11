@@ -100,7 +100,8 @@ Every kingdom has a **culture** (`sim/Culture.cs`, [docs/CULTURE.md](docs/CULTUR
 - **Values**: war, honour, nature, wealth, knowledge, faith, freedom, tradition. They decide how a kingdom rules itself, whom it likes and how eager it is for war.
 - **Customs**: once a year the kingdom's mind writes a **law, a ritual or a taboo** in a small custom language, validated like an invention. Customs change how its villages work, fight and believe, and strong ones have a price. A kingdom keeps three of each kind, so cultures drift. Rebels keep their mother's culture.
 - **Religions** (`sim/Religion.cs`): gods, and **myths drawn from what really happened** to the kingdom (a war, a ruler's death, lightning, a hero). An event no god answers for gives birth to a new god. Faith changes loyalty and opinions.
-- **You are a god too**: peoples notice your powers near their villages. They name you, then worship, fear or hate you.
+- **Faiths between kingdoms** (`sim/Faiths.cs`): devout kingdoms call **holy wars** on unbelievers, lukewarm ones **convert** to the faith of fervent neighbours and allies, and a shared faith splits in a **heresy** when its kingdoms drift apart.
+- **You are a god too**: peoples notice your powers near their villages. They name you, then worship, fear or hate you. A **Miracle** lifts their faith; the **Convert** whisper turns a kingdom to another's faith.
 - **The chronicle** (`sim/Chronicle.cs`): every five years a chronicler writes a chapter from the events of those years. Warriors who slay four foes become **heroes**. **Ages are named** after what filled the last ten years ("The Age of Ash").
 
 As for inventions, the built-in language model writes customs, myths and chapters when it is ready, under a grammar; a procedural writer does it otherwise.
@@ -110,8 +111,8 @@ As for inventions, the built-in language model writes customs, myths and chapter
 The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.cs`, `scripts/ui/power_bar.gd`):
 - **Life**: bring any creature (animals and monsters) under the mouse, or found a village of any people on free land, which starts a kingdom of its own.
 - **Nature**: fire, lightning, rain (puts fires out, the grass grows back), and a **biome brush** that paints any land biome, mushroom land, cursed land, volcanic rock and lava included.
-- **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds).
-- **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands.
+- **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds), miracle (heals, and the peoples who see it grow in faith and worship you).
+- **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands, or make one take up the other's faith (convert).
 - **Inspector**: click a creature or a village to keep its card on screen. **Laws**: switch the rules of the world on and off.
 
 ### The interface
@@ -125,7 +126,7 @@ The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a t
 - **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), the chronicle (the age, the written chapters, the events and their filters).
 - **Powers bar**: tabs for terrain, creatures, peoples, nature, wrath and mercy, whispers; the chosen power and the brush beside them. **Inspector** card with a portrait, the village's stores and a button to follow with the camera. **Map layers** on the right.
 - **Windows**: laws of the world (grouped, one line each), settings (game, display, sound, controls), pause menu (Esc).
-- Buttons of features to come are there already, **locked**: more powers (terrain, disasters, miracles, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
+- Buttons of features to come are there already, **locked**: more powers (terrain, disasters, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
 
 ![The game](docs/images/interface_game.png)
 

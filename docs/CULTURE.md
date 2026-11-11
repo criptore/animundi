@@ -68,19 +68,31 @@ The mind writes the title and the text. The engine ties the myth to what really 
 
 **Faith** (0–100) moves every season toward what the culture values, its temples, its myths, its customs and what it makes of the player. Faith adds or takes loyalty in every village. Kingdoms of the same religion like each other more; devout kingdoms of rival religions like each other less.
 
+## Faiths between kingdoms
+
+Code: `sim/Faiths.cs`. Conversions and heresies happen once a year, and the law **Faiths spread and split** switches them off.
+
+- **Holy wars.** A devout kingdom (faith above 55, and faith among its dearest values) calls a war on a kingdom of another faith holy: its rulers are half again as quick to plot it, and the chronicle says the priests call it a holy war on the unbelievers.
+- **Conversions.** A kingdom takes up the faith of a neighbour, ally or trade partner whose faith burns at least 15 points hotter than its own, if it does not hate it and is not at war with it. The closer the bond and the wider the gap, the likelier. It takes the other's creed and gods (the god it makes of the player stays its own), keeps telling its old myths, and its faith is shaken a little.
+- **Heresies.** When a faith is kept by several kingdoms (rebels keep their mother's), one that values things far from the others, and still cares for its gods, breaks away: it keeps the old gods, finds a new god in what it holds dearest (war, glory, the forest, gold, wisdom, the sky, the wind, the ancestors), and names its faith after it ("the Way of Urun").
+
+Each step is told in the chronicle (event filter "Gods and customs") and remembered by the kingdom, so it may become a myth.
+
 ## The player is a god
 
 Peoples notice what the powers do within sight of their villages (the brush and 14 tiles):
 
 | Power | Leaves |
 |---|---|
-| Bless (people healed), rain that puts fires out | gratitude |
+| Bless (people healed), rain that puts fires out, **miracle** | gratitude |
 | Fire, lightning, meteor, smite (people killed) | dread |
 
 Both fade over the seasons. While both are faint the player is unnoticed. Then:
 - gratitude at least equal to dread: the player is **worshipped** (more faith, more loyalty);
 - else, in cultures where faith and tradition outweigh freedom and war: **feared** (a little more faith);
 - else: **hated** (less faith, less loyalty, more eagerness for war).
+
+The **Miracle** power (Wrath & Mercy tab) is a sign from the sky: it heals what stands under the brush, and the kingdoms whose villages see it gain faith and a great deal of gratitude. The **Convert** whisper (Whispers tab) makes a kingdom take up another's faith: click its land, then the other kingdom's.
 
 The first time they notice, they give the unseen hand a name in their language, and it joins their gods. Miracles and wrath become myths about that god. Powers are dragged over the map and act every frame: a kingdom feels one kind of act at most every 0.4 seconds, and remembers and speaks of it once a season.
 
@@ -111,3 +123,5 @@ Every event of the log is kept in the **annals**. Every five years the chronicle
 ```bash
 godot --headless --path . --script res://tools/run_test.gd -- test_culture
 ```
+
+`test_faiths` checks holy wars, the Convert whisper, heresies, conversions and the Miracle.

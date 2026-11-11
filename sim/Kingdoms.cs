@@ -372,7 +372,7 @@ public partial class Simulation
 				int wars = Wars.FindAll(w => w.A == a || w.B == a).Count;
 				if (o < -20f && wars == 0 && !kingKind && !Plotting("war", a, b)
 					&& Strength(a) >= Strength(b) * 0.8f && Strength(a) >= 3
-					&& _rng.NextDouble() < 0.12 + 0.35 * aggression && CanReach(a, b))
+					&& _rng.NextDouble() < (0.12 + 0.35 * aggression) * (HolyWar(a, b) ? HolyWarLean : 1f) && CanReach(a, b))
 					StartPlan("war", a, b, YearSeconds * (0.6f + 0.6f * (float)_rng.NextDouble()));
 				else if (o > 30f && !Plotting("alliance", a, b) && !Plotting("alliance", b, a) && _rng.NextDouble() < 0.3)
 					StartPlan("alliance", a, b, YearSeconds * 0.5f);
@@ -388,7 +388,8 @@ public partial class Simulation
 		string ruler = kingdom.King >= 0 ? $"{NameOf(kingdom.King)} of {kingdom.Name}" : kingdom.Name;
 		string text = kind switch
 		{
-			"war" => $"{ruler} plots war against {Kingdoms[target].Name}.",
+			"war" => $"{ruler} plots war against {Kingdoms[target].Name}"
+				+ (HolyWar(k, target) ? $": the priests of {kingdom.Culture.Creed} call it a holy war on the unbelievers." : "."),
 			"peace" => $"{ruler} seeks peace with {Kingdoms[target].Name}.",
 			"alliance" => $"{ruler} courts an alliance with {Kingdoms[target].Name}.",
 			_ => $"{Villages[target].Name} plots to break away from {kingdom.Name}.",

@@ -31,10 +31,12 @@ const POWERS := {
 	"meteor": ["Meteor", "Click to drop a meteor the size of the brush.", false],
 	"smite": ["Smite", "Click or drag to kill every creature under the brush.", true],
 	"bless": ["Bless", "Click or drag to heal and feed every creature under the brush.", true],
+	"miracle": ["Miracle", "Click for a sign from the sky: it heals, and the faith of the peoples who see it grows.", false],
 	"biome": ["Biome", "Click or drag to paint %s.", true],
 	"war": ["War", "Click a kingdom's land, then the kingdom it will attack.", false],
 	"peace": ["Peace", "Click the lands of two kingdoms at war to make peace.", false],
 	"alliance": ["Alliance", "Click the lands of two kingdoms to ally them.", false],
+	"convert": ["Convert", "Click a kingdom's land, then the kingdom whose faith it will take up.", false],
 }
 
 ## The tabs: id, name, icon.
@@ -54,6 +56,7 @@ const PLACE := {
 	"fire": ["nature", "fire"], "lightning": ["nature", "lightning"], "rain": ["nature", "rain"],
 	"meteor": ["divine", "meteor"], "smite": ["divine", "smite"], "bless": ["divine", "bless"],
 	"war": ["whispers", "swords"], "peace": ["whispers", "dove"], "alliance": ["whispers", "rings"],
+	"convert": ["whispers", "ankh"], "miracle": ["divine", "halo"],
 }
 
 ## Powers to come (docs/ROADMAP.md, 0.7 and 0.9): tab, name, icon, what they will do.
@@ -72,13 +75,11 @@ const SOON := [
 	["nature", "Plague", "plague", "A sickness that spreads from creature to creature."],
 	["divine", "Curse", "curse", "Bad luck, weakness and fear on those under the brush."],
 	["divine", "Heal", "heal", "Cure wounds and sickness."],
-	["divine", "Miracle", "halo", "A sign from the sky: the faith of those who see it grows."],
 	["divine", "Madness", "spiral", "Creatures under the brush turn on each other."],
 	["divine", "Resurrect", "grave", "Bring the dead back, as they were or as undead."],
 	["whispers", "Rebellion", "flag", "Push a village to break away from its kingdom."],
 	["whispers", "Inspire", "bulb", "Give a people's mind an idea: it invents at once."],
 	["whispers", "Forget", "forget", "Make a people forget its language, culture or faith."],
-	["whispers", "Convert", "ankh", "Turn a village to another faith."],
 ]
 
 ## Tools in a row of the tray, and the rows it shows.

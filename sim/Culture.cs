@@ -94,6 +94,7 @@ public partial class Simulation
 	{
 		_nextReligion = 0;
 		_nextCultureSeason = 0;
+		_nextFaithYear = 0;
 		CustomsRejected = 0;
 		SetupChronicle();
 	}
@@ -416,6 +417,7 @@ public partial class Simulation
 				if (Kingdoms[k].Alive)
 					FaithSeason(k);
 		}
+		FaithsStep();
 		ChronicleStep();
 	}
 
