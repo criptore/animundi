@@ -93,7 +93,7 @@ public static class LocalModel
 			Preload();
 			_params = new ModelParams(path)
 			{
-				ContextSize = 2048,
+				ContextSize = 4096,
 				GpuLayerCount = 0,
 				Threads = Math.Max(1, Environment.ProcessorCount / 2),
 			};
@@ -152,10 +152,13 @@ public static class LocalModel
 		}
 	}
 
-	/// <summary>Asks the model, in the background; the answer is forced into the invention
-	/// language by its grammar. One question at a time.</summary>
-	public static System.Threading.Tasks.Task<string> Generate(string prompt)
+	/// <summary>Asks the model, in the background; the answer is forced into a record by a
+	/// grammar (the invention language's unless another is given: customs, myths, chapters of
+	/// the chronicle). One question at a time.</summary>
+	public static System.Threading.Tasks.Task<string> Generate(string prompt, string grammar = null, string system = null)
 	{
+		grammar ??= Grammar();
+		system ??= "You invent things for a people in a world simulation. Answer with one JSON record.";
 		return System.Threading.Tasks.Task.Run(async () =>
 		{
 			await _busy.WaitAsync();
@@ -165,9 +168,9 @@ public static class LocalModel
 				var inference = new InferenceParams
 				{
 					MaxTokens = 600,
-					SamplingPipeline = new DefaultSamplingPipeline { Temperature = 0.8f, Grammar = new Grammar(Grammar(), "root") },
+					SamplingPipeline = new DefaultSamplingPipeline { Temperature = 0.8f, Grammar = new Grammar(grammar, "root") },
 				};
-				string chat = "<|im_start|>system\nYou invent things for a people in a world simulation. Answer with one JSON record.<|im_end|>\n"
+				string chat = $"<|im_start|>system\n{system}<|im_end|>\n"
 					+ $"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n";
 				var sb = new StringBuilder();
 				await foreach (var piece in executor.InferAsync(chat, inference))
@@ -238,6 +241,25 @@ public static class LocalModel
 		});
 		return string.Join("\n", lines) + "\n";
 	}
+
+	/// <summary>GBNF for a quoted free text of at most `max` characters (letters, digits and
+	/// plain punctuation: nothing that could break out of the JSON string).</summary>
+	public static string Text(int max, int min = 0) => $"\"\\\"\" [a-zA-Z0-9 ,.'!?;:-]{{{min},{max}}} \"\\\"\"";
+
+	/// <summary>GBNF for a whole number from 1 to max (max under 100).</summary>
+	public static string Whole(int max)
+	{
+		var parts = new List<string> { "[1-9]" };
+		int tens = max / 10, units = max % 10;
+		if (tens >= 2)
+			parts.Add($"[1-{tens - 1}] [0-9]");
+		if (tens >= 1)
+			parts.Add($"\"{tens}\" [0-{units}]");
+		return string.Join(" | ", parts);
+	}
+
+	/// <summary>GBNF for a quoted name: a capital, then letters, spaces, hyphens, apostrophes.</summary>
+	public static string Name(int max) => $"\"\\\"\" [A-Z] [a-zA-Z' -]{{1,{max - 1}}} \"\\\"\"";
 
 	private static bool _preloaded;
 	public static string NativeFolder { get; private set; } = "";

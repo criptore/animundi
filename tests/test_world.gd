@@ -52,6 +52,7 @@ func _initialize() -> void:
 	test_villages()
 	test_kingdoms()
 	test_inventions()
+	test_culture()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -1299,3 +1300,223 @@ func test_power_bar() -> void:
 	card.close()
 	check(closed[0] == 1, "closing twice tells once")
 	card.queue_free()
+
+
+func test_culture() -> void:
+	var made := make_sim("culture", 160)
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.SetMindEndpoint("")
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60 * 2)
+	var row: Dictionary = sim.CultureTable()[0]
+	var k: int = row.index
+	check(row.values.size() == 8 and row.gods.size() >= 1 and row.creed != "" and row.structure != "" and row.walls != "",
+			"every kingdom has a culture: values, a way of building, a first god (%s, %s)" % [row.creed, row.structure])
+
+	# The custom language: the engine rejects what breaks its rules.
+	var bad := {
+		"unknown kind": '{"name": "Sky Rule", "kind": "decree", "about": "war", "text": "So it is.", "effects": [{"do": "attack", "amount": 5}]}',
+		"unknown value": '{"name": "Sky Rule", "kind": "law", "about": "pizza", "text": "So it is.", "effects": [{"do": "attack", "amount": 5}]}',
+		"over the cap": '{"name": "Sky Rule", "kind": "law", "about": "war", "text": "So it is.", "effects": [{"do": "attack", "amount": 50}]}',
+		"too strong": '{"name": "Sky Rule", "kind": "law", "about": "war", "text": "So it is.", "effects": [{"do": "attack", "amount": 15}, {"do": "loyalty", "amount": 10}]}',
+		"taboo without a price": '{"name": "Sky Ban", "kind": "taboo", "about": "faith", "text": "So it is.", "effects": [{"do": "faith", "amount": 5}]}',
+		"work effect without a job": '{"name": "Sky Rule", "kind": "law", "about": "wealth", "text": "So it is.", "effects": [{"do": "yield", "amount": 5}]}',
+		"bad name": '{"name": "x<script>", "kind": "law", "about": "war", "text": "So it is.", "effects": [{"do": "attack", "amount": 5}]}',
+		"bad text": '{"name": "Sky Rule", "kind": "law", "about": "war", "text": "<b>So it is</b>", "effects": [{"do": "attack", "amount": 5}]}',
+		"no effect": '{"name": "Sky Rule", "kind": "law", "about": "war", "text": "So it is.", "effects": []}',
+		"not JSON": 'a law, please',
+	}
+	var refused := []
+	var customs_before: int = row.customs.size()
+	for why in bad:
+		if sim.SubmitCustomJson(k, bad[why], "model") == "":
+			refused.append(why)
+	check(refused.is_empty() and sim.CultureTable()[0].customs.size() == customs_before, "invalid customs are rejected (accepted: %s)" % [refused])
+
+	# A law changes how the kingdom's villages fight and how loyal they are.
+	var capital := -1
+	for v in sim.VillageTable():
+		if v.capital and v.kingdom == row.kingdom:
+			capital = v.index
+	var attack_before: float = sim.VillageMods(capital).attack
+	var law := '{"name": "Blood Oath", "kind": "law", "about": "war", "text": "Every grown hand owes a season to the army.", "effects": [{"do": "attack", "amount": 12}, {"do": "loyalty", "amount": -4}]}'
+	check(sim.SubmitCustomJson(k, law, "model") == "", "a valid law is adopted")
+	var mods: Dictionary = sim.VillageMods(capital)
+	check(is_equal_approx(mods.attack - attack_before, 12.0), "a law changes the kingdom's villages (attack %s -> %s)" % [attack_before, mods.attack])
+	var war_before: float = row.values.war
+	check(sim.CultureTable()[0].values.war > war_before or war_before == 1.0, "a custom strengthens the value it is about")
+	check(sim.SubmitCustomJson(k, law, "model") != "", "the same custom is not adopted twice")
+
+	# Three customs of a kind: a fourth makes the oldest give way.
+	for n in 6:
+		sim.SubmitCustomJson(k, '{"name": "Law %s", "kind": "law", "about": "honour", "text": "So it is.", "effects": [{"do": "defense", "amount": 3}]}' % "abcdef"[n], "model")
+	var laws: Array = sim.CultureTable()[0].customs.filter(func(c): return c.kind == "law")
+	check(laws.size() == 3 and laws.all(func(c): return c.name != "Blood Oath"), "a kingdom keeps three laws: old ones give way (%s)" % [laws.map(func(c): return c.name)])
+	check(is_equal_approx(sim.VillageMods(capital).attack, attack_before), "a custom given up no longer acts")
+
+	# The procedural writer: valid customs from what the kingdom values.
+	var rejected_before: int = sim.CustomsRejected
+	for n in 30:
+		sim.CultureNow(k)
+	var written: Array = sim.CultureTable()[0].customs
+	check(sim.CustomsRejected == rejected_before and written.size() == 9 and written.any(func(c): return c.mind == "procedural"),
+			"the procedural writer's customs are all valid: laws, rituals and taboos (%s)" % [written.map(func(c): return c.kind + " " + c.name)])
+	var bounded := true
+	for v in sim.VillageTable():
+		var m: Dictionary = sim.VillageMods(v.index)
+		bounded = bounded and m.attack >= -40.0 and m.attack <= 80.0 and m.defense >= -40.0 and m.defense <= 60.0
+	check(bounded, "customs never push a village's bonuses out of bounds")
+
+	# The player is a god: healing is worshipped, wrath is feared or hated.
+	var place: Dictionary = {}
+	for v in sim.VillageTable():
+		if v.index == capital:
+			place = v
+	check(sim.CultureTable()[0].stance == "unnoticed", "a people the player never touched has not noticed them")
+	sim.TakeTaggedEvents()
+	for n in 40:
+		sim.PowerBless(place.x + 0.5, place.y + 0.5, 6.0)
+	var blessed: Dictionary = sim.CultureTable()[0]
+	check(blessed.stance == "worshipped" and blessed.god_name != "" and blessed.gods.any(func(g): return g.player),
+			"a people the player heals worships them, under a name of its own (%s, %s)" % [blessed.stance, blessed.god_name])
+	var told := 0
+	var tagged: PackedStringArray = sim.TakeTaggedEvents()
+	for n in range(0, tagged.size(), 2):
+		if tagged[n] == "culture":
+			told += 1
+	check(told <= 2 and blessed.gratitude <= 12.0, "a power dragged over a village is felt and told once, not at every touch (%d events, gratitude %d)" % [told, blessed.gratitude])
+	check(sim.MythNow(k), "a people remembers what happened to it")
+	var myth: Dictionary = sim.CultureTable()[0].myths[-1]
+	check("healing" in myth.source and myth.god == blessed.god_name and place.name in myth.source,
+			"its myth is drawn from what really happened, and given to the god who did it (%s / %s)" % [myth.title, myth.source])
+	var other: Dictionary = sim.CultureTable()[1]
+	var other_place: Dictionary = {}
+	for v in sim.VillageTable():
+		if v.capital and v.kingdom == other.kingdom:
+			other_place = v
+	# (on the village's heart: owned land a few tiles away may be water)
+	sim.PowerMeteor(other_place.x + 0.5, other_place.y + 0.5, 1.0)
+	var struck: Dictionary = sim.CultureTable()[1]
+	check(struck.stance in ["feared", "hated"] and struck.dread > struck.gratitude,
+			"a people the player strikes fears or hates them (%s, dread %d)" % [struck.stance, struck.dread])
+	check(sim.MythNow(struck.index) and "star fell" in sim.CultureTable()[1].myths[-1].source, "the meteor becomes a myth of theirs")
+	check(sim.SubmitMythJson(k, '{"title": "x<script>", "text": "A tale of old days."}', "model") != "", "a myth with a bad title is rejected")
+
+	# The chronicle: chapters written from the events of their years, and named ages.
+	sim.WriteChapterNow()
+	var chapters: Array = sim.ChronicleTable()
+	check(chapters.size() >= 1 and chapters[0].text.length() > 20 and chapters[0].mind == "procedural" and chapters[0].to == sim.Year(),
+			"the chronicler writes a chapter from the events of its years (%s: %s)" % [chapters[0].title if chapters.size() > 0 else "", chapters[0].text.left(120) if chapters.size() > 0 else ""])
+	check(sim.AgeName() == "The Age of Dawn" and chapters[0].age == "The Age of Dawn", "the world begins in the Age of Dawn")
+	var kingdoms: Array = sim.KingdomTable()
+	sim.PowerWhisper("war", kingdoms[0].index, kingdoms[1].index)
+	sim.RunSteps(30 * 60 * 9)
+	sim.WriteChapterNow()
+	var ages: Array = sim.AgeTable()
+	check(ages.size() >= 2 and sim.AgeName().begins_with("The Age of ") and sim.AgeName() != "The Age of Dawn" and sim.ChronicleTable()[0].age == sim.AgeName(),
+			"after ten years an age is named after what filled them (%s)" % [ages.map(func(a): return [a.name, a.theme, a.from])])
+	var good := '{"title": "The Long Summer", "text": "The harvests were rich and the kings were quiet. No one remembers a better time.", "age": "The Age of Gold"}'
+	check(sim.SubmitChapterJson(good, "model") == "" and sim.ChronicleTable()[0].title == "The Long Summer", "a mind's chapter joins the chronicle")
+	check(sim.SubmitChapterJson('{"title": "Bad", "text": "<b>too short</b>", "age": ""}', "model") != ""
+			and sim.SubmitChapterJson('{"title": "Fine Title", "text": "A text that is long enough to be a chapter.", "age": "Gold"}', "model") != "",
+			"a chapter with a bad text or a badly named age is rejected")
+
+	# Years go by: minds write customs and myths on their own, faith moves, rebels keep their gods.
+	sim.RunSteps(30 * 60 * 6)
+	var later: Array = sim.CultureTable()
+	check(later.all(func(c): return c.faith >= 0.0 and c.faith <= 100.0 and c.customs.size() <= 9 and c.gods.size() <= 6),
+			"cultures stay within bounds as years go by (faith %s)" % [later.map(func(c): return int(c.faith))])
+	check(sim.ChronicleTable().size() >= 4, "the chronicler writes a chapter every five years (%d chapters)" % sim.ChronicleTable().size())
+	var biggest := -1
+	for v in sim.VillageTable():
+		if not v.capital and (biggest < 0 or v.population > sim.VillageInfo(biggest).population):
+			biggest = v.index
+	if biggest >= 0:
+		var mother: String = sim.VillageInfo(biggest).kingdom
+		var mother_row: Dictionary = sim.CultureTable().filter(func(c): return c.kingdom == mother)[0]
+		sim.ForcePlan(sim.Plot("rebellion", mother_row.index, biggest))
+		var rebel_name: String = sim.VillageInfo(biggest).kingdom
+		var rebels: Array = sim.CultureTable().filter(func(c): return c.kingdom == rebel_name)
+		check(rebel_name != mother and rebels.size() == 1 and rebels[0].religion == mother_row.religion and rebels[0].creed == mother_row.creed
+				and rebels[0].customs.size() == mother_row.customs.size(),
+				"a kingdom born of a rebellion keeps its mother's gods and customs (%s from %s)" % [rebel_name, mother])
+	else:
+		check(true, "no second village to rebel in this world (skipped)")
+
+	# A local model (a fake llama.cpp server): its custom is validated like any other, and a
+	# broken answer falls back to the procedural writer.
+	var server := TCPServer.new()
+	if server.listen(18088, "127.0.0.1") == OK:
+		sim.SetMindEndpoint("http://127.0.0.1:18088")
+		var answers := ['{"name": "Moon Vigil", "kind": "ritual", "about": "faith", "text": "Fires are lit for the gods at dusk.", "effects": [{"do": "faith", "amount": 6}]}',
+				'{"name": "Broken", "kind": "ritual"']
+		var results := []
+		for answer in answers:
+			var before: int = sim.ModelAnswers + sim.ModelFailures
+			var customs_then: Array = sim.CultureTable().filter(func(c): return c.index == k)[0].customs.map(func(c): return c.name)
+			sim.AskCultureMind(k, "custom")
+			var asked := false
+			for step in 600:
+				if server.is_connection_available():
+					var peer := server.take_connection()
+					var request := ""
+					for wait in 200:
+						peer.poll()
+						if peer.get_available_bytes() > 0:
+							request += peer.get_utf8_string(peer.get_available_bytes())
+							if "json_schema" in request and request.ends_with("}"):
+								break
+						OS.delay_msec(5)
+					var body := JSON.stringify({"content": answer})
+					peer.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s" % [body.to_utf8_buffer().size(), body]).to_utf8_buffer())
+					asked = "Write ONE new custom" in request and "taboo" in request
+					peer.disconnect_from_host()
+				sim.RunSteps(15)
+				OS.delay_msec(5)
+				if sim.ModelAnswers + sim.ModelFailures > before:
+					break
+			var now: Array = sim.CultureTable().filter(func(c): return c.index == k)[0].customs
+			results.append([asked, now.filter(func(c): return not (c.name in customs_then)).map(func(c): return [c.name, c.mind])])
+		check(results[0][0] and results[0][1] == [["Moon Vigil", "model"]], "a local model is asked for a custom with the language's schema, and its answer is adopted (%s)" % [results[0]])
+		check(results[1][1].size() == 1 and results[1][1][0][1] == "procedural", "a broken answer falls back to the procedural writer (%s)" % [results[1]])
+		server.stop()
+	sim.SetMindEndpoint("")
+	# (questions other minds sent to the server that is gone fail now, not during the next checks)
+	for wait in 80:
+		sim.RunSteps(15)
+		OS.delay_msec(25)
+
+	# The built-in model with a tiny random model: grammars keep customs, myths and chapters
+	# well-formed records whatever it writes.
+	sim.StartMind(ProjectSettings.globalize_path("res://tests/data/tiny_random.gguf"), "", false)
+	for wait in 400:
+		if sim.MindStatus().status in ["ready", "failed", "missing"]:
+			break
+		OS.delay_msec(25)
+	if sim.MindStatus().status == "ready":
+		var broken := []
+		for what in ["custom", "custom", "chapter"]:
+			var asked: int = sim.ModelAnswers + sim.ModelFailures
+			if what == "chapter":
+				sim.AskChronicler()
+			else:
+				sim.AskCultureMind(k, what)
+			for wait in 1200:
+				sim.RunSteps(5)
+				OS.delay_msec(25)
+				if sim.ModelAnswers + sim.ModelFailures > asked:
+					break
+			var record = JSON.parse_string(sim.LastModelAnswer)
+			var why: String = sim.LastModelError
+			var keys: Array = ["title", "text", "age"] if what == "chapter" else ["name", "kind", "about", "text", "effects"]
+			if not (record is Dictionary) or not record.has_all(keys) or why.begins_with("not valid JSON") or "unknown" in why or "needs a job" in why or "forbidden character" in why:
+				broken.append([what, why, sim.LastModelAnswer.left(80)])
+		check(broken.is_empty(), "the grammars keep the built-in model's customs and chapters well-formed (%s)" % [broken])
+	else:
+		check(false, "the built-in mind loads its model (%s)" % [sim.MindStatus()])
+	sim.StopMind()
+	var grammar: String = sim.CultureGrammar()
+	check("do-work-speed" in grammar and "\\\"taboo\\\"" in grammar and JSON.parse_string(sim.CultureSchema()).properties.effects.maxItems == 2,
+			"the custom language has a grammar and a schema")
+	sim.queue_free()

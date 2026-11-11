@@ -44,7 +44,12 @@ public partial class Simulation
 	// ------------------------------------------------------------------ fire and water
 
 	/// <summary>Sets the land alight under the brush. Returns the tiles that caught fire.</summary>
-	public int PowerFire(float x, float y, float radius) => World == null ? 0 : Ignite(x, y, radius);
+	public int PowerFire(float x, float y, float radius)
+	{
+		int lit = World == null ? 0 : Ignite(x, y, radius);
+		GodActs("fire", x, y, radius, lit);
+		return lit;
+	}
 
 	/// <summary>A bolt of lightning: kills what stands there and lights the land. Returns the
 	/// creatures killed.</summary>
@@ -60,6 +65,7 @@ public partial class Simulation
 		}
 		Ignite(x, y, 1.5f);
 		LogEvent($"lightning strikes near ({(int)x}, {(int)y}).", "disasters");
+		GodActs("lightning", x, y, 1.5f, 1);
 		return killed;
 	}
 
@@ -91,6 +97,7 @@ public partial class Simulation
 		});
 		_burningTiles.RemoveAll(t => TileBurn[t] == 0f);
 		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
+		GodActs("rain", x, y, radius, doused);
 		return doused;
 	}
 
@@ -102,7 +109,7 @@ public partial class Simulation
 	{
 		if (!OnLand(x, y))
 			return 0;
-		int killed = PowerSmite(x, y, radius);
+		int killed = Smite(x, y, radius, out _);
 		TilesWithin(x, y, radius, t =>
 		{
 			if (World.Water[t] != SimWorld.WaterLand)
@@ -124,15 +131,26 @@ public partial class Simulation
 		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
 		Ignite(x, y, radius + 1.5f);
 		LogEvent($"a meteor falls near ({(int)x}, {(int)y}).", "disasters");
+		GodActs("meteor", x, y, radius, 1);
 		return killed;
 	}
 
 	/// <summary>Kills every creature under the brush. Returns how many.</summary>
 	public int PowerSmite(float x, float y, float radius)
 	{
+		int killed = Smite(x, y, radius, out int people);
+		GodActs("smite", x, y, radius, people);
+		return killed;
+	}
+
+	private int Smite(float x, float y, float radius, out int people)
+	{
 		int killed = 0;
+		people = 0;
 		foreach (int i in UnitsWithin(x, y, radius).ToArray())
 		{
+			if (Assets.Species[Units.Species[i]].IsPeople)
+				people++;
 			KillUnit(i, Death.Other);
 			killed++;
 		}
@@ -142,14 +160,17 @@ public partial class Simulation
 	/// <summary>Heals, feeds and waters every creature under the brush. Returns how many.</summary>
 	public int PowerBless(float x, float y, float radius)
 	{
-		int blessed = 0;
+		int blessed = 0, people = 0;
 		foreach (int i in UnitsWithin(x, y, radius))
 		{
 			Units.Health[i] = Math.Max(Units.Health[i], MaxHealth(i));
 			Units.Hunger[i] = 0f;
 			Units.Thirst[i] = 0f;
 			blessed++;
+			if (Assets.Species[Units.Species[i]].IsPeople)
+				people++;
 		}
+		GodActs("bless", x, y, radius, people);
 		return blessed;
 	}
 

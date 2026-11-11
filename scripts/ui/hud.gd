@@ -45,13 +45,14 @@ const EVENTS_SHOWN := 14
 const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 ## The dock's books: id, name, icon.
 const BOOKS := [["kingdoms", "Kingdoms", "crown"], ["villages", "Villages", "house"], ["life", "Life", "paw"],
-		["inventions", "Inventions", "bulb"], ["chronicle", "Chronicle", "scroll"]]
+		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["chronicle", "Chronicle", "scroll"]]
 const LAYER_ICONS := {"Biomes": "biome", "Height": "height", "Temperature": "thermo", "Humidity": "humidity", "Rivers": "river"}
 ## Map layers to come (docs/ROADMAP.md, 0.9): name, icon.
 const LAYERS_SOON := [["Kingdoms", "crown"], ["Cultures", "book"], ["Religions", "ankh"], ["Armies", "swords"]]
 const SEASON_ICONS := ["spring", "summer", "autumn", "winter"]
 const EVENT_FILTERS := [["", "All", "scroll"], ["kings", "Kings", "crown"], ["wars", "Wars", "swords"], ["cities", "Cities", "house"],
-		["inventions", "Inventions", "bulb"], ["disasters", "Disasters", "fire"]]
+		["inventions", "Inventions", "bulb"], ["culture", "Gods and customs", "ankh"], ["heroes", "Heroes", "star"],
+		["disasters", "Disasters", "fire"]]
 const DOCK_WIDTH := 330
 const DOCK_MAX_HEIGHT := 360.0
 
@@ -97,6 +98,9 @@ var _kingdoms_box: VBoxContainer
 var _plans_label: Label
 var _inventions_label: Label
 var _mind_label: Label
+var _cultures_label: Label
+var _age_label: Label
+var _chapters_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
 var _kingdom_rows := {}
 var _village_rows: Array = []
@@ -378,6 +382,15 @@ func _build_dock() -> void:
 	_inventions_label = _text("Nothing invented yet.", UI.BLUE)
 	_pages["inventions"].add_child(_inventions_label)
 
+	_cultures_label = _text("No people has a culture yet.", UI.CREAM)
+	_pages["cultures"].add_child(_cultures_label)
+
+	# The chronicle: the age, the chapters the chronicler wrote, then the events as they come.
+	_age_label = UI.label("The Age of Dawn", "Heading")
+	_pages["chronicle"].add_child(_age_label)
+	_chapters_label = _text("The chronicler has written nothing yet: the first chapter comes after five years.", UI.GOLD)
+	_pages["chronicle"].add_child(_chapters_label)
+	_pages["chronicle"].add_child(HSeparator.new())
 	var filters := HFlowContainer.new()
 	filters.add_theme_constant_override("h_separation", 3)
 	var group := ButtonGroup.new()
@@ -771,6 +784,47 @@ func set_inventions(inventions: Array) -> void:
 			line += " · from the " + inv.parent
 		lines.append(line)
 	_inventions_label.text = "\n\n".join(lines) if not lines.is_empty() else "Nothing invented yet."
+
+
+## The cultures of the kingdoms (0.6): what they value, how they rule and build, their customs,
+## their gods and myths, and what they make of the player.
+func set_cultures(cultures: Array) -> void:
+	var blocks := PackedStringArray()
+	for c in cultures.slice(0, 8):
+		var values: Array = c.values.keys()
+		values.sort_custom(func(a, b): return c.values[a] > c.values[b])
+		var lines := PackedStringArray()
+		lines.append("%s · %s" % [c.kingdom.to_upper(), c.people])
+		lines.append("A %s. They prize %s, %s and %s, and %s." % [c.structure, values[0], values[1], values[2], c.nature])
+		lines.append("They build with %s walls and %s roofs, with %s." % [c.walls, c.roof, c.ornament])
+		var gods := PackedStringArray()
+		for g in c.gods:
+			gods.append("%s (%s%s)" % [g.name, "you, " if g.player else "", g.domain])
+		lines.append("Faith %d · %s · %s" % [int(c.faith), c.creed, ", ".join(gods)])
+		match c.stance:
+			"worshipped":
+				lines.append("They worship you as %s." % c.god_name)
+			"feared":
+				lines.append("They fear you as %s." % c.god_name)
+			"hated":
+				lines.append("They curse you as %s." % c.god_name)
+		for custom in c.customs:
+			lines.append("%s · %s (%s)\n   %s" % [custom.kind.capitalize(), custom.name, custom.effects, custom.text])
+		for myth in c.myths.slice(-2):
+			lines.append("Myth · %s\n   %s\n   (%s)" % [myth.title, myth.text, myth.source])
+		blocks.append("\n".join(lines))
+	_cultures_label.text = "\n\n".join(blocks) if not blocks.is_empty() else "No people has a culture yet."
+
+
+## The written chronicle (0.6): the age the world is in and the latest chapters.
+func set_chronicle(age: String, chapters: Array) -> void:
+	_age_label.text = age
+	var blocks := PackedStringArray()
+	for ch in chapters.slice(0, 3):
+		var years: String = "Year %d" % ch.to if ch.from == ch.to else "Years %d to %d" % [ch.from, ch.to]
+		blocks.append("%s · %s\n%s" % [years, ch.title, ch.text])
+	if not blocks.is_empty():
+		_chapters_label.text = "\n\n".join(blocks)
 
 
 ## Plots under way, shown before they happen.

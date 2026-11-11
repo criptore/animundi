@@ -66,6 +66,9 @@ func _process(_delta: float) -> bool:
 			_main._hud._open(_main._hud._settings_window)
 		elif _where == "pause":
 			_main._hud._open_pause()
+		elif _where == "cultures" or _where == "chronicle":
+			# A book of the dock, open (0.6: cultures, the written chronicle).
+			_main._hud._show_book(_where, false)
 		elif _where == "inspect" and _main._sim.VillageCount() > 0:
 			var first: Dictionary = _main._sim.VillageTable()[0]
 			point = Vector2(first.x + 0.5, first.y + 0.5) * WorldMap.TILE

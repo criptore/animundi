@@ -94,13 +94,16 @@ See [INVENTIONS.md](INVENTIONS.md).
 - [x] Cultures invent **objects and buildings**: each kingdom's mind once a year, from its situation (war, hunger, crowding, restlessness, its busiest job); invented buildings get sprites assembled from parts with the kingdom's colour (`art/homes.py`, 32 shapes)
 - [x] Inventions spread (kingdom, trade partners, neighbours, by usefulness), are forgotten when useless or replaced, and evolve by descent (parent, generation), traced in the chronicle (event filter "inventions")
 - [x] Procedural fallback when no model is available (and when it is slow or wrong)
-- [ ] Inventions with new effect blocks unlocked by ages (0.8), monster and nature minds (0.7), the culture mind writing laws, rituals and myths (0.6)
+- [x] The culture mind writes laws, rituals and myths (done with 0.6): the model takes the grammar of the record it is asked for
+- [ ] Inventions with new effect blocks unlocked by ages (0.8), monster and nature minds (0.7)
 
 ## 0.6 Culture
-- [ ] AI-shaped cultures: values, laws, rituals, taboos, architecture style
-- [ ] Religions: gods and myths drawn from real world events
-- [ ] The player recognised as a god: worshipped, feared or hated
-- [ ] Chronicle written by the AI (wars, heroes, disasters, named ages)
+See [CULTURE.md](CULTURE.md).
+- [x] AI-shaped cultures (`sim/Culture.cs`): eight values per kingdom (war, honour, nature, wealth, knowledge, faith, freedom, tradition) that shape opinions, eagerness for war and how it rules itself; laws, rituals and taboos written once a year in the custom language (validated records with effects and a price, three of each kind, old ones give way); an architecture style (walls, roofs, ornament) that picks the sprites of invented buildings; rebels inherit their mother's culture
+- [x] Religions (`sim/Religion.cs`): gods with a domain and a temperament; kingdoms remember what they lived through (wars, conquests, rulers' deaths, cities, lightning, heroes, rebellions) and their minds turn it into myths; an event no god answers for gives birth to a god; faith changes loyalty and opinions
+- [x] The player recognised as a god: powers near a village leave gratitude or dread; the people names the unseen hand, then worships, fears or hates it (faith, loyalty, eagerness for war); miracles and wrath become myths
+- [x] Chronicle written by the AI (`sim/Chronicle.cs`): annals of every event, a chapter every five years by the model or the procedural chronicler, heroes (four foes slain in war), ages named after what filled the last ten years; the Cultures book and the written chronicle in the dock, the age beside the date
+- [ ] Later: holy wars, conversions and heresies; clothing by culture; map layers for cultures and religions (0.9); the chronicle per kingdom, person and place, and its export as text
 
 ## 0.7 Monsters and nature
 - [ ] Monster species with AI minds: mutations, new abilities, lairs

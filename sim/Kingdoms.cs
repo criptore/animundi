@@ -38,6 +38,8 @@ public partial class Simulation
 		/// <summary>Tiredness of war, 0..1: grows with the dead, fades in peace.</summary>
 		public float Weariness;
 		public int Kings;
+		/// <summary>What its people value, their customs, gods and myths (Culture.cs).</summary>
+		public Culture Culture;
 	}
 
 	public sealed class KingPlan
@@ -93,6 +95,7 @@ public partial class Simulation
 			Dynasty = lang.PersonName(), Banner2 = Color.FromHsv((float)_rng.NextDouble(), 0.35f, 0.95f),
 			Division = _rng.Next(6), Symbol = _rng.Next(8),
 		};
+		k.Culture = NewCulture(species);
 		Kingdoms.Add(k);
 		int id = Kingdoms.Count - 1;
 		JoinKingdom(v, id);
@@ -106,6 +109,7 @@ public partial class Simulation
 	{
 		var village = Villages[v];
 		village.Kingdom = k;
+		village.ModsDirty = true;
 		var kingdom = Kingdoms[k];
 		int shade = 0;
 		foreach (var o in Villages)
@@ -163,6 +167,7 @@ public partial class Simulation
 			if (Kingdoms[k].Alive && Kingdoms[k].King == i)
 			{
 				LogEvent($"{NameOf(i)} {Kingdoms[k].Dynasty}, {(Units.Female[i] ? "queen" : "king")} of {Kingdoms[k].Name}, has died.", "kings");
+				Remember(k, "death", $"{(Units.Female[i] ? "queen" : "king")} {NameOf(i)} {Kingdoms[k].Dynasty} died", 1.5f);
 				Kingdoms[k].King = -1;
 				_pendingSuccession.Add((k, i));
 			}
@@ -216,6 +221,7 @@ public partial class Simulation
 		WarStep(dt);
 		TradeStep(dt);
 		InventionStep(dt);
+		CultureStep(dt);
 	}
 
 	private void Fall(int k)
@@ -255,7 +261,10 @@ public partial class Simulation
 				continue;
 			int rank = RankOf(v);
 			if (rank > village.Rank && rank >= 2)
+			{
 				LogEvent($"{village.Name} becomes a {RankNames[rank]}.", "cities");
+				Remember(village.Kingdom, "city", $"{village.Name} grew into a {RankNames[rank]}", rank == 3 ? 2f : 1f);
+			}
 			village.Rank = rank;
 		}
 	}
@@ -268,8 +277,15 @@ public partial class Simulation
 	{
 		var ka = Kingdoms[a];
 		var kb = Kingdoms[b];
-		float aggression = Assets.Species[ka.Species].Race?.Temper("aggression") ?? 0.5f;
+		float aggression = Aggression(a);
 		float o = ka.Species == kb.Species ? 25f : 0f;
+		// Peoples who value the same things get on; a shared faith binds, rival faiths divide
+		// the devout.
+		o += Math.Clamp((Kinship(ka.Culture, kb.Culture) - 0.75f) * 60f, -12f, 12f);
+		if (ka.Culture.Religion == kb.Culture.Religion)
+			o += 10f;
+		else if (ka.Culture.Faith > 60f && kb.Culture.Faith > 60f)
+			o -= 10f;
 		o -= 40f * aggression;
 		o += 10f;
 		if (Bordering(a, b))
@@ -335,7 +351,7 @@ public partial class Simulation
 			var ka = Kingdoms[a];
 			if (!ka.Alive || ka.King < 0)
 				continue;
-			float aggression = Assets.Species[ka.Species].Race?.Temper("aggression") ?? 0.5f;
+			float aggression = Aggression(a);
 			bool kingKind = (Units.Traits[ka.King] & (int)Trait.Kind) != 0;
 			for (int b = 0; b < Kingdoms.Count; b++)
 			{
@@ -479,7 +495,7 @@ public partial class Simulation
 			var capital = Villages[kingdom.Capital];
 			float dist = MathF.Sqrt((capital.X - village.X) * (capital.X - village.X) + (capital.Y - village.Y) * (capital.Y - village.Y));
 			float l = 50f - dist / 2.5f - village.Population / 3.5f + (village.Species == kingdom.Species ? 10f : -20f)
-				- kingdom.Weariness * 35f - (kingdom.King < 0 ? 10f : 0f) - village.Conquered * 30f + village.LoyaltyBonus;
+				- kingdom.Weariness * 35f - (kingdom.King < 0 ? 10f : 0f) - village.Conquered * 30f + village.LoyaltyBonus + FaithLoyalty(village.Kingdom);
 			village.Conquered = Math.Max(0f, village.Conquered - 0.05f);
 			village.Loyalty = Math.Clamp(village.Loyalty * 0.5f + l * 0.5f + (float)(_rng.NextDouble() * 10 - 5), -100f, 100f);
 			// Big disloyal villages plot to break away, at most once every eight years.
@@ -500,6 +516,8 @@ public partial class Simulation
 		village.CalmUntil = Scheduler.Time + YearSeconds * 8;
 		int k = CreateKingdom(village.Species, v);
 		var rebels = Kingdoms[k];
+		InheritCulture(old, k);
+		Remember(k, "freedom", $"{village.Name} broke free of {Kingdoms[old].Name}", 2f);
 		int joined = 0;
 		for (int o = 0; o < Villages.Count; o++)
 		{

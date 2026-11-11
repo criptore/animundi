@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages and 0.4 Civilisation
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds and 0.6 Culture
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -94,6 +94,17 @@ Villages now do everything WorldBox villages do (the full list, and how each rul
 
 Every kingdom has a **mind** that invents, once a year, what its people need: tools, weapons, armour, techniques and buildings, written in a small **invention language** (JSON records the engine validates). Inventions change the world (faster work, bigger harvests, stronger soldiers, homes, food, loyalty), **spread** to neighbours and trade partners, are **forgotten** when useless and **evolve by descent** (most improve one the people know). Invented buildings get sprites assembled from parts in the kingdom's colour. The mind is a **language model built into the game** (llama.cpp compiled in; the model is downloaded once on first launch, or shipped with a build, see [docs/INVENTIONS.md](docs/INVENTIONS.md)); until it is ready, and without it, a procedural inventor invents: the game never waits for it.
 
+## 0.6 Culture
+
+Every kingdom has a **culture** (`sim/Culture.cs`, [docs/CULTURE.md](docs/CULTURE.md)):
+- **Values**: war, honour, nature, wealth, knowledge, faith, freedom, tradition. They decide how a kingdom rules itself, whom it likes and how eager it is for war.
+- **Customs**: once a year the kingdom's mind writes a **law, a ritual or a taboo** in a small custom language, validated like an invention. Customs change how its villages work, fight and believe, and strong ones have a price. A kingdom keeps three of each kind, so cultures drift. Rebels keep their mother's culture.
+- **Religions** (`sim/Religion.cs`): gods, and **myths drawn from what really happened** to the kingdom (a war, a ruler's death, lightning, a hero). An event no god answers for gives birth to a new god. Faith changes loyalty and opinions.
+- **You are a god too**: peoples notice your powers near their villages. They name you, then worship, fear or hate you.
+- **The chronicle** (`sim/Chronicle.cs`): every five years a chronicler writes a chapter from the events of those years. Warriors who slay four foes become **heroes**. **Ages are named** after what filled the last ten years ("The Age of Ash").
+
+As for inventions, the built-in language model writes customs, myths and chapters when it is ready, under a grammar; a procedural writer does it otherwise.
+
 ## 0.9 God powers (first part)
 
 The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.cs`, `scripts/ui/power_bar.gd`):
@@ -111,14 +122,14 @@ The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a t
 
 - **Title screen**, then the **world setup** on the left of the map: the land (seed, size, continents, water, climate: the map is redrawn as you change them) and its peoples.
 - **Top bar**: menu, date and season, speed of time and "go to year", the world's numbers (people, villages, kingdoms, animals), laws, settings.
-- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, the chronicle and its filters.
+- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), the chronicle (the age, the written chapters, the events and their filters).
 - **Powers bar**: tabs for terrain, creatures, peoples, nature, wrath and mercy, whispers; the chosen power and the brush beside them. **Inspector** card with a portrait, the village's stores and a button to follow with the camera. **Map layers** on the right.
 - **Windows**: laws of the world (grouped, one line each), settings (game, display, sound, controls), pause menu (Esc).
 - Buttons of features to come are there already, **locked**: more powers (terrain, disasters, miracles, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
 
 ![The game](docs/images/interface_game.png)
 
-Next: 0.6 Culture (AI-shaped values, laws, religions and an AI-written chronicle). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+Next: 0.7 Monsters and nature (monster minds, nature spirits, disasters, plagues). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -200,6 +211,12 @@ dotnet build
 godot --headless --path . --script res://tests/test_world.gd
 ```
 
+Some tests only:
+
+```bash
+godot --headless --path . --script res://tools/run_test.gd -- test_culture test_kingdoms
+```
+
 A world with peoples over the years (villages, stores, homes, buildings, jobs, events):
 
 ```bash
@@ -225,7 +242,7 @@ godot --headless --path . --script res://tools/render_preview.gd -- <seed> <size
 Screenshot of the game (needs a display; on a headless machine wrap it in `xvfb-run`). `zoom` is screen pixels per world pixel, a tile being 8 world pixels; 0 shows the whole map:
 
 ```bash
-godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano] [years]
+godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle] [years]
 ```
 
 To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, NumPy, SciPy):

@@ -57,6 +57,8 @@ public partial class Simulation
 		Kingdoms[b].Allies.Remove(a);
 		if (announce)
 			LogEvent($"{Kingdoms[a].Name} declares war on {Kingdoms[b].Name}!", "wars");
+		Remember(a, "war", $"war was carried to {Kingdoms[b].Name}", 1.5f);
+		Remember(b, "war", $"{Kingdoms[a].Name} brought war upon them", 1.5f);
 		// Allies of the attacked join in.
 		foreach (int al in Kingdoms[b].Allies)
 			if (al != a && Kingdoms[al].Alive && !AtWar(al, a))
@@ -82,6 +84,8 @@ public partial class Simulation
 				if (k == a || k == b)
 					Units.Army[i] = -1;
 			}
+		Remember(a, "peace", $"peace was made with {Kingdoms[b].Name}", 1f);
+		Remember(b, "peace", $"peace was made with {Kingdoms[a].Name}", 1f);
 		LogEvent($"peace between {Kingdoms[a].Name} and {Kingdoms[b].Name} after {(int)((Scheduler.Time - war.Started) / YearSeconds)} years of war"
 			+ $" ({war.DeadA + war.DeadB} dead).", "wars");
 	}
@@ -330,6 +334,8 @@ public partial class Simulation
 		village.Loyalty = -10f;
 		JoinKingdom(v, k);
 		Conquests++;
+		Remember(k, "conquest", $"{village.Name} was taken from {Kingdoms[old].Name}", 2f);
+		Remember(old, "loss", $"{village.Name} fell to {Kingdoms[k].Name}", 2f);
 		LogEvent($"{Kingdoms[k].Name} takes {village.Name} from {Kingdoms[old].Name}{(capital ? ", its capital" : "")}!", "wars");
 		if (capital)
 			Kingdoms[old].Capital = -1;
@@ -465,6 +471,7 @@ public partial class Simulation
 		{
 			WarDied(j);
 			KillUnit(j, Death.War);
+			WarKill(i);
 			Units.Prey[i] = -1;
 			Units.Task[i] = (byte)Task.Wander;
 			return false;
@@ -475,6 +482,7 @@ public partial class Simulation
 		{
 			WarDied(i);
 			KillUnit(i, Death.War);
+			WarKill(j);
 			return false;
 		}
 		return true;
