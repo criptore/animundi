@@ -86,4 +86,5 @@ const NAMES := [
 	"humidity",
 	"inspect",
 	"brush",
+	"legend",
 ]

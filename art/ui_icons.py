@@ -655,6 +655,16 @@ def humidity(k):
     k.p("lblue", (13, 3), (13, 4), (1, 11), (1, 12))
 
 
+def legend(k):
+    """A horned dragon's head in profile, a glowing eye: the legendary monsters."""
+    k.g("red", [(1, 9), (5, 5), (10, 5), (14, 8), (14, 10), (9, 11), (6, 13), (1, 12)])
+    k.g("dred", [(8, 10), (14, 10), (13, 12), (8, 12)])
+    k.g("bone", [(4, 6), (1, 1), (7, 5)])
+    k.g("bone", [(8, 5), (8, 1), (10, 5)])
+    k.p("yellow", (10, 7))
+    k.p("ink", (13, 8))
+
+
 def inspect(k):
     eye(k, "cream", "blue", "ink")
 
@@ -671,7 +681,7 @@ ICONS = [
     star, heart, fire, lightning, rain, meteor, smite, bless, curse, heal, sprout, tornado,
     quake, flood, volcano, plague, raise_, lower, stamp, spiral, grave, halo, forget, biome,
     height, thermo, river, bread, log, stone, ingot, coin, hammer, sword, wheat, spring,
-    summer, autumn, winter, drought, blizzard, water, humidity, inspect, brush,
+    summer, autumn, winter, drought, blizzard, water, humidity, inspect, brush, legend,
 ]
 
 

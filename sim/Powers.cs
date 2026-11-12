@@ -228,6 +228,9 @@ public partial class Simulation
 		int s = Assets.SpeciesIndex(id ?? "");
 		if (s < 0 || Assets.Species[s].IsPeople || !OnLand(x, y))
 			return 0;
+		// A legend is unique: called once, never as a herd.
+		if (Assets.Species[s].IsLegend)
+			return SummonLegend(id, x, y);
 		int spawned = 0;
 		for (int k = 0; k < count; k++)
 		{

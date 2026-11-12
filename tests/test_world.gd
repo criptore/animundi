@@ -54,6 +54,7 @@ func _initialize() -> void:
 	test_inventions()
 	test_culture()
 	test_faiths()
+	test_legends()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -1633,4 +1634,105 @@ func test_faiths() -> void:
 	check(seen > 0 and after.faith > 20.0 and after.gratitude > 0.0 and after.stance == "worshipped" and after.god_name != "",
 			"a miracle heals and makes the people who see it worship the player (%s, faith %d)" % [after.stance, after.faith])
 	check(sim.PowerMiracle(-50.0, -50.0, 2.0) == 0, "no miracle off the map")
+	sim.queue_free()
+
+
+func legend_row(sim: Node2D, id: String) -> Dictionary:
+	for l in sim.LegendTable():
+		if l.id == id:
+			return l
+	return {}
+
+
+## Legendary monsters (sim/Legends.cs): unique, named, with a mind; they wake by themselves or
+## are called by the player, raid, are remembered in myths, and can be slain.
+func test_legends() -> void:
+	var made := make_sim("legends", 160)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.SetLaw("natural_disasters", false)
+	sim.SetMindEndpoint("")
+	var table: Array = sim.LegendTable()
+	var drawn := table.size() == 6
+	for l in table:
+		drawn = drawn and l.state in ["absent", "dormant"] and l.name != "" and l.full_name.ends_with(l.title)
+	check(drawn, "each world draws which legends sleep in it, each with a name of its own (%s)" % [table.map(func(l): return [l.id, l.state, l.full_name])])
+	var atlas := SpriteAtlas.shared()
+	var sprites := true
+	for rec in JSON.parse_string(FileAccess.get_file_as_string("res://data/legends.json")).legends:
+		for pose in ["idle", "walk1", "walk2", "attack", "swim", "death"]:
+			sprites = sprites and atlas.has("%s_%s" % [rec.sprite, pose])
+		sprites = sprites and SpriteLibrary.world_size(rec.sprite + "_idle").y * WorldMap.TILE > 16.0
+	check(sprites, "every legend has all its poses, drawn larger than the common creatures")
+	check(sim.IsLegend("ash_wyrm") and not sim.IsLegend("wolf") and "ash_wyrm" in sim.SpawnableSpecies(),
+			"legends are creatures the player can call with the creatures' power")
+
+	# Asleep while the law says so, awake when their year comes.
+	sim.SetLaw("legends", false)
+	sim.SetLegendWake("elder_treant", 1)
+	sim.RunSteps(30)
+	check(legend_row(sim, "elder_treant").state == "dormant", "with the law off, legends stay asleep")
+	sim.SetLaw("legends", true)
+	sim.RunSteps(30)
+	var treant := legend_row(sim, "elder_treant")
+	check(treant.state == "awake" and not treant.summoned and treant.unit >= 0, "a legend wakes in its lair when its year comes (%s)" % treant.state)
+
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60)
+	var village: Dictionary = sim.VillageTable()[0]
+	var spot := Vector2(-1, -1)
+	for d in [Vector2i(6, 0), Vector2i(0, 6), Vector2i(-6, 0), Vector2i(0, -6), Vector2i(4, 4), Vector2i(-4, -4), Vector2i(3, 0), Vector2i(0, 3)]:
+		var t := Vector2i(village.x, village.y) + d
+		if t.x >= 0 and t.y >= 0 and t.x < w.width and t.y < w.height and not w.is_water(w.index(t.x, t.y)):
+			spot = Vector2(t.x + 0.5, t.y + 0.5)
+			break
+
+	# Called by the player: once, never two.
+	check(sim.PowerSpawn("ash_wyrm", spot.x, spot.y, 5) == 1 and sim.PowerSpawn("ash_wyrm", spot.x, spot.y, 5) == 0,
+			"a legend is unique: called once, refused while it walks the world")
+	var wyrm := legend_row(sim, "ash_wyrm")
+	check(wyrm.state == "awake" and wyrm.summoned and sim.UnitName(wyrm.unit) == wyrm.full_name and wyrm.full_name in sim.UnitInfo(wyrm.unit),
+			"a legend has its name in the world and in the inspector (%s)" % sim.UnitInfo(wyrm.unit))
+	check(sim.LegendLabels().size() >= 1, "the names of the legends that walk the world are written over them")
+
+	# Its mind: the procedural one, and a mind's decision validated like any record.
+	sim.LegendThinkNow("ash_wyrm")
+	wyrm = legend_row(sim, "ash_wyrm")
+	check(wyrm.goal in ["slumber", "roam", "hunt", "raid", "tribute"] and wyrm.words != "" and wyrm.mind == "procedural",
+			"a legend's mind chooses what it does and says it (%s: \"%s\")" % [wyrm.goal, wyrm.words])
+	check(sim.SubmitLegendJson("ash_wyrm", '{"goal": "dance", "target": "", "words": "Hm."}') != ""
+			and sim.SubmitLegendJson("ash_wyrm", '{"goal": "raid", "target": "Nowhere", "words": "Burn."}') != ""
+			and sim.SubmitLegendJson("ash_wyrm", 'burn them all') != "",
+			"a legend's decision that breaks the rules is refused")
+	var target: String = village.kingdom
+	check(sim.SubmitLegendJson("ash_wyrm", '{"goal": "raid", "target": "%s", "words": "Your walls are kindling to me."}' % target) == ""
+			and legend_row(sim, "ash_wyrm").goal == "raid" and legend_row(sim, "ash_wyrm").target == target,
+			"a valid decision is followed: a raid on a kingdom within reach")
+
+	# The raid: people fall, warriors strike back, the kingdom remembers.
+	sim.RunSteps(30 * 40)
+	wyrm = legend_row(sim, "ash_wyrm")
+	check(wyrm.kills > 0 or wyrm.health < 0.999 or wyrm.state == "slain", "a raid leaves dead and wounds (%d slain, strength %d%%, %s)" % [wyrm.kills, int(wyrm.health * 100.0), wyrm.state])
+	check(wyrm.deeds != "", "a legend's deeds are kept (%s)" % wyrm.deeds)
+	var k := -1
+	for row in sim.KingdomTable():
+		if row.name == target:
+			k = row.index
+	var told := false
+	for n in 6:
+		if k < 0 or not sim.MythNow(k):
+			break
+	for c in sim.CultureTable():
+		if c.index == k:
+			for m in c.myths:
+				told = told or wyrm.name in String(m.source)
+	check(told, "the kingdom a legend fell upon makes a myth of it")
+
+	# Slain, and called back.
+	wyrm = legend_row(sim, "ash_wyrm")
+	if wyrm.state == "awake":
+		sim.PowerSmite(wyrm.x, wyrm.y, 1.0)
+	wyrm = legend_row(sim, "ash_wyrm")
+	check(wyrm.state == "slain" and wyrm.slain > 0 and wyrm.slayer != "", "a legend can be slain, and who slew it is told (%s)" % wyrm.slayer)
+	check(sim.PowerSpawn("ash_wyrm", spot.x, spot.y, 1) == 1, "a slain legend can be called back by the player")
 	sim.queue_free()

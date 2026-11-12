@@ -13,6 +13,7 @@ const LAWS := [
 	["Nature", "seasons", "Seasons", "Winter stops growth and frost creeps from the poles."],
 	["Creatures", "hunger", "Hunger and thirst", "Creatures must eat and drink, or die."],
 	["Creatures", "old_age", "Old age", "Creatures die when their time has come."],
+	["Creatures", "legends", "Legends wake", "Unique legendary monsters may wake in their lairs as the years go by."],
 	["Disasters", "natural_disasters", "Natural disasters", "Lightning strikes and starts wildfires."],
 	["Disasters", "plagues", "Plagues", "Sicknesses appear and spread."],
 	["Disasters", "eruptions", "Eruptions and earthquakes", "Volcanoes wake, the ground shakes."],

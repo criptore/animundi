@@ -558,6 +558,8 @@ public partial class Simulation
 			if (Units.Task[i] == (byte)Task.Hunt && Units.Prey[i] >= 0 && Units.Alive[Units.Prey[i]]
 				&& MathF.Abs(Units.X[Units.Prey[i]] - Units.X[i]) + MathF.Abs(Units.Y[Units.Prey[i]] - Units.Y[i]) < 1.5f)
 				pose = ((int)(time * 6f + i) & 1) == 0 ? Attack : Idle;
+			else if (sp.IsLegend && LegendStriking(i))
+				pose = Attack;
 			else if (!AtTarget(i))
 			{
 				int step = (int)(time * (4f + sp.Speed * 4f) + (i & 7)) & 3;
