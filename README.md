@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture and the first legends of 0.7
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -106,7 +106,7 @@ Every kingdom has a **culture** (`sim/Culture.cs`, [docs/CULTURE.md](docs/CULTUR
 
 As for inventions, the built-in language model writes customs, myths and chapters when it is ready, under a grammar; a procedural writer does it otherwise.
 
-## 0.7 Legends (first part)
+## 0.7 Monsters and nature
 
 ![The legendary monsters](docs/images/legends.png)
 
@@ -116,12 +116,20 @@ Common monsters stay simple creatures. A few **legendary monsters** are unique, 
 - Its deeds enter the lore: the chronicle tells them, the peoples who live through them make myths and gods of them, and the warrior who slays one becomes a hero.
 - Their sprites are open-source pixel art, larger and more detailed than the common creatures: CC0 tiles of Dungeon Crawl Stone Soup ([sources](art/reference/legends/README.md)), with every pose made by `art/legends.py`.
 
+![Nature at work around a village](docs/images/nature.png)
+
+Nature makes history too ([docs/NATURE.md](docs/NATURE.md)). Each rule is a law of the world, and each disaster a power of the player.
+- **Disasters** (`sim/Disasters.cs`): earthquakes, eruptions whose lava flows then cools into rock, floods, tornadoes, droughts and wildfires. The kingdoms that live through them make myths of them.
+- **Diseases** (`sim/Plagues.cs`): each sickness is generated when it breaks out, with a symptom, a name ("the Red Cough"), carriers, and a cure (a shaman's herbs, shut gates, or none). It spreads by closeness and by trade, leaves survivors immune, and becomes a plague in the chronicle.
+- **Nature spirits** (`sim/Spirits.cs`): every large forest, sea, mountain range, plain, desert, swamp or snowfield has a spirit with a name and a mood. Felling, burning, hunting, building and mining in its lands anger it; worship calms it. Its mind (the local model, or a procedural one) warns, punishes the kingdom it blames with the disasters of its kind, or blesses.
+- **Monsters that change** (`sim/Monsters.cs`): common monsters dig lairs that grow and bring more of them until warriors burn them out, and each species mutates every few years (venomous, giant, swift, swarming...), with a new name and a lineage.
+
 ## 0.9 God powers (first part)
 
 The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.cs`, `scripts/ui/power_bar.gd`):
 - **Life**: bring any creature (animals and monsters) under the mouse, or found a village of any people on free land, which starts a kingdom of its own.
-- **Nature**: fire, lightning, rain (puts fires out, the grass grows back), and a **biome brush** that paints any land biome, mushroom land, cursed land, volcanic rock and lava included.
-- **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds), miracle (heals, and the peoples who see it grow in faith and worship you).
+- **Nature**: fire, lightning, rain (puts fires out, the grass grows back, ends a drought), the six disasters (wildfire, drought, tornado, earthquake, flood, eruption), plague, and a **biome brush** that paints any land biome, mushroom land, cursed land, volcanic rock and lava included.
+- **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds), heal (cures the sick), miracle (heals, and the peoples who see it grow in faith and worship you).
 - **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands, or make one take up the other's faith (convert).
 - **Inspector**: click a creature or a village to keep its card on screen. **Laws**: switch the rules of the world on and off.
 
@@ -133,14 +141,14 @@ The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a t
 
 - **Title screen**, then the **world setup** on the left of the map: the land (seed, size, continents, water, climate: the map is redrawn as you change them) and its peoples.
 - **Top bar**: menu, date and season, speed of time and "go to year", the world's numbers (people, villages, kingdoms, animals), laws, settings.
-- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), the chronicle (the age, the written chapters, the events and their filters).
+- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), legends, nature (spirits, disasters, sicknesses, monsters and lairs), the chronicle (the age, the written chapters, the events and their filters).
 - **Powers bar**: tabs for terrain, creatures, peoples, nature, wrath and mercy, whispers; the chosen power and the brush beside them. **Inspector** card with a portrait, the village's stores and a button to follow with the camera. **Map layers** on the right.
 - **Windows**: laws of the world (grouped, one line each), settings (game, display, sound, controls), pause menu (Esc).
-- Buttons of features to come are there already, **locked**: more powers (terrain, disasters, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
+- Buttons of features to come are there already, **locked**: more powers (terrain, blizzards, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
 
 ![The game](docs/images/interface_game.png)
 
-Next: 0.7 Monsters and nature (monster minds, nature spirits, disasters, plagues). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+Next: 0.8 Ages (from stone to space, with their consequences). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 

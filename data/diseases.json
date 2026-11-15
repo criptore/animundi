@@ -1,0 +1,11 @@
+{
+	"_about": "What diseases are generated from, read by sim/AssetLibrary.cs and sim/Plagues.cs (docs/NATURE.md). A disease is drawn when it first breaks out: a symptom, a name made of one of the adjectives and one of the symptom's nouns (\"the Red Cough\"), who carries it (people, beasts or all), and its numbers drawn between the symptom's bounds. contagion: chance per second that a sick creature passes it to each creature standing close. lethality: share of the sick who die of it. seconds: how long it lasts (a year is 60 s). Symptoms: fever (the sick thirst twice as fast), cough (it carries further), wasting (the sick hunger twice as fast), shakes (the sick are weak: wounded, and beaten in fights), rot (those it kills may rise as zombies).",
+	"adjectives": ["Red", "Grey", "Black", "Pale", "Weeping", "Hollow", "Marsh", "Ashen", "Crimson", "Yellow", "Silent", "Winter", "Creeping", "Bitter"],
+	"symptoms": [
+		{ "id": "fever", "nouns": ["Fever", "Sweat", "Burning"], "text": "a burning fever: the sick thirst twice as fast", "contagion": [0.05, 0.1], "lethality": [0.12, 0.35], "seconds": [25, 45] },
+		{ "id": "cough", "nouns": ["Cough", "Breath", "Lung"], "text": "a cough that carries far", "contagion": [0.09, 0.16], "lethality": [0.06, 0.2], "seconds": [20, 40] },
+		{ "id": "wasting", "nouns": ["Wasting", "Hunger", "Thinning"], "text": "a wasting: the sick hunger twice as fast", "contagion": [0.04, 0.08], "lethality": [0.1, 0.3], "seconds": [35, 60] },
+		{ "id": "shakes", "nouns": ["Shakes", "Palsy", "Trembling"], "text": "a trembling that leaves the sick too weak to fight", "contagion": [0.05, 0.1], "lethality": [0.08, 0.25], "seconds": [25, 50] },
+		{ "id": "rot", "nouns": ["Rot", "Blight", "Pox"], "text": "a rot of the flesh: some of its dead rise again", "contagion": [0.04, 0.08], "lethality": [0.2, 0.4], "seconds": [30, 50] }
+	]
+}

@@ -95,7 +95,8 @@ See [INVENTIONS.md](INVENTIONS.md).
 - [x] Inventions spread (kingdom, trade partners, neighbours, by usefulness), are forgotten when useless or replaced, and evolve by descent (parent, generation), traced in the chronicle (event filter "inventions")
 - [x] Procedural fallback when no model is available (and when it is slow or wrong)
 - [x] The culture mind writes laws, rituals and myths (done with 0.6): the model takes the grammar of the record it is asked for
-- [ ] Inventions with new effect blocks unlocked by ages (0.8), monster and nature minds (0.7)
+- [ ] Inventions with new effect blocks unlocked by ages (0.8)
+- [x] Monster and nature minds (done with 0.7): legends, monster species and nature spirits ask the same model, each with its grammar
 
 ## 0.6 Culture
 See [CULTURE.md](CULTURE.md).
@@ -108,10 +109,11 @@ See [CULTURE.md](CULTURE.md).
 
 ## 0.7 Monsters and nature
 - [x] Legendary monsters (`sim/Legends.cs`, [LEGENDS.md](LEGENDS.md)): six unique legends (Ash Wyrm, Frost Titan, Elder Treant, Hollow King, Sand Colossus, Storm Roc), each world drawing which sleep in it and when they wake, or called by the player (once); a mind (local model or procedural) that slumbers, roams, hunts, raids or demands tribute; their deeds in the chronicle, the peoples' memories and myths; heroes who slay them; detailed sprites (`art/legends.py`). Common monsters keep no mind.
-- [ ] Monster species that change: mutations, new abilities, lairs of common monsters
-- [ ] Nature spirits (forests, volcanoes, seas) with moods
-- [ ] Disasters: earthquakes, eruptions, floods, tornadoes, droughts, wildfires
-- [ ] Generated diseases and plagues
+- [x] Monster species that change (`sim/Monsters.cs`, [NATURE.md](NATURE.md)): lairs of common monsters that grow and bring new ones, burned out by warriors; mutations every few years (venomous, giant, swift, swarming, iron-hided, burning, plague-bearing, cunning) chosen by the species' mind (local model or procedural), with a new name and a lineage; zombies from rotting plagues, demons from eruptions, ghosts in abandoned villages
+- [x] Nature spirits (`sim/Spirits.cs`): one per large forest, sea, mountain range, plain, desert, swamp or snowfield, and per volcano the player raises; a mood moved by what is done in their lands (trees felled, fires, hunting, buildings, mines, docks) and by worship; a mind (local model or procedural) that warns, punishes with the disasters of its kind or blesses; remembered as myths and gods
+- [x] Disasters (`sim/Disasters.cs`): earthquakes, eruptions (lava that flows, then cools), floods, tornadoes, droughts, wildfires; by nature, by spirits and as god powers
+- [x] Generated diseases and plagues (`sim/Plagues.cs`): symptom, name, carrier, contagion, lethality, cure (herbs, quarantine); immunity, trade carrying them, plagues in the chronicle; the Plague and Heal powers
+- [ ] Later: blizzards and acid rain; lairs people can see being raided; spirits one can bargain with (offerings); a card for spirits, lairs and diseases in the inspector (0.9)
 
 ## 0.8 Ages
 - [ ] Stone to Space and beyond, with no final age
@@ -128,7 +130,8 @@ Nothing here before the world lives on its own (see the order of work above). Sp
 - [ ] Fire power drops sparks (particles) that set alight the tiles they land on, as in WorldBox (the fire power lights the tiles under the brush for now; the F test key is gone)
 - [x] The powers bar (`scripts/ui/power_bar.gd`, `sim/Powers.cs`): a power and a brush size, then click or drag on the map; first powers: bring creatures, settle a people (a new village and kingdom), fire, lightning, rain, meteor, smite, bless
 - [x] Miracle (Wrath & Mercy) and Convert (Whispers) powers
-- [ ] More powers: terrain (raise, lower, water), weather, disasters, curses, faith mode, avatar, gestures, storyteller
+- [x] Disasters and sickness as powers (done with 0.7): wildfire, drought, tornado, earthquake, flood, eruption, plague, heal
+- [ ] More powers: terrain (raise, lower, water), weather, curses, faith mode, avatar, gestures, storyteller
 - [x] Inspector cards for a creature and a village: click to pin, refreshed while it lives
 - [ ] Inspector cards: kingdom, species, spirit, invention (with its script and lineage)
 - [ ] Map layers (kingdoms, cultures, languages, religions, clans, families, species, alliances, armies), war lines, plot and task icons, unit arrows, and statistics

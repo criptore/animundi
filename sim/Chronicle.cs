@@ -52,7 +52,7 @@ public partial class Simulation
 	/// <summary>How much each kind of event weighs when an age is named.</summary>
 	private static readonly Dictionary<string, float> ThemeWeights = new()
 	{
-		["wars"] = 4f, ["disasters"] = 3f, ["heroes"] = 3f, ["legends"] = 3.5f, ["kings"] = 2f, ["cities"] = 2f, ["inventions"] = 1f, ["culture"] = 0.75f, ["life"] = 1f,
+		["wars"] = 4f, ["disasters"] = 3f, ["heroes"] = 3f, ["legends"] = 3.5f, ["nature"] = 2.5f, ["kings"] = 2f, ["cities"] = 2f, ["inventions"] = 1f, ["culture"] = 0.75f, ["life"] = 1f,
 	};
 
 	/// <summary>What an event weighs: its kind's weight; a wildfire far from anyone and the
@@ -70,6 +70,7 @@ public partial class Simulation
 		["disasters"] = (new[] { "Ash", "Storms", "Embers", "Ruin" }, "Fire and Ruin"),
 		["heroes"] = (new[] { "Heroes", "Songs", "Champions" }, "Songs of the Brave"),
 		["legends"] = (new[] { "the Beast", "Legends", "Giants", "the Wyrm" }, "When Legends Walked"),
+		["nature"] = (new[] { "Spirits", "the Wild", "Roots", "Fangs" }, "The Wild Stirs"),
 		["culture"] = (new[] { "Gods", "Omens", "Prayers", "Customs" }, "Gods and Customs"),
 		["kings"] = (new[] { "Crowns", "Thrones", "Heirs" }, "Crowns Passing"),
 		["cities"] = (new[] { "Stone", "Hearths", "Walls" }, "Walls Rising"),
@@ -222,7 +223,8 @@ public partial class Simulation
 				{
 					"wars" => $"{n} more deeds of war", "kings" => $"{n} more affairs of crowns", "cities" => $"{n} more tidings from the villages",
 					"inventions" => $"{n} more inventions and borrowings", "disasters" => $"{n} more disasters", "culture" => $"{n} more matters of gods and customs",
-					"heroes" => $"{n} more tales of heroes", _ => $"{n} more things",
+					"heroes" => $"{n} more tales of heroes", "legends" => $"{n} more deeds of legends", "nature" => $"{n} more stirrings of the wild",
+					_ => $"{n} more things",
 				});
 			sb.Append($"These years also saw {string.Join(", ", parts)}.");
 		}

@@ -64,6 +64,7 @@ public partial class Simulation
 			killed++;
 		}
 		Ignite(x, y, 1.5f);
+		DamageLairs(x, y, 1.5f, 0.5f, "is blasted by lightning");
 		LogEvent($"lightning strikes near ({(int)x}, {(int)y}).", "disasters");
 		GodActs("lightning", x, y, 1.5f, 1);
 		return killed;
@@ -97,6 +98,8 @@ public partial class Simulation
 		});
 		_burningTiles.RemoveAll(t => TileBurn[t] == 0f);
 		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
+		// Rain in the middle of a drought ends it.
+		doused += EndDroughts(x, y, -radius);
 		GodActs("rain", x, y, radius, doused);
 		return doused;
 	}
@@ -130,6 +133,8 @@ public partial class Simulation
 		_burningTiles.RemoveAll(t => TileBurn[t] == 0f);
 		_burning.RemoveAll(p => !_pAlive[p] || _pBurn[p] == 0f);
 		Ignite(x, y, radius + 1.5f);
+		DamageLairs(x, y, radius + 0.5f, 1f, "is crushed by a falling star");
+		Grieve(World.Index((int)x, (int)y), 4f, "struck");
 		LogEvent($"a meteor falls near ({(int)x}, {(int)y}).", "disasters");
 		GodActs("meteor", x, y, radius, 1);
 		return killed;

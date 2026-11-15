@@ -112,6 +112,69 @@ public sealed class LegendRecord
 	public float T(string key) => Temper.TryGetValue(key, out float v) ? v : 0.5f;
 }
 
+/// <summary>A kind of nature spirit (data/spirits.json): the lands it can be the spirit of.</summary>
+public sealed class SpiritRecord
+{
+	[JsonPropertyName("kind")] public string Kind { get; set; }
+	/// <summary>What its lands are called: "the Northern Woods".</summary>
+	[JsonPropertyName("places")] public List<string> Places { get; set; } = new();
+	[JsonPropertyName("biomes")] public List<string> Biomes { get; set; } = new();
+	/// <summary>The domain of the god a people makes of it.</summary>
+	[JsonPropertyName("domain")] public string Domain { get; set; } = "the wild";
+	[JsonPropertyName("deed")] public string Deed { get; set; } = "Spoke from the Wild";
+	/// <summary>What it does in anger (Spirits.cs), and its gift when content.</summary>
+	[JsonPropertyName("wrath")] public List<string> Wrath { get; set; } = new();
+	[JsonPropertyName("gift")] public string Gift { get; set; } = "bloom";
+	/// <summary>Syllables of its name: one from the first half, one from the second.</summary>
+	[JsonPropertyName("names")] public List<string> Names { get; set; } = new();
+	[JsonPropertyName("lore")] public string Lore { get; set; } = "";
+	/// <summary>Only born of land the world did not have at first (volcanoes).</summary>
+	[JsonPropertyName("late")] public bool Late { get; set; }
+}
+
+/// <summary>A symptom diseases are generated from (data/diseases.json).</summary>
+public sealed class SymptomRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	[JsonPropertyName("nouns")] public List<string> Nouns { get; set; } = new();
+	[JsonPropertyName("text")] public string Text { get; set; } = "";
+	/// <summary>Chance per second to pass it to someone close: [from, to].</summary>
+	[JsonPropertyName("contagion")] public List<float> Contagion { get; set; } = new() { 0.05f, 0.1f };
+	/// <summary>Share of the sick who die of it: [from, to].</summary>
+	[JsonPropertyName("lethality")] public List<float> Lethality { get; set; } = new() { 0.1f, 0.3f };
+	/// <summary>Seconds it lasts: [from, to].</summary>
+	[JsonPropertyName("seconds")] public List<float> Seconds { get; set; } = new() { 25f, 45f };
+}
+
+/// <summary>A change a monster species can go through (data/monsters.json).</summary>
+public sealed class MutationRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	[JsonPropertyName("adjective")] public string Adjective { get; set; } = "";
+	[JsonPropertyName("text")] public string Text { get; set; } = "";
+	[JsonPropertyName("speed")] public float Speed { get; set; } = 1f;
+	[JsonPropertyName("roam")] public float Roam { get; set; } = 1f;
+	[JsonPropertyName("size")] public int Size { get; set; }
+	[JsonPropertyName("litter")] public int Litter { get; set; }
+	[JsonPropertyName("lifespan")] public float Lifespan { get; set; } = 1f;
+	/// <summary>Multiplies the chance people have to fight it off.</summary>
+	[JsonPropertyName("defend")] public float Defend { get; set; } = 1f;
+	/// <summary>Multiplies how fast its lairs bring new ones.</summary>
+	[JsonPropertyName("spawn")] public float Spawn { get; set; } = 1f;
+	/// <summary>fire (what it kills burns), plague (it carries a sickness), or "".</summary>
+	[JsonPropertyName("ability")] public string Ability { get; set; } = "";
+}
+
+/// <summary>A common monster (data/monsters.json): its lair and the changes it can go through.</summary>
+public sealed class MonsterRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	/// <summary>nest, crypt, pit, cave, pool or cairn (the lair's sprite), and what it is called.</summary>
+	[JsonPropertyName("lair")] public string Lair { get; set; } = "cave";
+	[JsonPropertyName("lair_name")] public string LairName { get; set; } = "lair";
+	[JsonPropertyName("pool")] public List<string> Pool { get; set; } = new();
+}
+
 /// <summary>The sounds a people's language draws from.</summary>
 public sealed class LanguageRecord
 {
@@ -181,6 +244,23 @@ public sealed class AssetLibrary
 		[JsonPropertyName("legends")] public List<LegendRecord> Legends { get; set; } = new();
 	}
 
+	private sealed class SpiritsFile
+	{
+		[JsonPropertyName("spirits")] public List<SpiritRecord> Spirits { get; set; } = new();
+	}
+
+	private sealed class DiseasesFile
+	{
+		[JsonPropertyName("adjectives")] public List<string> Adjectives { get; set; } = new();
+		[JsonPropertyName("symptoms")] public List<SymptomRecord> Symptoms { get; set; } = new();
+	}
+
+	private sealed class MonstersFile
+	{
+		[JsonPropertyName("monsters")] public List<MonsterRecord> Monsters { get; set; } = new();
+		[JsonPropertyName("mutations")] public List<MutationRecord> Mutations { get; set; } = new();
+	}
+
 	private sealed class BuildingsFile
 	{
 		[JsonPropertyName("buildings")] public List<BuildingRecord> Buildings { get; set; } = new();
@@ -213,6 +293,14 @@ public sealed class AssetLibrary
 	public Dictionary<string, BiomeRecord> Biomes = new();
 	/// <summary>The legendary monsters (data/legends.json); each is also a species.</summary>
 	public List<LegendRecord> Legends = new();
+	/// <summary>Kinds of nature spirits (data/spirits.json).</summary>
+	public List<SpiritRecord> Spirits = new();
+	/// <summary>What diseases are generated from (data/diseases.json).</summary>
+	public List<string> DiseaseAdjectives = new();
+	public List<SymptomRecord> Symptoms = new();
+	/// <summary>Common monsters and the changes they can go through (data/monsters.json).</summary>
+	public List<MonsterRecord> Monsters = new();
+	public List<MutationRecord> Mutations = new();
 
 	public static AssetLibrary Load(string speciesPath = "res://data/species.json",
 		string plantsPath = "res://data/plants.json", string biomesPath = "res://data/biomes.json")
@@ -240,6 +328,20 @@ public sealed class AssetLibrary
 				Id = l.Id, Name = l.Title, Sprite = l.Sprite, Speed = l.Speed, Roam = l.Roam, Diet = "none",
 				Size = 14, Lifespan = 100000f, Litter = 0, IsLegend = true,
 			});
+		}
+		if (FileAccess.FileExists("res://data/spirits.json"))
+			lib.Spirits = JsonSerializer.Deserialize<SpiritsFile>(FileAccess.GetFileAsString("res://data/spirits.json")).Spirits;
+		if (FileAccess.FileExists("res://data/diseases.json"))
+		{
+			var diseases = JsonSerializer.Deserialize<DiseasesFile>(FileAccess.GetFileAsString("res://data/diseases.json"));
+			lib.DiseaseAdjectives = diseases.Adjectives;
+			lib.Symptoms = diseases.Symptoms;
+		}
+		if (FileAccess.FileExists("res://data/monsters.json"))
+		{
+			var monsters = JsonSerializer.Deserialize<MonstersFile>(FileAccess.GetFileAsString("res://data/monsters.json"));
+			lib.Monsters = monsters.Monsters;
+			lib.Mutations = monsters.Mutations;
 		}
 		return lib;
 	}

@@ -266,6 +266,14 @@ func _use_power(screen_pos: Vector2) -> void:
 			_sim.PowerLightning(at.x, at.y)
 		"meteor":
 			_sim.PowerMeteor(at.x, at.y, r)
+		"wildfire", "drought", "tornado", "earthquake", "flood", "eruption":
+			if _sim.PowerDisaster(powers.power, at.x, at.y, r) == 0:
+				_hud.notice({"flood": "Water needs low land to rise over.", "wildfire": "Nothing burns here."}.get(powers.power, "Disasters need land to strike."))
+		"plague":
+			if _sim.PowerPlague(at.x, at.y, r) == 0:
+				_hud.notice("A sickness needs living creatures to take hold of.")
+		"heal":
+			_sim.PowerHeal(at.x, at.y, r)
 		"spawn":
 			if _sim.PowerSpawn(powers.arg, at.x, at.y, powers.brush) == 0:
 				_hud.notice("A legend is unique: it already walks this world, or it needs land to stand on." if _sim.IsLegend(powers.arg) \
@@ -339,7 +347,7 @@ func _process(_delta: float) -> void:
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
 	var brushing: bool = _hud.powers.power != "inspect" and not _hud.blocking()
-	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle"] else 0.6
+	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle", "wildfire", "drought", "earthquake", "flood", "eruption", "plague", "heal"] else 0.6
 	var at := _ground_at(pointer)
 	_brush.visible = brushing and not tilt_on
 	_tilt_brush.visible = brushing and tilt_on
@@ -379,6 +387,7 @@ func _process(_delta: float) -> void:
 		_hud.set_mind(_sim.MindStatus())
 		_hud.set_cultures(_sim.CultureTable())
 		_hud.set_legends(_sim.LegendTable())
+		_hud.set_nature(_sim.NatureTable())
 		_hud.set_chronicle(_sim.AgeName(), _sim.ChronicleTable())
 		_refresh_inspector()
 	# The camera stays on the creature or the village the player follows.

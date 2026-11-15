@@ -186,6 +186,9 @@ public partial class Simulation
 			b.Gold += 1f;
 		r.Trips++;
 		Trades++;
+		// Sickness travels with the goods (Plagues.cs).
+		TradeCarriesSickness(r.A, r.B);
+		TradeCarriesSickness(r.B, r.A);
 		if (moved || r.Trips % 3 == 1)
 			_vehicles.Add(new Vehicle { Boat = r.Sea, Path = r.Path, Back = r.Trips % 2 == 0, Village = r.A });
 	}

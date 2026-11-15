@@ -719,6 +719,8 @@ public partial class Simulation
 		if (bld.Type == _tWindmill)
 			MakeFields(v, bld.X, bld.Y);
 		village.ModsDirty = true;
+		// The spirit of that land feels what is raised on it (Spirits.cs).
+		Grieve(World.Index(bld.X, bld.Y), 1.5f, "built", village.Kingdom);
 		PlanRoad(v, bld.X, bld.Y + 1, village.X, village.Y + 1);
 		if (!_houseTypes.Contains(bld.Type) && bld.Type != _tDummy)
 			LogEvent($"{village.Name} builds a {rec.Name.ToLower()}.", "cities");
@@ -759,7 +761,8 @@ public partial class Simulation
 			foreach (int t in village.Fields)
 			{
 				float w = _wheat[t];
-				if (w <= 0f || w >= 1f)
+				// No wheat grows under a drought or under water.
+				if (w <= 0f || w >= 1f || Parched[t] > 0 || Flooded[t] > 0)
 					continue;
 				int before = GroundCode(t);
 				_wheat[t] = Math.Min(1f, w + rate * dt);
@@ -915,6 +918,7 @@ public partial class Simulation
 		}
 		village.Zones.Clear();
 		LogEvent($"{village.Name} is abandoned: no one lives there any more.", "cities");
+		Haunt(village);
 	}
 
 	// ------------------------------------------------------------------ watch towers
@@ -1056,13 +1060,16 @@ public partial class Simulation
 	// ------------------------------------------------------------------ the map overlay
 
 	/// <summary>What the map draws on a tile: 0 nothing, 1 road, 2 bare field, 3 young wheat,
-	/// 4 growing wheat, 5 ripe wheat.</summary>
+	/// 4 growing wheat, 5 ripe wheat, 6 flood water, 7 parched earth (Disasters.cs).</summary>
 	private int GroundCode(int t)
 	{
+		// Water over the land hides what is under it; dry land shows where no one ploughed.
+		if (Flooded.Length > t && Flooded[t] > 0)
+			return 6;
 		if (_ground[t] == GroundRoad)
 			return 1;
 		if (_ground[t] != GroundField)
-			return 0;
+			return Parched.Length > t && Parched[t] > 0 ? 7 : 0;
 		float w = _wheat[t];
 		return w <= 0f ? 2 : w < 0.5f ? 3 : w < 1f ? 4 : 5;
 	}

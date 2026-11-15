@@ -76,6 +76,14 @@ public sealed class UnitManager
 	/// <summary>Foes slain in war (heroes, Chronicle.cs).</summary>
 	public int[] Kills = Array.Empty<int>();
 
+	// Sickness (0.7, Plagues.cs).
+	/// <summary>The disease the unit carries (index in Simulation.Diseases + 1), or 0.</summary>
+	public int[] Sick = Array.Empty<int>();
+	/// <summary>Seconds it has been sick.</summary>
+	public float[] SickFor = Array.Empty<float>();
+	/// <summary>Diseases it has survived, one bit each (disease index modulo 64).</summary>
+	public ulong[] Immune = Array.Empty<ulong>();
+
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
 
@@ -123,6 +131,9 @@ public sealed class UnitManager
 		ArmyStep[i] = -1;
 		Health[i] = 100f;
 		Kills[i] = 0;
+		Sick[i] = 0;
+		SickFor[i] = 0f;
+		Immune[i] = 0UL;
 		Count++;
 		return i;
 	}
@@ -181,6 +192,9 @@ public sealed class UnitManager
 		Array.Resize(ref ArmyStep, size);
 		Array.Resize(ref Health, size);
 		Array.Resize(ref Kills, size);
+		Array.Resize(ref Sick, size);
+		Array.Resize(ref SickFor, size);
+		Array.Resize(ref Immune, size);
 		Array.Resize(ref _free, size);
 	}
 }

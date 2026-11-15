@@ -62,6 +62,10 @@ public partial class Simulation : Node2D
 		SetupLife();
 		SetupNature();
 		SetupLegends(worldData.Get("seed_value").AsInt32());
+		SetupDisasters(worldData.Get("seed_value").AsInt32());
+		SetupPlagues(worldData.Get("seed_value").AsInt32());
+		SetupSpirits(worldData.Get("seed_value").AsInt32());
+		SetupMonsters(worldData.Get("seed_value").AsInt32());
 		ClearDrawing();
 
 		// Walking and chasing: every step, every unit.
@@ -80,6 +84,13 @@ public partial class Simulation : Node2D
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "villages", Global = true, Interval = 2f, Batches = 1, Run = VillageStep });
 		// Legendary monsters: they wake, think and act four times a second.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "legends", Global = true, Interval = 0.25f, Batches = 1, Run = (_, _, dt) => LegendStep(dt) });
+		// Disasters underway (lava, floods, whirlwinds, droughts) and the watch over plagues: four times a second.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "disasters", Global = true, Interval = 0.25f, Batches = 1, Run = (_, _, dt) => DisasterStep(dt) });
+		// The sick: each unit once a second, spread over 10 batches.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "plagues", Interval = 1f, CoarseInterval = 2f, Batches = 10, Run = PlagueStep });
+		// Nature spirits think once a year each; monsters' lairs and mutations every two seconds.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spirits", Global = true, Interval = 1f, Batches = 1, Run = (_, _, dt) => SpiritStep(dt) });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "monsters", Global = true, Interval = 2f, Batches = 1, Run = (_, _, dt) => MonsterStep(dt) });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}
@@ -178,6 +189,9 @@ public partial class Simulation : Node2D
 			if (Units.Alive[i])
 				Population[Units.Species[i]]--;
 		Units.Clear();
+		_sickTotal = 0;
+		foreach (var d in Diseases)
+			d.Sick = 0;
 		Zones?.Rebuild(Units);
 	}
 

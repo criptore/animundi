@@ -59,6 +59,10 @@ public partial class Simulation
 		["peace"] = ("the hearth", "Stayed the Blades"), ["death"] = ("death", "Called the Crown Home"), ["city"] = ("stone", "Raised the Stones"),
 		["fire"] = ("fire", "Walked in Flame"), ["storm"] = ("storms", "Threw the Bolt"), ["hero"] = ("glory", "Chose a Champion"),
 		["freedom"] = ("the wind", "Cut the Rope"), ["miracle"] = ("the sky", "Healed the People"), ["wrath"] = ("the sky", "Struck the Land"),
+		// Disasters and plagues (Disasters.cs, Plagues.cs), and lairs burned out (Monsters.cs).
+		["quake"] = ("the deep earth", "Shook the World"), ["eruption"] = ("fire", "Opened the Mountain"), ["flood"] = ("the sea", "Raised the Waters"),
+		["whirlwind"] = ("the wind", "Sent the Whirlwind"), ["drought"] = ("the sun", "Drank the Rivers"), ["plague"] = ("sickness", "Breathed the Plague"),
+		["hunt"] = ("the hunt", "Burned the Nest"),
 	};
 
 	private void FoundReligion(Culture c, int species)
@@ -327,7 +331,7 @@ public partial class Simulation
 		{
 			var c = Kingdoms[k].Culture;
 			string place = Villages[v].Name;
-			bool kindly = kind == "bless" || kind == "rain" || kind == "miracle";
+			bool kindly = kind == "bless" || kind == "rain" || kind == "miracle" || kind == "heal";
 			ulong now = Godot.Time.GetTicksMsec();
 			if (c.LastFelt.TryGetValue(kind, out ulong felted) && now - felted < 400)
 				continue;
@@ -335,6 +339,8 @@ public partial class Simulation
 			float felt = kind switch
 			{
 				"bless" => Math.Min(12f, 2f * amount), "rain" => 6f, "miracle" => 20f, "fire" => 5f, "lightning" => 10f, "meteor" => 25f,
+				"heal" => Math.Min(14f, 3f * amount), "earthquake" => 20f, "eruption" => 25f, "flood" => 15f, "tornado" => 12f, "drought" => 12f, "wildfire" => 8f,
+				"plague" => Math.Min(25f, 5f * amount),
 				_ => Math.Min(20f, 4f * amount),
 			};
 			if (kindly)
@@ -352,8 +358,16 @@ public partial class Simulation
 					"fire" => $"fire sprang from nowhere near {place}",
 					"lightning" => $"a bolt from a clear sky struck near {place}",
 					"meteor" => $"a star fell on the land of {place}",
+					"heal" => $"the sick of {place} rose from their beds, healed by no hand",
+					"earthquake" => $"the ground shook under {place} on a still day",
+					"eruption" => $"the earth opened in fire near {place}",
+					"flood" => $"the waters rose over {place} under a clear sky",
+					"tornado" => $"a whirlwind came down on {place} from a clear sky",
+					"drought" => $"the sky closed over {place} and the rain forgot the land",
+					"wildfire" => $"fire sprang from nowhere near {place}",
+					"plague" => $"a sickness fell from the sky on {place}",
 					_ => $"people of {place} fell dead where they stood",
-				}, kind == "miracle" || kind == "meteor" ? 3f : 2f);
+				}, kind is "miracle" or "meteor" or "earthquake" or "eruption" or "plague" ? 3f : 2f);
 			}
 			UpdateStance(k);
 		}

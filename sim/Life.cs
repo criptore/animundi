@@ -17,7 +17,7 @@ public partial class Simulation
 	public enum Task : byte { Wander, Graze, Drink, Hunt, Rest, Work, Deliver, Feast, Home, Sail }
 
 	/// <summary>Why a unit died (for statistics and the event log).</summary>
-	public enum Death { OldAge, Hunger, Thirst, Eaten, Fire, Other, War }
+	public enum Death { OldAge, Hunger, Thirst, Eaten, Fire, Other, War, Plague, Disaster }
 
 	/// <summary>Seconds for hunger to go from full to starving (thirst: ThirstSeconds).</summary>
 	public const float HungerSeconds = 50f;
@@ -37,7 +37,11 @@ public partial class Simulation
 		["animal_spawn"] = true,  // natural animals are born over time in their biomes
 		["hunger"] = true,        // creatures need food and water
 		["old_age"] = true,       // creatures die of old age
-		["natural_disasters"] = true,  // lightning sets forests on fire
+		["natural_disasters"] = true,  // lightning, wildfires, tornadoes, floods and droughts (Disasters.cs)
+		["eruptions"] = true,     // earthquakes, and eruptions where there is volcanic rock
+		["plagues"] = true,       // sicknesses appear and spread (Plagues.cs)
+		["spirits"] = true,       // nature spirits bless and punish (Spirits.cs)
+		["monsters"] = true,      // monsters mutate and dig lairs (Monsters.cs)
 		["trees_growth"] = true,  // plants grow and spread
 		["legends"] = true,       // legendary monsters wake in their lairs (data/legends.json)
 		["faiths"] = true,        // kingdoms convert to their neighbours' faiths, and faiths split in heresies
@@ -169,6 +173,9 @@ public partial class Simulation
 		int s = Units.Species[i];
 		if (Assets.Species[s].IsLegend)
 			LegendDied(i, cause);
+		if (Units.Sick[i] > 0)
+			SickDied(i, cause);
+		MonsterDied(i, cause);
 		if (Assets.Species[s].IsPeople)
 		{
 			if (cause == Death.Thirst || cause == Death.Hunger)
@@ -491,19 +498,26 @@ public partial class Simulation
 		if (d2 < 0.35f * 0.35f)
 		{
 			var hunter = Assets.Species[Units.Species[i]];
-			// People fight back: warriors and the brave often win, and the beast dies instead.
+			float px = Units.X[j], py = Units.Y[j];
+			// People fight back: warriors and the brave often win, and the beast dies instead
+			// (a monster that has changed may be harder to fight off, Monsters.cs).
 			if (Assets.Species[Units.Species[j]].IsPeople)
 			{
-				if (_rng.NextDouble() < DefendChance(j))
+				if (_rng.NextDouble() < DefendChance(j) * (StrainOf(Units.Species[i])?.Defend ?? 1f))
 				{
+					MonsterBite(i, px, py);
 					KillUnit(i, Death.Other);
 					return;
 				}
 			}
 			KillUnit(j, Death.Eaten);
+			MonsterBite(i, px, py);
 			Units.Prey[i] = -1;
 			if (hunter.IsPeople)
 			{
+				// The spirit of that land counts the beasts taken from it (Spirits.cs).
+				if (World.InBounds((int)px, (int)py))
+					Grieve(World.Index((int)px, (int)py), 0.6f, "hunted", KingdomOfUnit(i));
 				// The hunter brings the meat home.
 				Units.Carry[i] = (byte)Goods.Food;
 				Units.CarryAmount[i] = 6f;

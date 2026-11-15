@@ -92,8 +92,9 @@ public partial class Simulation
 
 	// ------------------------------------------------------------------ events
 
-	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life.</summary>
-	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "culture", "heroes", "legends", "disasters", "life" };
+	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life...
+	/// "nature" is what spirits and monsters do; "disasters" includes plagues.</summary>
+	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "culture", "heroes", "legends", "nature", "disasters", "life" };
 
 	private void LogEvent(string text, string cat = "life")
 	{
@@ -319,6 +320,12 @@ public partial class Simulation
 					Scorch[t] = (byte)Math.Max(0, Scorch[t] - ashFade);
 					_scorchChanged.Add(t);
 				}
+				// Under a drought (Disasters.cs) the grass withers and nothing grows or seeds.
+				if (Parched[t] > 0)
+				{
+					Grass[t] = Math.Max(0f, Grass[t] - 0.03f * elapsed);
+					continue;
+				}
 				if (Scorch[t] < 128)
 					Grass[t] = Math.Min(_fertility[b], Grass[t] + 0.04f * _fertility[b] * growth * elapsed);
 				if (!treesGrow)
@@ -495,7 +502,8 @@ public partial class Simulation
 				if (!World.InBounds(nx, ny))
 					continue;
 				int nt = World.Index(nx, ny);
-				if (TileBurn[nt] == 0f && _rng.NextDouble() < _burnChance[World.Biome[nt]] * damp * dt)
+				// (dry land burns far more easily)
+				if (TileBurn[nt] == 0f && _rng.NextDouble() < _burnChance[World.Biome[nt]] * damp * dt * (Parched[nt] > 0 ? 2.5f : 1f))
 					IgniteTile(nt);
 			}
 			for (int p = _tileFirst[t]; p >= 0; p = _pNext[p])
@@ -516,6 +524,7 @@ public partial class Simulation
 				Scorch[t] = 255;
 				Grass[t] = 0f;
 				_scorchChanged.Add(t);
+				Grieve(t, 0.25f, "burned");
 			}
 		}
 		_burningTiles.RemoveAll(t => TileBurn[t] == 0f);
