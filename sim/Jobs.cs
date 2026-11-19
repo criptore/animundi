@@ -489,6 +489,8 @@ public partial class Simulation
 					break;
 				if (Units.WorkTimer[i] > 0f)
 					return true;
+				// The spirit of that land counts every tree (Spirits.cs).
+				Grieve(World.Index((int)_pX[target], (int)_pY[target]), 1f, "felled", village.Kingdom);
 				RemovePlant(target);
 				Carry(i, Goods.Wood, 4f);
 				break;

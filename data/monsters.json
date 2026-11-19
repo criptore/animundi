@@ -1,0 +1,24 @@
+{
+	"_about": "Common monsters that change, read by sim/AssetLibrary.cs and sim/Monsters.cs (docs/NATURE.md). monsters: the species of data/species.json that are monsters; lair is the sprite of their lair (nest, crypt, pit, cave, pool, cairn: made in scripts/render2d/sprite_atlas.gd), lair_name what the chronicle calls it, pool the mutations the species can go through, each once. mutations: adjective is added to the species' name (\"Venomous Spider\"); speed, roam, lifespan and spawn multiply (spawn: how fast lairs bring new ones); size and litter add; defend multiplies the chance people have to fight the monster off; ability: fire (what it kills burns) or plague (it carries a sickness of its own).",
+	"monsters": [
+		{ "id": "spider", "lair": "nest", "lair_name": "spider nest", "pool": ["venom", "giant", "swarm", "swift", "cunning"] },
+		{ "id": "skeleton", "lair": "crypt", "lair_name": "crypt", "pool": ["armoured", "swift", "cunning", "plague"] },
+		{ "id": "ghost", "lair": "crypt", "lair_name": "haunted barrow", "pool": ["swift", "cunning"] },
+		{ "id": "slime", "lair": "pool", "lair_name": "spawning pool", "pool": ["giant", "swarm", "venom", "burning"] },
+		{ "id": "demon", "lair": "pit", "lair_name": "fire pit", "pool": ["burning", "giant", "swift", "cunning"] },
+		{ "id": "zombie", "lair": "crypt", "lair_name": "grave pit", "pool": ["plague", "armoured", "giant", "swift"] },
+		{ "id": "golem", "lair": "cairn", "lair_name": "standing cairn", "pool": ["armoured", "giant"] },
+		{ "id": "yeti", "lair": "cave", "lair_name": "ice cave", "pool": ["giant", "swift", "cunning", "armoured"] },
+		{ "id": "dragon", "lair": "cave", "lair_name": "dragon's cave", "pool": ["burning", "armoured", "cunning"] }
+	],
+	"mutations": [
+		{ "id": "venom", "adjective": "Venomous", "text": "their bite now kills many of those who would have fought them off", "defend": 0.6 },
+		{ "id": "giant", "adjective": "Giant", "text": "they grow huge: no prey is too big for them", "size": 3, "speed": 0.9 },
+		{ "id": "swift", "adjective": "Swift", "text": "they run faster and range further", "speed": 1.3, "roam": 1.4 },
+		{ "id": "swarm", "adjective": "Swarming", "text": "they breed in swarms", "litter": 2, "spawn": 1.6 },
+		{ "id": "armoured", "adjective": "Iron-hided", "text": "their hide turns blades, and they live longer", "defend": 0.75, "lifespan": 1.5 },
+		{ "id": "burning", "adjective": "Burning", "text": "what they kill catches fire", "ability": "fire" },
+		{ "id": "plague", "adjective": "Plague-bearing", "text": "they carry a sickness in their bite", "ability": "plague" },
+		{ "id": "cunning", "adjective": "Cunning", "text": "they learn to strike the unwary", "defend": 0.85, "roam": 1.5 }
+	]
+}

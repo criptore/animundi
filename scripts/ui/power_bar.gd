@@ -33,6 +33,14 @@ const POWERS := {
 	"bless": ["Bless", "Click or drag to heal and feed every creature under the brush.", true],
 	"miracle": ["Miracle", "Click for a sign from the sky: it heals, and the faith of the peoples who see it grows.", false],
 	"biome": ["Biome", "Click or drag to paint %s.", true],
+	"wildfire": ["Wildfire", "Click dry woods or grass to start a great fire.", false],
+	"drought": ["Drought", "Click to dry the land for a year: the grass withers, wheat fails, fire runs. Rain ends it.", false],
+	"tornado": ["Tornado", "Click to bring down a whirlwind that throws creatures and tears buildings.", false],
+	"earthquake": ["Earthquake", "Click to shake the ground: buildings fall, lairs cave in.", false],
+	"flood": ["Flood", "Click near water to raise it over the low land for a while.", false],
+	"eruption": ["Eruption", "Click to open the earth: lava pours out and flows downhill.", false],
+	"plague": ["Plague", "Click creatures to give them a new sickness, which spreads.", false],
+	"heal": ["Heal", "Click or drag to cure the sick and close wounds.", true],
 	"war": ["War", "Click a kingdom's land, then the kingdom it will attack.", false],
 	"peace": ["Peace", "Click the lands of two kingdoms at war to make peace.", false],
 	"alliance": ["Alliance", "Click the lands of two kingdoms to ally them.", false],
@@ -57,24 +65,23 @@ const PLACE := {
 	"meteor": ["divine", "meteor"], "smite": ["divine", "smite"], "bless": ["divine", "bless"],
 	"war": ["whispers", "swords"], "peace": ["whispers", "dove"], "alliance": ["whispers", "rings"],
 	"convert": ["whispers", "ankh"], "miracle": ["divine", "halo"],
+	"wildfire": ["nature", "summer"], "drought": ["nature", "drought"], "tornado": ["nature", "tornado"],
+	"earthquake": ["nature", "quake"], "flood": ["nature", "flood"], "eruption": ["nature", "volcano"],
+	"plague": ["nature", "plague"], "heal": ["divine", "heal"],
 }
 
-## Powers to come (docs/ROADMAP.md, 0.7 and 0.9): tab, name, icon, what they will do.
+## Disasters: powers that call the simulation's PowerDisaster with their own name.
+const DISASTERS := ["wildfire", "drought", "tornado", "earthquake", "flood", "eruption"]
+
+## Powers to come (docs/ROADMAP.md, 0.9): tab, name, icon, what they will do.
 const SOON := [
 	["terrain", "Raise the land", "raise", "Lift the ground: plains into hills, hills into mountains."],
 	["terrain", "Lower the land", "lower", "Dig the ground down, until the sea comes in."],
 	["terrain", "Water", "water", "Pour lakes and rivers, or dry them up."],
 	["terrain", "Stamps", "stamp", "Paste ready-made volcanoes, islands, craters and oases."],
 	["nature", "Seeds", "sprout", "Sow plants and trees where the brush goes."],
-	["nature", "Drought", "drought", "Dry the land: the grass dies, fires spread."],
 	["nature", "Blizzard", "blizzard", "Freeze the land under the brush."],
-	["nature", "Tornado", "tornado", "A whirlwind that throws creatures and tears buildings."],
-	["nature", "Earthquake", "quake", "Shake the ground: buildings fall, the land cracks."],
-	["nature", "Flood", "flood", "The sea rises over the low lands."],
-	["nature", "Eruption", "volcano", "Wake a volcano: lava flows down its slopes."],
-	["nature", "Plague", "plague", "A sickness that spreads from creature to creature."],
 	["divine", "Curse", "curse", "Bad luck, weakness and fear on those under the brush."],
-	["divine", "Heal", "heal", "Cure wounds and sickness."],
 	["divine", "Madness", "spiral", "Creatures under the brush turn on each other."],
 	["divine", "Resurrect", "grave", "Bring the dead back, as they were or as undead."],
 	["whispers", "Rebellion", "flag", "Push a village to break away from its kingdom."],

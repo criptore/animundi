@@ -46,14 +46,14 @@ const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 ## The dock's books: id, name, icon.
 const BOOKS := [["kingdoms", "Kingdoms", "crown"], ["villages", "Villages", "house"], ["life", "Life", "paw"],
 		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["legends", "Legends", "legend"],
-		["chronicle", "Chronicle", "scroll"]]
+		["nature", "Nature", "sprout"], ["chronicle", "Chronicle", "scroll"]]
 const LAYER_ICONS := {"Biomes": "biome", "Height": "height", "Temperature": "thermo", "Humidity": "humidity", "Rivers": "river"}
 ## Map layers to come (docs/ROADMAP.md, 0.9): name, icon.
 const LAYERS_SOON := [["Kingdoms", "crown"], ["Cultures", "book"], ["Religions", "ankh"], ["Armies", "swords"]]
 const SEASON_ICONS := ["spring", "summer", "autumn", "winter"]
 const EVENT_FILTERS := [["", "All", "scroll"], ["kings", "Kings", "crown"], ["wars", "Wars", "swords"], ["cities", "Cities", "house"],
 		["inventions", "Inventions", "bulb"], ["culture", "Gods and customs", "ankh"], ["heroes", "Heroes", "star"],
-		["legends", "Legends", "legend"], ["disasters", "Disasters", "fire"]]
+		["legends", "Legends", "legend"], ["nature", "Spirits and monsters", "sprout"], ["disasters", "Disasters", "fire"]]
 const DOCK_WIDTH := 330
 const DOCK_MAX_HEIGHT := 360.0
 
@@ -101,6 +101,7 @@ var _inventions_label: Label
 var _mind_label: Label
 var _cultures_label: Label
 var _legends_label: Label
+var _nature_label: Label
 var _age_label: Label
 var _chapters_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
@@ -390,6 +391,10 @@ func _build_dock() -> void:
 	# Legendary monsters: those that walk the world, those slain, and rumours of the sleepers.
 	_legends_label = _text("No legend walks this world yet.", UI.CREAM)
 	_pages["legends"].add_child(_legends_label)
+
+	# Nature (0.7): its spirits and their moods, disasters, sicknesses, monsters and their lairs.
+	_nature_label = _text("Nature is quiet.", UI.CREAM)
+	_pages["nature"].add_child(_nature_label)
 
 	# The chronicle: the age, the chapters the chronicler wrote, then the events as they come.
 	_age_label = UI.label("The Age of Dawn", "Heading")
@@ -820,6 +825,58 @@ func set_legends(legends: Array) -> void:
 	_legends_label.text = "\n\n".join(parts) if not parts.is_empty() else "No legend walks this world. Call one with the creatures' power, if you dare."
 
 
+## Nature (0.7, sim/Spirits.cs, Disasters.cs, Plagues.cs, Monsters.cs): the spirits of the land
+## and their moods, the disasters underway and the last ones, the sicknesses, and the monsters
+## that changed, with their lairs.
+func set_nature(nature: Dictionary) -> void:
+	var parts := PackedStringArray()
+	var spirits := PackedStringArray()
+	for s in nature.get("spirits", []):
+		var text := "%s\n%s (%+.1f) · %d tiles" % [s.full_name, s.mood_word, s.mood, s.tiles]
+		if s.worshippers > 0:
+			text += " · worshipped by %d" % s.worshippers
+		if s.wounds != "":
+			text += "\nthis year: %s" % s.wounds
+		if s.words != "" and s.act != "rest":
+			text += "\n\"%s\"" % s.words
+		if s.deeds != "":
+			text += "\n" + "\n".join(String(s.deeds).split("\n").slice(-2))
+		spirits.append(text)
+	if not spirits.is_empty():
+		parts.append("Spirits\n" + "\n\n".join(spirits))
+	var disasters := PackedStringArray()
+	for d in nature.get("disasters", []).slice(0, 6):
+		var by := "" if d.cause in ["nature", "player"] else " · sent by %s" % String(d.cause).split(",")[0]
+		if d.cause == "player":
+			by = " · by your hand"
+		disasters.append("%s %s%s\n%s · %d dead · %d buildings lost" % [String(d.kind).capitalize(), d.place, by,
+				"underway" if d.underway else "year %d" % d.year, d.killed, d.ruined])
+	if not disasters.is_empty():
+		parts.append("Disasters\n" + "\n".join(disasters))
+	var diseases := PackedStringArray()
+	for d in nature.get("diseases", []).slice(0, 5):
+		var state := "%d sick now" % d.sick if d.ended < 0 else "burned out in year %d" % d.ended
+		diseases.append("%s%s · from %s, year %d\n%s · carried by %s · %s\n%s · %d dead · %d recovered" % [String(d.name).capitalize(),
+				" (plague)" if d.plague else "", d.origin, d.year, d.text, d.carrier,
+				{"herbs": "cured by shamans' herbs", "quarantine": "held back by shut gates"}.get(d.cure, "no cure known"), state, d.dead, d.recovered])
+	if not diseases.is_empty():
+		parts.append("Sicknesses\n" + "\n\n".join(diseases))
+	var monsters := PackedStringArray()
+	for m in nature.get("strains", []):
+		var text := "%ss · %d alive · %d lairs" % [m.name, m.population, m.lairs]
+		if m.generation > 1:
+			text += " · generation %d" % m.generation
+		if m.lineage != "":
+			text += "\n" + "\n".join(String(m.lineage).split("\n").slice(-2))
+		monsters.append(text)
+	for l in nature.get("lairs", []).slice(0, 6):
+		monsters.append("%s %s · since year %d\n%s" % [String(l.name).capitalize(), l.place, l.year,
+				("%s · %d born of it" % [["new", "new", "grown", "great"][clampi(int(l.size), 0, 3)], l.born]) if l.alive else String(l.end)])
+	if not monsters.is_empty():
+		parts.append("Monsters\n" + "\n".join(monsters))
+	_nature_label.text = "\n\n".join(parts) if not parts.is_empty() else "Nature is quiet: no spirit dwells here, and nothing stirs."
+
+
 func set_cultures(cultures: Array) -> void:
 	var blocks := PackedStringArray()
 	for c in cultures.slice(0, 8):
@@ -939,6 +996,8 @@ func set_villages(villages: Array) -> void:
 				line += " · metal %d · gold %d" % [v.metal, v.gold]
 			if v.building != "":
 				line += "\nbuilding a %s" % v.building
+			if v.get("sick", 0) > 0:
+				line += "\n%d sick with %s%s" % [v.sick, v.sickness, " · gates shut" if v.quarantine else ""]
 			row[0].text = line
 			row[0].tooltip_text = "Show %s" % v.name
 			row[1] = Vector2(v.x, v.y)

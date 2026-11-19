@@ -316,7 +316,11 @@ public partial class Simulation
 	private static readonly string[] WindmillFrames = { "buildings/windmill_0", "buildings/windmill_1" };
 
 	// What a drawn item is (packed with its index into a long, sorted by feet height).
-	private const long KUnit = 0, KPlant = 1, KPlantFlame = 2, KRemains = 3, KBuilding = 4, KTileFlame = 5, KVehicle = 6;
+	private const long KUnit = 0, KPlant = 1, KPlantFlame = 2, KRemains = 3, KBuilding = 4, KTileFlame = 5, KVehicle = 6, KEffect = 7;
+	// Effects made in the atlas (scripts/render2d/sprite_atlas.gd), rebuilt every frame: lairs,
+	// whirlwinds, and the mark over the sick (`unit` is whose head it floats over, or -1).
+	private readonly List<(string id, float x, float y, float w, float h, int unit)> _fx = new();
+	private static readonly string[] TornadoFrames = { "effects/Tornado_0", "effects/Tornado_1", "effects/Tornado_2" };
 	private long[] _items = Array.Empty<long>();
 
 	/// <summary>Animation clock in real seconds: flames, walking, the bonfire and windmills move at
@@ -413,6 +417,23 @@ public partial class Simulation
 		foreach (int t in _burningTiles)
 			if (!cull || InView(t % World.Width + 0.5f, t / World.Width + 0.85f, margin))
 				Add(ref n, KTileFlame, t, t / World.Width + 0.85f);
+		// Lairs, whirlwinds and the sick (Monsters.cs, Disasters.cs, Plagues.cs).
+		_fx.Clear();
+		foreach (var lair in Lairs)
+			if (lair.Alive && (!cull || InView(lair.X + 0.5f, lair.Y + 1f, margin)))
+			{
+				float grown = 0.75f + 0.125f * lair.Size;
+				_fx.Add(($"effects/Lair_{lair.Kind}", lair.X + 0.5f, lair.Y + 0.95f, 14f * grown, 12f * grown, -1));
+			}
+		foreach (var d in Disasters)
+			if (d.Kind == "tornado" && (!cull || InView(d.X, d.Y, margin)))
+				_fx.Add((TornadoFrames[(int)(AnimTime * 10f) % 3], d.X, d.Y + 0.4f, 16f, 27f, -1));
+		if (_sickTotal > 0)
+			for (int i = 0; i < Units.Capacity; i++)
+				if (Units.Alive[i] && Units.Sick[i] > 0 && Units.Task[i] != (byte)Task.Sail && (!cull || InView(Units.X[i], Units.Y[i], margin)))
+					_fx.Add(("effects/Sick", Units.X[i], Units.Y[i] + 0.0002f, 3f, 3f, i));
+		for (int e = 0; e < _fx.Count; e++)
+			Add(ref n, KEffect, e, _fx[e].y);
 		if (_near)
 		{
 			// The plants in view, from the tiles the camera sees.
@@ -527,6 +548,22 @@ public partial class Simulation
 					WriteShadow(_unitShadowBuffer, k * 8, veh.Boat ? 0f : vsize.X, vx * Tile, vy * Tile);
 					continue;
 				}
+				case KEffect:
+				{
+					var fx = _fx[i];
+					var (_, erect, ecolor) = SpriteInfo(fx.id);
+					float ey = fx.y * Tile;
+					if (fx.unit >= 0)
+					{
+						// Over the head of the sick: lifted by the creature's own height.
+						var whose = Assets.Species[Units.Species[fx.unit]];
+						var body = (whose.IsPeople ? _peopleFrames[Units.Species[fx.unit]][Units.Role[fx.unit]] : _speciesFrames[Units.Species[fx.unit]])[Idle];
+						ey -= body.size.Y * (0.6f + 0.4f * Math.Clamp(Units.Age[fx.unit] / AdultAge(whose), 0f, 1f)) + 1f + MathF.Sin(time * 4f + fx.unit);
+					}
+					WriteSprite(_unitBuffer, k * Stride, fx.w, fx.h, fx.x * Tile, ey, erect, ecolor, fx.h);
+					WriteShadow(_unitShadowBuffer, k * 8, 0f, 0f, 0f);
+					continue;
+				}
 				case KRemains:
 				{
 					// The remains of a dead creature, lying where it fell.
@@ -569,7 +606,8 @@ public partial class Simulation
 			var (size, rect, avg) = frames[pose];
 			// The young grow from 60% to full size.
 			float grown = Math.Clamp(Units.Age[i] / AdultAge(sp), 0f, 1f);
-			size *= 0.6f + 0.4f * grown;
+			// (monsters that grew giant are drawn larger, Monsters.cs)
+			size *= (0.6f + 0.4f * grown) * (StrainOf(Units.Species[i])?.Scale ?? 1f);
 			float ox = Units.X[i] * Tile;
 			float oy = Units.Y[i] * Tile;
 			WriteSprite(_unitBuffer, k * Stride, Units.FacingLeft[i] ? -size.X : size.X, size.Y, ox, oy, rect, avg, size.Y);

@@ -5,6 +5,7 @@
 ## - "title": the title screen, as the game opens;
 ## - "setup": shows the world setup panel, as a new world opens;
 ## - "laws", "settings", "pause": the map centre with that window open;
+## - "nature": the first village with a whirlwind, a flood, an eruption, a sickness and a lair (0.7);
 ## - "inspect": as "village", with the first village's card pinned and a power chosen;
 ## - "village": starts the world with Humans, Elves and Orcs and centres on the first village;
 ## - "volcano": centres on the world's first volcano (once the terrain tools can place one);
@@ -69,6 +70,22 @@ func _process(_delta: float) -> bool:
 		elif _where == "cultures" or _where == "chronicle":
 			# A book of the dock, open (0.6: cultures, the written chronicle).
 			_main._hud._show_book(_where, false)
+		elif _where == "nature" and _main._sim.VillageCount() > 0:
+			# Nature at work around the first village (0.7): a whirlwind, a flood, an eruption,
+			# a sickness, a spiders' nest, and the Nature book open.
+			var home: Dictionary = _main._sim.VillageTable()[0]
+			var sim = _main._sim
+			point = Vector2(home.x + 0.5, home.y + 0.5) * WorldMap.TILE
+			sim.PowerDisaster("flood", home.x - 5.5, home.y + 0.5, 4.0)
+			sim.PowerDisaster("eruption", home.x + 8.5, home.y - 4.5, 3.0)
+			sim.PowerDisaster("drought", home.x + 0.5, home.y + 12.5, 2.0)
+			sim.PowerPlague(home.x + 0.5, home.y + 0.5, 3.0)
+			for n in 6:
+				sim.SpawnAt("spider", home.x - 3.5, home.y + 5.5, false)
+			sim.FoundLairAt("spider", home.x - 4, home.y + 5)
+			sim.RunSteps(30 * 6)
+			sim.PowerDisaster("tornado", home.x + 4.5, home.y + 2.5, 2.0)
+			_main._hud._show_book("nature", false)
 		elif _where == "inspect" and _main._sim.VillageCount() > 0:
 			var first: Dictionary = _main._sim.VillageTable()[0]
 			point = Vector2(first.x + 0.5, first.y + 0.5) * WorldMap.TILE

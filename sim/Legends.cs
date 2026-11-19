@@ -434,10 +434,10 @@ public partial class Simulation
 			l.Goal = "slumber";
 			return;
 		}
-		if (d > 4f)
+		// (once the raid has begun, chasing someone a few tiles away does not begin it again)
+		if (d > 4f && l.GoalUntil == 0)
 		{
 			WalkTo(l, vx, vy);
-			l.GoalUntil = 0;
 			return;
 		}
 		if (l.GoalUntil == 0)

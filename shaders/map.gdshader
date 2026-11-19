@@ -18,7 +18,8 @@ uniform bool show_patterns = true;
 // Winter: frost whitens the land towards the poles (0 = none, 1 = midwinter).
 uniform float frost = 0.0;
 // Villages: territory (RGB = owner colour, A = owner key, 0 = no one's) and ground made by people
-// (R * 255: 0 nothing, 1 road, 2 bare field, 3 young wheat, 4 growing wheat, 5 ripe wheat).
+// (R * 255: 0 nothing, 1 road, 2 bare field, 3 young wheat, 4 growing wheat, 5 ripe wheat,
+// 6 flood water, 7 parched earth).
 uniform sampler2D territory : filter_nearest;
 uniform sampler2D ground : filter_nearest;
 uniform bool show_territory = true;
@@ -151,6 +152,16 @@ void fragment() {
 			float hr = hash(vec2(cell) * 8.0 + vec2(sub) + 11.0);
 			vec3 dirt = vec3(0.62, 0.50, 0.34) * (hr > 0.9 ? 0.85 : (hr < 0.08 ? 1.12 : 1.0));
 			col = mix(col, dirt, mix(0.75, 0.95, detail));
+		} else if (g == 6) {
+			// Flood water over the land (sim/Disasters.cs): shallow, muddy, with moving glints.
+			float hw = hash(vec2(cell) * 8.0 + vec2(sub) + floor(TIME * 2.0));
+			vec3 flood = vec3(0.30, 0.56, 0.70) * (hw > 0.92 ? 1.22 : (hw < 0.1 ? 0.9 : 1.0));
+			col = mix(col, flood, mix(0.8, 0.72, detail));
+		} else if (g == 7) {
+			// Parched earth under a drought: dusty, cracked up close.
+			float hd = hash(vec2(cell) * 8.0 + vec2(sub) + 31.0);
+			vec3 dust = vec3(0.76, 0.64, 0.42) * (hd > 0.9 ? 0.8 : 1.0);
+			col = mix(col, dust, mix(0.42, 0.5, detail));
 		} else if (g >= 2) {
 			// A field: furrows of soil, wheat on every other row once sown, green then gold.
 			bool furrow = sub.y % 2 == 1;

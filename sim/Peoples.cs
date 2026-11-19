@@ -582,6 +582,8 @@ public partial class Simulation
 				["buildings"] = BuildingSummary(k), ["jobs"] = JobCounts(v), ["founded"] = v.Founded, ["mother"] = v.Mother,
 				["rank"] = RankNames[v.Rank], ["kingdom"] = v.Kingdom >= 0 ? Kingdoms[v.Kingdom].Name : "",
 				["capital"] = v.Kingdom >= 0 && Kingdoms[v.Kingdom].Capital == k, ["siege"] = v.Siege, ["loyalty"] = (int)v.Loyalty,
+				["sick"] = k < _villageSick.Length ? _villageSick[k] : 0, ["quarantine"] = _quarantined.Contains(k),
+				["sickness"] = k < _villageDisease.Length && _villageSick[k] > 0 && _villageDisease[k] >= 0 && _villageDisease[k] < Diseases.Count ? Diseases[_villageDisease[k]].Name : "",
 			});
 		}
 		return list;
@@ -641,6 +643,7 @@ public partial class Simulation
 		if (sp.IsLegend)
 			return LegendInfo(i);
 		string needs = $"hunger {(int)(Units.Hunger[i] * 100)}% · thirst {(int)(Units.Thirst[i] * 100)}%";
+		needs += SickInfo(i);
 		if (!sp.IsPeople)
 			return $"{sp.Name}, {(int)Units.Age[i]} years · {needs}";
 		string traits = "";

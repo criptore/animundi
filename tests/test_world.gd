@@ -55,6 +55,10 @@ func _initialize() -> void:
 	test_culture()
 	test_faiths()
 	test_legends()
+	test_disasters()
+	test_plagues()
+	test_spirits()
+	test_monsters()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -748,6 +752,9 @@ func test_inventions() -> void:
 	check(built or table.size() > 0, "invented buildings can be built where they are known (built: %s)" % built)
 
 	# A local model (a fake llama.cpp server here): asked in the background, its answer validated.
+	# (spirits and monsters ask the same model once a year: they keep quiet here)
+	sim.SetLaw("spirits", false)
+	sim.SetLaw("monsters", false)
 	var server := TCPServer.new()
 	if server.listen(18087, "127.0.0.1") == OK:
 		sim.SetMindEndpoint("http://127.0.0.1:18087")
@@ -768,7 +775,8 @@ func test_inventions() -> void:
 					OS.delay_msec(5)
 				var body := JSON.stringify({"content": answer})
 				peer.put_data(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s" % [body.to_utf8_buffer().size(), body]).to_utf8_buffer())
-				answered = "Invent ONE" in request
+				# (other minds, of cultures or legends, may ask the same server meanwhile)
+				answered = answered or "Invent ONE" in request
 				peer.disconnect_from_host()
 			sim.RunSteps(15)
 			OS.delay_msec(5)
@@ -798,7 +806,11 @@ func test_inventions() -> void:
 			sim.RunSteps(5)
 			OS.delay_msec(25)
 			if sim.ModelAnswers + sim.ModelFailures > asked_before:
-				break
+				# (legends, spirits and monsters ask the same model: wait for the inventor's answer)
+				var got = JSON.parse_string(sim.LastModelAnswer)
+				if got is Dictionary and got.has("kind"):
+					break
+				asked_before = sim.ModelAnswers + sim.ModelFailures
 		var record = JSON.parse_string(sim.LastModelAnswer)
 		check(record is Dictionary and record.has("kind") and record.has("effects") and not sim.LastModelError.begins_with("not valid JSON"),
 				"the built-in model answers in the background with a record of the invention language, then validated (%s)" % [
@@ -1273,9 +1285,10 @@ func test_power_bar() -> void:
 	check(up == 3 and top == 8 and bar.brush == 1 and bar.radius() > 0.5, "the brush steps through its sizes and stops at both ends")
 	var soon := []
 	bar.soon_requested.connect(func(power_name, _what): soon.append(power_name))
-	for child in bar._grids["nature"].get_children():
-		if child.has_meta("soon"):
-			child.pressed.emit()
+	for tab in bar._grids:
+		for child in bar._grids[tab].get_children():
+			if child.has_meta("soon"):
+				child.pressed.emit()
 	check(soon.size() >= 5 and bar.power == "inspect", "powers to come say so and change nothing (%s)" % [soon])
 	var laws := []
 	var laws_window: PanelContainer = load("res://scripts/ui/laws_window.gd").new()
@@ -1448,6 +1461,9 @@ func test_culture() -> void:
 
 	# A local model (a fake llama.cpp server): its custom is validated like any other, and a
 	# broken answer falls back to the procedural writer.
+	# (spirits and monsters ask the same model once a year: they keep quiet here)
+	sim.SetLaw("spirits", false)
+	sim.SetLaw("monsters", false)
 	var server := TCPServer.new()
 	if server.listen(18088, "127.0.0.1") == OK:
 		sim.SetMindEndpoint("http://127.0.0.1:18088")
@@ -1508,7 +1524,11 @@ func test_culture() -> void:
 				sim.RunSteps(5)
 				OS.delay_msec(25)
 				if sim.ModelAnswers + sim.ModelFailures > asked:
-					break
+					# (legends, spirits and monsters ask the same model: wait for the answer asked for)
+					var got = JSON.parse_string(sim.LastModelAnswer)
+					if got is Dictionary and got.has("title" if what == "chapter" else "about"):
+						break
+					asked = sim.ModelAnswers + sim.ModelFailures
 			var record = JSON.parse_string(sim.LastModelAnswer)
 			var why: String = sim.LastModelError
 			var keys: Array = ["title", "text", "age"] if what == "chapter" else ["name", "kind", "about", "text", "effects"]
@@ -1682,7 +1702,7 @@ func test_legends() -> void:
 	var village: Dictionary = sim.VillageTable()[0]
 	var spot := Vector2(-1, -1)
 	for d in [Vector2i(6, 0), Vector2i(0, 6), Vector2i(-6, 0), Vector2i(0, -6), Vector2i(4, 4), Vector2i(-4, -4), Vector2i(3, 0), Vector2i(0, 3)]:
-		var t := Vector2i(village.x, village.y) + d
+		var t: Vector2i = Vector2i(village.x, village.y) + d
 		if t.x >= 0 and t.y >= 0 and t.x < w.width and t.y < w.height and not w.is_water(w.index(t.x, t.y)):
 			spot = Vector2(t.x + 0.5, t.y + 0.5)
 			break
@@ -1718,12 +1738,15 @@ func test_legends() -> void:
 	for row in sim.KingdomTable():
 		if row.name == target:
 			k = row.index
-	var told := false
-	for n in 6:
-		if k < 0 or not sim.MythNow(k):
-			break
+	# (a kingdom the raid wiped out tells no myth: those that saw it from afar may)
+	var tellers: Array = [k] if k >= 0 else sim.KingdomTable().map(func(row): return row.index)
+	var told: bool = k < 0
+	for teller in tellers:
+		for n in 6:
+			if not sim.MythNow(teller):
+				break
 	for c in sim.CultureTable():
-		if c.index == k:
+		if c.index in tellers:
 			for m in c.myths:
 				told = told or wyrm.name in String(m.source)
 	check(told, "the kingdom a legend fell upon makes a myth of it")
@@ -1735,4 +1758,343 @@ func test_legends() -> void:
 	wyrm = legend_row(sim, "ash_wyrm")
 	check(wyrm.state == "slain" and wyrm.slain > 0 and wyrm.slayer != "", "a legend can be slain, and who slew it is told (%s)" % wyrm.slayer)
 	check(sim.PowerSpawn("ash_wyrm", spot.x, spot.y, 1) == 1, "a slain legend can be called back by the player")
+	sim.queue_free()
+
+
+## A world where nature does nothing by itself: the tests of 0.7 call each thing themselves.
+func make_quiet_sim(seed_text: String, size := 128) -> Array:
+	var made := make_sim(seed_text, size)
+	for law in ["natural_disasters", "eruptions", "plagues", "spirits", "monsters", "legends"]:
+		made[1].SetLaw(law, false)
+	made[1].SetMindEndpoint("")
+	return made
+
+
+func count_ruins(sim: Node2D) -> int:
+	var n := 0
+	for b in sim.BuildingTable():
+		if b.id == "ruin":
+			n += 1
+	return n
+
+
+func test_disasters() -> void:
+	var made := make_quiet_sim("disasters", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	check(sim.LawTable().has("eruptions") and sim.LawTable().has("plagues") and sim.LawTable().has("spirits") and sim.LawTable().has("monsters"),
+			"disasters, plagues, spirits and monsters are laws of the world")
+	sim.StartPeoples(PackedStringArray(["humans"]), 16)
+	sim.RunSteps(30 * 120)
+	var village: Dictionary = sim.VillageTable()[0]
+	var at := Vector2(village.x + 0.5, village.y + 0.5)
+	check(sim.PowerDisaster("earthquake", 2.0, 2.0, 3.0) == 0 or not w.is_water(w.index(2, 2)), "no disaster starts on the sea")
+
+	# Earthquake: buildings fall.
+	var ruins := count_ruins(sim)
+	var people: int = sim.PeopleCount()
+	var quakes := 0
+	for n in 4:
+		quakes += sim.PowerDisaster("earthquake", at.x, at.y, 5.0)
+	var quake: Dictionary = sim.DisasterTable()[0]
+	check(quakes == 4 and count_ruins(sim) > ruins and quake.kind == "earthquake" and quake.cause == "player" and not quake.underway,
+			"an earthquake brings buildings down (%d ruins, were %d; %d people, were %d)" % [count_ruins(sim), ruins, sim.PeopleCount(), people])
+	var k := -1
+	for row in sim.KingdomTable():
+		k = row.index
+	var told := false
+	for n in 6:
+		if k < 0 or not sim.MythNow(k):
+			break
+	for c in sim.CultureTable():
+		for m in c.myths:
+			told = told or "shook" in String(m.source)
+	check(told, "the kingdom that lived through a disaster makes a myth of it")
+
+	# Flood: the low land by the water goes under for a while, then the water draws back.
+	var shore := find_tile(w, -1, true)
+	sim.TakeOverlayChanges()
+	check(sim.PowerDisaster("flood", shore.x + 0.5, shore.y + 0.5, 3.0) == 1, "a flood rises from the shore")
+	var flood: Dictionary = sim.DisasterTable()[0]
+	var codes := {}
+	var changes: PackedInt32Array = sim.TakeOverlayChanges()
+	for n in range(0, changes.size(), 3):
+		codes[changes[n + 1]] = true
+	check(flood.kind == "flood" and flood.underway and flood.tiles > 0 and sim.TileFlooded(shore.x, shore.y) and codes.has(6),
+			"flooded land is under water on the map (%d tiles)" % flood.tiles)
+	sim.EndDisastersNow()
+	sim.RunSteps(30)
+	check(not sim.TileFlooded(shore.x, shore.y) and not sim.DisasterTable()[0].underway, "the water draws back")
+
+	# Drought: the grass withers and does not grow back; rain ends it.
+	var meadow := find_tile(w, Biomes.GRASSLAND)
+	if meadow.x < 0:
+		meadow = find_tile(w, Biomes.FOREST)
+	sim.SetGrass(meadow.x, meadow.y, 1.0)
+	check(sim.PowerDisaster("drought", meadow.x + 0.5, meadow.y + 0.5, 3.0) == 1 and sim.TileParched(meadow.x, meadow.y) and sim.GrassAt(meadow.x, meadow.y) < 0.5,
+			"a drought withers the grass (%.2f)" % sim.GrassAt(meadow.x, meadow.y))
+	var dry: float = sim.GrassAt(meadow.x, meadow.y)
+	sim.RunSteps(30 * 20)
+	check(sim.GrassAt(meadow.x, meadow.y) <= dry and sim.TileParched(meadow.x, meadow.y), "nothing grows while the drought lasts (%.2f, was %.2f)" % [sim.GrassAt(meadow.x, meadow.y), dry])
+	sim.PowerRain(meadow.x + 0.5, meadow.y + 0.5, 2.0)
+	sim.RunSteps(30)
+	check(not sim.TileParched(meadow.x, meadow.y), "rain ends a drought")
+
+	# Tornado: it wanders.
+	check(sim.PowerDisaster("tornado", meadow.x + 0.5, meadow.y + 0.5, 2.0) == 1, "a whirlwind comes down")
+	var before: Dictionary = sim.DisasterTable()[0]
+	sim.RunSteps(30 * 4)
+	var after: Dictionary = sim.DisasterTable()[0]
+	check(after.kind == "tornado" and after.underway and Vector2(after.x, after.y).distance_to(Vector2(before.x, before.y)) > 0.5,
+			"the whirlwind wanders over the land (%.1f tiles in 4 s)" % Vector2(after.x, after.y).distance_to(Vector2(before.x, before.y)))
+	sim.EndDisastersNow()
+	sim.RunSteps(30)
+
+	# Eruption: lava pours out, flows, then cools into volcanic rock.
+	sim.TakeBiomeChanges()
+	check(sim.PowerDisaster("eruption", meadow.x + 0.5, meadow.y + 0.5, 3.0) == 1 and sim.BiomeAt(meadow.x, meadow.y) == "Lava",
+			"an eruption opens the ground in lava")
+	var poured: int = sim.DisasterTable()[0].tiles
+	sim.RunSteps(30 * 12)
+	var flowed: int = sim.DisasterTable()[0].tiles
+	var lava_on_map := false
+	var repainted: PackedInt32Array = sim.TakeBiomeChanges()
+	for n in range(0, repainted.size(), 2):
+		lava_on_map = lava_on_map or repainted[n + 1] == Biomes.LAVA
+	check(flowed > poured and lava_on_map, "lava flows over the land around and the map shows it (%d tiles, were %d)" % [flowed, poured])
+	sim.EndDisastersNow()
+	sim.RunSteps(30)
+	sim.CoolLavaNow()
+	sim.RunSteps(30)
+	check(sim.BiomeAt(meadow.x, meadow.y) == "Volcanic rock", "lava cools into volcanic rock (%s)" % sim.BiomeAt(meadow.x, meadow.y))
+
+	# Wildfire, and nature striking on its own.
+	var woods := find_tile(w, Biomes.FOREST)
+	if woods.x >= 0:
+		sim.SetGrass(woods.x, woods.y, 0.7)
+		check(sim.PowerDisaster("wildfire", woods.x + 0.5, woods.y + 0.5, 3.0) == 1 and sim.BurningCount() > 0, "a wildfire breaks out in the woods")
+	var seen: int = sim.DisasterTable().size()
+	sim.SetLaw("natural_disasters", true)
+	sim.SetLaw("eruptions", true)
+	var kinds := {}
+	for n in 12:
+		sim.NaturalDisasterNow()
+		kinds[sim.DisasterTable()[0].kind] = true
+		sim.EndDisastersNow()
+		sim.RunSteps(10)
+	check(sim.DisasterTable().size() >= seen and kinds.size() >= 2, "nature strikes on its own, in several ways (%s)" % [kinds.keys()])
+	check(sim.LifeStats().has("Disaster") and sim.LifeStats().has("Plague"), "deaths by disaster and by plague are counted")
+	var atlas := SpriteAtlas.shared()
+	check(atlas.has("effects/Tornado_0") and atlas.has("effects/Tornado_2") and atlas.has("effects/Sick"), "the whirlwind and the mark of the sick have their sprites")
+	sim.queue_free()
+
+
+func test_plagues() -> void:
+	var made := make_quiet_sim("plagues", 128)
+	var sim: Node2D = made[1]
+	sim.StartPeoples(PackedStringArray(["humans"]), 16)
+	sim.RunSteps(30 * 30)
+	var village: Dictionary = sim.VillageTable()[0]
+	var v: int = village.index
+	var at := Vector2(village.x + 0.5, village.y + 0.5)
+
+	# A sickness passes from one to the next, kills some, and the others get over it for good.
+	var d: int = sim.StartDisease(v, "fever", "none", 0.5, 0.5, 20.0, 3)
+	var first: Dictionary = sim.DiseaseTable()[0]
+	check(d >= 0 and sim.SickCount() == 3 and first.name.begins_with("the ") and first.sick == 3 and first.ended < 0,
+			"a disease breaks out with a name of its own (%s)" % first.name)
+	var sick_unit := -1
+	for i in 4000:
+		if sim.UnitSick(i):
+			sick_unit = i
+			break
+	check(sick_unit >= 0 and first.name in sim.UnitInfo(sick_unit), "the inspector tells who is sick, and with what (%s)" % sim.UnitInfo(sick_unit))
+	sim.RunSteps(30 * 10)
+	var spreading: Dictionary = sim.DiseaseTable()[0]
+	check(spreading.caught > 3, "it passes to those who stand close (%d caught it)" % spreading.caught)
+	check(sim.VillageTable()[0].sick > 0 and sim.VillageTable()[0].sickness == first.name, "a village counts its sick")
+	sim.RunSteps(30 * 90)
+	var over: Dictionary = sim.DiseaseTable()[0]
+	check(over.dead > 0 and over.recovered > 0 and over.ended > 0 and sim.SickCount() == 0 and sim.LifeStats().Plague == over.dead,
+			"it kills some, the others get over it, and it burns out (%d dead, %d recovered of %d)" % [over.dead, over.recovered, over.caught])
+
+	# Quarantine, and the player's healing hand.
+	sim.StartPeoples(PackedStringArray(["elves"]), 16)
+	sim.RunSteps(30 * 20)
+	var other: Dictionary = sim.VillageTable().filter(func(row): return row.index != v)[0]
+	check(sim.StartDisease(other.index, "cough", "quarantine", 0.4, 0.0, 300.0, 8) >= 0, "another sickness, in another village")
+	sim.RunSteps(30 * 6)
+	check(sim.VillageQuarantined(other.index), "a village with many sick shuts its gates")
+	var healed: int = sim.PowerHeal(other.x + 0.5, other.y + 0.5, 14.0)
+	check(healed > 0 and sim.SickCount() == 0, "the player heals the sick (%d)" % healed)
+	sim.RunSteps(30 * 6)
+	check(not sim.VillageQuarantined(other.index), "the gates open again when no one is sick")
+
+	# The player's plague takes any creature of flesh; golems never sicken.
+	var spot := at + Vector2(6, 0)
+	var sheep := 0
+	for n in 5:
+		if sim.SpawnAt("sheep", spot.x, spot.y, false) >= 0:
+			sheep += 1
+	if sheep > 0:
+		var before: int = sim.DiseaseTable().size()
+		var caught: int = sim.PowerPlague(spot.x, spot.y, 1.0)
+		var plague: Dictionary = sim.DiseaseTable()[0]
+		check(caught > 0 and sim.DiseaseTable().size() == before + 1 and plague.carrier == "all" and plague.cause == "player",
+				"the player's plague takes hold of the creatures under the brush (%d caught %s)" % [caught, plague.name])
+		sim.PowerSmite(spot.x, spot.y, 2.0)
+		var golem: int = sim.SpawnAt("golem", spot.x, spot.y, false)
+		check(golem >= 0 and sim.PowerPlague(spot.x, spot.y, 0.6) == 0, "what is not of flesh never sickens")
+	# On its own.
+	sim.SetLaw("plagues", true)
+	var known: int = sim.DiseaseTable().size()
+	for n in 6:
+		sim.OutbreakNow()
+	check(sim.DiseaseTable().size() > known, "sicknesses break out on their own (%d new)" % (sim.DiseaseTable().size() - known))
+	var names := {}
+	for row in sim.DiseaseTable():
+		names[row.name] = true
+	check(names.size() == sim.DiseaseTable().size(), "every disease of a world has its own name (%s)" % [names.keys()])
+	sim.queue_free()
+
+
+func test_spirits() -> void:
+	var made := make_quiet_sim("spirits", 160)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	var spirits: Array = sim.SpiritTable()
+	var fine := spirits.size() >= 2 and spirits.size() <= 9
+	var places := {}
+	for s in spirits:
+		fine = fine and s.tiles >= 80 and s.name != "" and String(s.full_name).contains("spirit of") and s.mood > 0.0
+		fine = fine and sim.SpiritAt(s.x, s.y) == s.index
+		places[s.place] = true
+	check(fine and places.size() == spirits.size(), "each large land of a world has a spirit with a name and a place (%s)" % [spirits.map(func(s): return s.full_name)])
+
+	sim.StartPeoples(PackedStringArray(["humans", "elves"]), 16)
+	sim.RunSteps(30 * 60)
+	# A spirit with a kingdom in or near its lands.
+	var spirit := -1
+	var kingdom := ""
+	var k := -1
+	var village := {}
+	for row in sim.VillageTable():
+		for dy in range(-10, 11, 5):
+			for dx in range(-10, 11, 5):
+				if spirit < 0 and sim.SpiritAt(row.x + dx, row.y + dy) >= 0:
+					spirit = sim.SpiritAt(row.x + dx, row.y + dy)
+					kingdom = row.kingdom
+					village = row
+	for row in sim.KingdomTable():
+		if row.name == kingdom:
+			k = row.index
+	check(spirit >= 0 and k >= 0, "a village lives in or near a spirit's lands")
+	if spirit < 0 or k < 0:
+		sim.queue_free()
+		return
+
+	# The rules a spirit's mind is held to.
+	sim.SetSpiritMood(spirit, 0.8)
+	check(sim.SubmitSpiritJson(spirit, '{"act": "punish", "target": "%s", "words": "Burn."}' % kingdom) != ""
+			and sim.SubmitSpiritJson(spirit, '{"act": "dance", "target": "", "words": "Hm."}') != ""
+			and sim.SubmitSpiritJson(spirit, '{"act": "bless", "target": "Nowhere", "words": "Take this."}') != ""
+			and sim.SubmitSpiritJson(spirit, 'bless them') != "",
+			"a spirit's decision that breaks the rules is refused (a content spirit does not punish)")
+	check(sim.SubmitSpiritJson(spirit, '{"act": "bless", "target": "%s", "words": "You walked softly. Eat."}' % kingdom) == "",
+			"a content spirit blesses a kingdom near its lands")
+	var blessed: Dictionary = sim.SpiritTable()[spirit]
+	check(blessed.act == "bless" and blessed.target == kingdom and blessed.deeds != "" and blessed.mood < 0.8, "its gift is given and kept among its deeds (%s)" % blessed.deeds)
+	sim.SetSpiritMood(spirit, -0.9)
+	check(sim.SubmitSpiritJson(spirit, '{"act": "bless", "target": "%s", "words": "Eat."}' % kingdom) != "", "an angry spirit does not bless")
+
+	# What is done to its lands grieves it; wrathful, it strikes the kingdom it blames.
+	sim.SetSpiritMood(spirit, 0.0)
+	sim.GrieveSpirit(spirit, 400.0, k)
+	var disasters: int = sim.DisasterTable().size() + sim.DiseaseTable().size()
+	var beasts: int = sim.UnitCount()
+	sim.SpiritThinkNow(spirit)
+	var angry: Dictionary = sim.SpiritTable()[spirit]
+	check(angry.act == "punish" and angry.target == kingdom and angry.mind == "procedural" and angry.words != "" and "trees felled" in angry.wounds,
+			"a spirit whose trees are felled grows wrathful and punishes the kingdom that did it (%s: \"%s\")" % [angry.act, angry.words])
+	check(angry.mood > -1.0 and (sim.DisasterTable().size() + sim.DiseaseTable().size() > disasters or sim.UnitCount() > beasts or "fields" in angry.deeds or "storm" in angry.deeds),
+			"its wrath is a disaster of its kind (%s)" % angry.deeds)
+	var told := false
+	for n in 8:
+		if not sim.MythNow(k):
+			break
+	for c in sim.CultureTable():
+		if c.index == k:
+			for m in c.myths:
+				told = told or angry.name in String(m.source)
+	check(told, "the kingdom makes a myth of what the spirit did to it")
+	var events := "\n".join(sim.TakeEvents())
+	check(angry.name in events, "the chronicle tells what spirits do")
+
+	# A volcano raised by the player gets its spirit.
+	var land := Vector2(village.x + 14.5, village.y + 0.5)
+	if not w.is_water(w.index(clampi(int(land.x), 0, w.width - 1), clampi(int(land.y), 0, w.height - 1))):
+		sim.PowerBiome("Volcanic rock", land.x, land.y, 4.0)
+		sim.SpiritWatchNow()
+		check(sim.SpiritTable().any(func(s): return s.kind == "volcano"), "a volcano the player raises gets a spirit of its own")
+	sim.queue_free()
+
+
+func test_monsters() -> void:
+	var made := make_quiet_sim("monsters", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	var atlas := SpriteAtlas.shared()
+	var sprites := true
+	for rec in JSON.parse_string(FileAccess.get_file_as_string("res://data/monsters.json")).monsters:
+		sprites = sprites and atlas.has("effects/Lair_%s" % rec.lair) and rec.id in sim.SpawnableSpecies()
+	check(sprites, "every monster has a lair, and every lair its sprite")
+	var spot := find_tile(w, Biomes.GRASSLAND)
+	if spot.x < 0:
+		spot = find_tile(w, -1)
+	var at := Vector2(spot.x + 0.5, spot.y + 0.5)
+	sim.SetLaw("hunger", false)
+	for n in 8:
+		sim.SpawnAt("spider", at.x, at.y, false)
+	check(sim.StrainTable().size() == 1 and sim.StrainTable()[0].name == "Spider" and sim.StrainTable()[0].generation == 1, "monsters that live in a world are listed")
+
+	# Lairs.
+	check(sim.FoundLairAt("spider", spot.x, spot.y) and not sim.FoundLairAt("spider", spot.x + 2, spot.y), "monsters make a lair, and no second one right beside it")
+	var lair: Dictionary = sim.LairTable()[0]
+	check(lair.alive and lair.name == "spider nest" and lair.kind == "nest" and lair.size == 1.0, "a lair has a name and a place (%s %s)" % [lair.name, lair.place])
+	sim.SetLaw("monsters", true)
+	sim.PowerSmite(at.x, at.y, 12.0)
+	sim.AgeLairs(6.0)
+	sim.RunSteps(30 * 8)
+	lair = sim.LairTable()[0]
+	check(lair.born > 0 and sim.PopulationOf("spider") > 0 and lair.size > 2.0, "a lair left alone grows and brings new monsters (%d born, size %.1f)" % [lair.born, lair.size])
+
+	# Mutations.
+	for n in 8:
+		sim.SpawnAt("spider", at.x, at.y, false)
+	check(sim.SubmitMutationJson("spider", '{"mutation": "wings", "name": ""}') != "" and sim.SubmitMutationJson("spider", 'grow') != ""
+			and sim.SubmitMutationJson("spider", '{"mutation": "venom", "name": "Sheep"}') != "",
+			"a change that breaks the rules is refused")
+	sim.MutateNow("spider")
+	var strain: Dictionary = sim.StrainTable()[0]
+	check(strain.generation == 2 and strain.mutations.size() == 1 and strain.name != "Spider" and String(strain.name).ends_with("Spider") and strain.mind == "procedural"
+			and strain.lineage != "" and sim.PopulationTable().has(strain.name),
+			"a thriving species of monsters changes, and bears a new name (%s)" % strain.name)
+	var free := ""
+	for id in ["venom", "giant", "swarm", "swift", "cunning"]:
+		if free == "" and sim.SubmitMutationJson("spider", '{"mutation": "%s", "name": "Ashfang Spider"}' % id) == "":
+			free = id
+	strain = sim.StrainTable()[0]
+	check(free != "" and strain.generation == 3 and strain.name == "Ashfang Spider" and sim.SubmitMutationJson("spider", '{"mutation": "%s", "name": ""}' % free) != "",
+			"a mind may name the strain; a change is only taken once (%s)" % strain.name)
+	check("Ashfang" in "\n".join(sim.TakeEvents()), "the chronicle tells how monsters change")
+
+	# The player's wrath destroys a lair.
+	sim.PowerMeteor(at.x, at.y, 2.0)
+	lair = sim.LairTable()[0]
+	check(not lair.alive and lair.end != "", "a meteor destroys a lair (%s)" % lair.end)
+
+	# A new world gets the species as they were.
+	sim.Start(w, PackedStringArray(Biomes.NAMES))
+	sim.SpawnAt("spider", at.x, at.y, false)
+	check(sim.PopulationTable().has("Spider") and sim.StrainTable()[0].generation == 1 and sim.LairTable().is_empty(), "a new world starts with the monsters as they were")
 	sim.queue_free()
