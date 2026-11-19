@@ -17,6 +17,10 @@ const BrushCursor = preload("res://scripts/ui/brush_cursor.gd")
 const TiltView = preload("res://scripts/render_tilt/tilt_view.gd")
 const StampStore = preload("res://scripts/world/stamp_store.gd")
 const MapRenderer = preload("res://scripts/render/map_renderer.gd")
+const WorldStore = preload("res://scripts/world/world_store.gd")
+const Soundscape = preload("res://scripts/audio/soundscape.gd")
+const Achievements = preload("res://scripts/world/achievements.gd")
+const Weather = preload("res://scripts/render2d/weather.gd")
 
 ## Animals placed on a new world: one per this many tiles.
 const TILES_PER_ANIMAL := 300
@@ -55,6 +59,8 @@ var _pinned_village := -1
 var _following := false
 ## People a settled village starts with.
 const SETTLERS := 10
+## Where mods live (docs/MODS.md); the simulation reads their data (sim/AssetLibrary.cs).
+const MODS_DIR := "user://mods"
 ## The light of the mood of the world over the flat map (sim/Eras.cs).
 var _world_tint := CanvasModulate.new()
 ## Another card pinned in the inspector (0.9): kind (kingdom, species, spirit, invention) and id.
@@ -62,11 +68,36 @@ var _pinned_card := ["", null]
 ## Lines between the capitals of kingdoms at war, over the flat map's Wars layer.
 var _war_lines := Node2D.new()
 var _stats_rounds := 0
+## The world is saved in the autosave slot every ten years (settings).
+var autosave := true
+## Sound effects, the music and the ambience (1.0), all made by the game.
+var sound := Soundscape.new()
+## The creatures and villages the player follows: [{kind, id, name, alive}] (1.0).
+var _favourites: Array = []
+## Settings of 1.0: pause on great events, shake the screen, weather over it.
+var pause_on_events := false
+var shake := true
+var weather := Weather.new()
+var _shake_left := 0.0
+var _shake_strength := 0.0
+## The first click of the Wind power: where the wind comes from (or none).
+var _wind_from := Vector2(-1, -1)
+## Achievements won in any world (1.0).
+var achievements := Achievements.new()
+## The sound of each power when it is used.
+const POWER_SOUNDS := {"fire": "fire", "wildfire": "fire", "lightning": "lightning", "rain": "rain", "meteor": "boom", "nuke": "bomb",
+		"earthquake": "quake", "eruption": "quake", "raise": "land", "lower": "land", "water": "rain", "stamp": "land", "tornado": "wind",
+		"blizzard": "wind", "drought": "wind", "flood": "rain", "bless": "bless", "heal": "bless", "seeds": "bless", "miracle": "miracle",
+		"enlighten": "miracle", "inspire": "miracle", "plague": "sick", "curse": "curse", "madness": "curse", "resurrect": "curse",
+		"dark_age": "curse", "forget_culture": "curse", "forget_faith": "curse", "war": "drums", "smite": "lightning", "era": "chime"}
+var _autosaved_year := 0
 
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(Biomes.COLORS[Biomes.DEEP_WATER].darkened(0.4))
 	add_child(_map)
+	add_child(sound)
+	add_child(weather)
 	add_child(_world_tint)
 	add_child(_sim)
 	add_child(_brush)
@@ -101,6 +132,44 @@ func _ready() -> void:
 	_hud.focus_requested.connect(func(tile):
 		_look_at(tile + Vector2(0.5, 0.5), 2.0))
 	_hud.card_requested.connect(show_card)
+	_hud.saves.save_requested.connect(func(slot):
+		var error := save_world(slot)
+		_hud.notice("The world is kept." if error == "" else "The world could not be saved: %s" % error)
+		_hud.saves.refresh())
+	_hud.saves.load_requested.connect(func(slot):
+		var error := load_world(slot)
+		if error != "":
+			_hud.notice("That world could not be loaded: %s" % error, 5.0))
+	_hud._settings_window.autosave_toggled.connect(func(on): autosave = on)
+	_hud._settings_window.volume_changed.connect(func(bus, v): sound.set_volume(bus, v))
+	_hud._settings_window.pause_on_events_toggled.connect(func(on): pause_on_events = on)
+	_hud._settings_window.shake_toggled.connect(func(on): shake = on)
+	_hud._settings_window.weather_toggled.connect(func(on):
+		weather.enabled = on
+		weather.set_weather(""))
+	_hud.achievements_requested.connect(func(): _hud.achievements.show_list(achievements.list, achievements.won))
+	_hud.scenarios_requested.connect(func(): _hud.scenarios.show_list(scenarios()))
+	_hud.scenarios.scenario_chosen.connect(start_scenario)
+	_hud.inspector.action_requested.connect(_inspector_action)
+	_hud.favourites_requested.connect(func(): _hud.favourites.show_list(_favourite_rows()))
+	_hud.favourites.show_requested.connect(func(kind, id):
+		if kind == "unit":
+			_pinned_village = -1
+			_pinned_card = ["", null]
+			_pinned_unit = id
+			_look_at(_sim.UnitPosition(id), 3.0)
+		else:
+			_pinned_unit = -1
+			_pinned_card = ["", null]
+			_pinned_village = id
+			var v: Dictionary = _sim.VillageInfo(id)
+			if not v.is_empty():
+				_look_at(Vector2(v.x + 0.5, v.y + 0.5), 2.0)
+		_hud.favourites.close()
+		_refresh_inspector())
+	_hud.favourites.remove_requested.connect(func(kind, id):
+		_favourites = _favourites.filter(func(f): return not (f.kind == kind and f.id == id))
+		_hud.favourites.show_list(_favourite_rows()))
 	_hud._setup.code_copied.connect(func(code): _hud.notice("Copied this world's code: %s" % code, 5.0))
 	add_child(_war_lines)
 	_war_lines.draw.connect(_draw_war_lines)
@@ -124,10 +193,11 @@ func generate() -> void:
 	# A new world: nothing of the old one is followed, the powers know its creatures and laws.
 	_hud.inspector.close()
 	_whisper_from = -1
-	for saved in StampStore.load_all():
-		_sim.AddStamp(saved[0], saved[1], saved[2])
+	_favourites.clear()
+	load_stamps()
 	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes(), _sim.EraIds(), stamp_names())
 	_hud.laws.set_laws(_sim.LawTable())
+	_hud._settings_window.set_mods(_sim.ModTable())
 	# The world waits while the player chooses its peoples.
 	_sim.SetTimeScale(0.0)
 	_hud.show_setup()
@@ -137,6 +207,7 @@ func generate() -> void:
 func start_peoples(races: PackedStringArray, per_village: int, ai := false) -> void:
 	_sim.StartPeoples(races, per_village)
 	_sim.SetTimeScale(1.0)
+	sound.start()
 	# The model built into the game (0.5 AI minds): found next to the game or in the player's data,
 	# else downloaded once in the background. The procedural inventor invents until it is ready.
 	if ai:
@@ -289,6 +360,17 @@ func _use_power(screen_pos: Vector2) -> void:
 		return
 	_stroke_tile = tile
 	var r: float = powers.radius()
+	# Faith mode: a power costs the faith the peoples put in the player.
+	if not _sim.SpendFaith(powers.power):
+		_hud.notice("Not enough faith: %s needs %d (you have %d). Faith comes each year from those who worship or fear you." % [
+				powers.POWERS[powers.power][0], int(_sim.PowerCost(powers.power)), int(_sim.GodFaith)], 4.0)
+		return
+	sound.play(POWER_SOUNDS.get(powers.power, "click"), -4.0 if powers.drags() else 0.0)
+	match powers.power:
+		"meteor", "earthquake", "eruption", "stamp":
+			shake_screen(6.0, 0.6)
+		"nuke":
+			shake_screen(14.0, 1.2)
 	match powers.power:
 		"fire":
 			_sim.PowerFire(at.x, at.y, r)
@@ -366,6 +448,22 @@ func _use_power(screen_pos: Vector2) -> void:
 				_hud.notice("No kingdom owns this land.")
 		"trait":
 			_sim.PowerTrait(powers.arg, at.x, at.y, r)
+		"hail":
+			_sim.PowerHail(at.x, at.y, r + 1.5)
+		"wind":
+			if _wind_from.x < 0.0:
+				_wind_from = at
+				_sim.AddGodFaith(_sim.PowerCost("wind"))
+				_hud.notice("The wind gathers… now click where it blows.", 5.0)
+			else:
+				_sim.PowerWind(_wind_from.x, _wind_from.y, at.x, at.y)
+				_wind_from = Vector2(-1, -1)
+		"forget_language":
+			if not _sim.PowerForgetLanguage(at.x, at.y):
+				_hud.notice("No kingdom owns this land.")
+		"story":
+			var told: String = _sim.PowerStory(powers.arg, at.x, at.y)
+			_hud.notice(("The storyteller speaks: %s." % told) if told != "" else "This story finds no one to be told of here.", 5.0)
 		"enlighten":
 			if not _sim.PowerEnlighten(at.x, at.y):
 				_hud.notice("No kingdom owns this land.")
@@ -383,6 +481,146 @@ func _use_power(screen_pos: Vector2) -> void:
 ## The side of the square "Copy the land" keeps, from the brush.
 func copy_size() -> int:
 	return clampi(_hud.powers.brush * 4, 6, 32)
+
+
+## Saves the world in a slot of WorldStore (the land, its settings and the whole simulation).
+## Returns "" or why it failed.
+func save_world(slot: String) -> String:
+	if world == null:
+		return "no world"
+	var peoples := {}
+	for k in _sim.KingdomTable():
+		peoples[k.people] = true
+	var about := {"year": _sim.Year(), "people": _sim.PeopleCount(), "kingdoms": _sim.KingdomCount(), "era": _sim.EraName(),
+			"peoples": ", ".join(peoples.keys())}
+	return WorldStore.save(slot, world, settings, _sim.SaveState(), about)
+
+
+## Brings back the world of a slot: its land, its settings, everything that lived in it.
+## Returns "" or why it could not.
+func load_world(slot: String) -> String:
+	var data := WorldStore.read(slot)
+	if data.is_empty():
+		return "the slot is empty or unreadable"
+	settings.from_code(data.code)
+	world = data.world
+	_map.set_world(world)
+	_map.show_layer(current_layer)
+	_sim.Start(world, PackedStringArray(Biomes.NAMES))
+	var error: String = _sim.LoadState(data.sim)
+	if error != "":
+		generate()
+		return error
+	_camera.bounds = _map.pixel_size()
+	_camera.frame_all()
+	_tilt.setup(self)
+	_apply_view()
+	_hud.set_stats(world)
+	_hud.clear_events()
+	_hud.inspector.close()
+	_whisper_from = -1
+	_favourites.clear()
+	_autosaved_year = _sim.Year()
+	load_stamps()
+	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes(), _sim.EraIds(), stamp_names())
+	_hud.laws.set_laws(_sim.LawTable())
+	_hud.show_game()
+	sound.start()
+	_sim.SetTimeScale(1.0)
+	_hud.show_speed(1.0)
+	_hud.notice("Year %d: the world goes on." % _sim.Year(), 4.0)
+	return ""
+
+
+## Shakes the flat view for a moment (meteors, bombs, quakes), if the settings allow it.
+func shake_screen(strength: float, seconds: float) -> void:
+	if shake:
+		_shake_strength = maxf(_shake_strength, strength)
+		_shake_left = maxf(_shake_left, seconds)
+
+
+## The sound of a great event of the chronicle, if it has one; a great event may pause the
+## world (settings) and shake it.
+func _event_sound(cat: String, text: String) -> void:
+	var great := "drops the bomb" in text or "a sun falls" in text or "declares war" in text or "wakes" in text and cat == "legends" \
+			or "is a plague now" in text or "The first people of the world" in text or "has fallen" in text
+	if great and pause_on_events and _sim.GetTimeScale() > 0.0:
+		_sim.SetTimeScale(0.0)
+		_hud.show_speed(0.0)
+		_hud.notice("Paused: %s" % text.get_slice(": ", 1) if ": " in text else "Paused for a great event.", 5.0)
+	if "drops the bomb" in text or "a sun falls" in text:
+		shake_screen(14.0, 1.2)
+		sound.play("bomb")
+	elif cat == "wars" and ("declares war" in text or "goes to war" in text):
+		sound.play("drums", -6.0)
+	elif cat == "ages" and (" enter " in text or "rocket" in text):
+		sound.play("rocket" if "rocket" in text else "fanfare", -4.0)
+	elif cat == "disasters" and ("earth" in text or "erupt" in text or "quake" in text):
+		shake_screen(5.0, 0.8)
+		sound.play("quake", -8.0)
+	elif " era begins" in text:
+		sound.play("chime", -6.0)
+
+
+## The player's stamps and those of the mods, given to the simulation.
+func load_stamps() -> void:
+	for saved in StampStore.load_all():
+		_sim.AddStamp(saved[0], saved[1], saved[2])
+	var mods := DirAccess.open(MODS_DIR)
+	if mods != null:
+		for mod in mods.get_directories():
+			for saved in StampStore.load_all(MODS_DIR.path_join(mod).path_join("stamps")):
+				_sim.AddStamp("%s_%s" % [mod, saved[0]], saved[1], saved[2])
+
+
+## The scenarios: data/scenarios.json, then those of the mods.
+func scenarios() -> Array:
+	var out := []
+	var files := ["res://data/scenarios.json"]
+	var mods := DirAccess.open(MODS_DIR)
+	if mods != null:
+		for mod in mods.get_directories():
+			files.append(MODS_DIR.path_join(mod).path_join("scenarios.json"))
+	for path in files:
+		if not FileAccess.file_exists(path):
+			continue
+		var data = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if data is Dictionary and data.get("scenarios") is Array:
+			for s in data.scenarios:
+				if s is Dictionary and s.has("id") and s.has("peoples"):
+					out.append(s)
+	return out
+
+
+## Begins a scenario: its land, its peoples, then their age, the mood of the world, the war and
+## the laws it asks for.
+func start_scenario(id: String) -> void:
+	var found := scenarios().filter(func(s): return s.id == id)
+	if found.is_empty():
+		return
+	var s: Dictionary = found[0]
+	var land: Dictionary = s.get("settings", {})
+	settings.seed_text = String(land.get("seed", id))
+	settings.set_size(int(land.get("size", 256)))
+	settings.continents = int(land.get("continents", 3))
+	settings.water_ratio = float(land.get("water", 0.55))
+	settings.temperature_offset = float(land.get("climate", 0.0))
+	generate()
+	for law in s.get("laws", {}):
+		_sim.SetLaw(law, bool(s.laws[law]))
+	_hud.laws.set_laws(_sim.LawTable())
+	start_peoples(PackedStringArray(s.peoples), int(s.get("per_village", 12)))
+	var kingdoms: Array = _sim.KingdomTable()
+	if s.has("age"):
+		for k in kingdoms:
+			_sim.SetKingdomAge(k.index, int(s.age))
+	if s.has("era"):
+		_sim.SetEra(String(s.era))
+	if s.get("war", false) and kingdoms.size() >= 2:
+		_sim.PowerWhisper("war", kingdoms[0].index, kingdoms[1].index)
+	_hud.show_game()
+	_hud.show_speed(1.0)
+	_hud.notice("%s · %s" % [s.name, s.text], 7.0)
 
 
 ## The stamps the simulation knows, id → name.
@@ -456,6 +694,51 @@ func _inspect(screen_pos: Vector2) -> void:
 	_refresh_inspector()
 
 
+## The inspector's actions (1.0): follow as a favourite, the family, the story, the mind.
+func _inspector_action(action: String) -> void:
+	var name := ""
+	if _pinned_unit >= 0 and _sim.UnitAlive(_pinned_unit):
+		name = _sim.UnitName(_pinned_unit)
+	elif _pinned_village >= 0:
+		name = String(_sim.VillageInfo(_pinned_village).get("name", ""))
+	elif _pinned_card[0] == "kingdom":
+		name = String(_sim.KingdomInfo(_pinned_card[1]).get("name", ""))
+	match action:
+		"favourite":
+			var kind := "unit" if _pinned_unit >= 0 else ("village" if _pinned_village >= 0 else "")
+			var id: int = _pinned_unit if _pinned_unit >= 0 else _pinned_village
+			if kind == "":
+				_hud.notice("Only creatures and villages can be followed.")
+				return
+			var had := _favourites.any(func(f): return f.kind == kind and f.id == id)
+			if had:
+				_favourites = _favourites.filter(func(f): return not (f.kind == kind and f.id == id))
+			else:
+				_favourites.append({"kind": kind, "id": id, "name": name, "alive": true})
+			_hud.inspector.set_favourite(not had)
+			_hud.notice(("%s is no longer followed." if had else "%s is among your favourites.") % name)
+		"family":
+			_hud.inspector.show_extra(_sim.FamilyOf(_pinned_unit) if _pinned_unit >= 0 else "Only people have families.")
+		"story":
+			_hud.inspector.show_extra(_sim.StoryOf(name) if name != "" else "")
+		"mind":
+			_hud.inspector.show_extra(_sim.MindOf(_pinned_unit) if _pinned_unit >= 0 else "Villages have no mind of their own: their kingdom does.")
+
+
+## The favourites as the window shows them, and the news of those who are gone.
+func _favourite_rows() -> Array:
+	for f in _favourites:
+		if not f.alive:
+			continue
+		var gone: bool = not _sim.UnitAlive(f.id) if f.kind == "unit" else _sim.VillageInfo(f.id).is_empty()
+		if gone:
+			f.alive = false
+			_hud.notice("%s %s." % [f.name, "has died" if f.kind == "unit" else "is no more"], 6.0)
+			sound.play("chime", -8.0)
+	return _favourites.map(func(f): return {"kind": f.kind, "id": f.id, "name": f.name, "alive": f.alive,
+			"about": (_sim.UnitInfo(f.id) if f.kind == "unit" else "village") if f.alive else "gone"})
+
+
 ## Pins a card in the inspector: "kingdom" (index), "species" (name), "invention" (id).
 func show_card(kind: String, id: Variant) -> void:
 	_pinned_unit = -1
@@ -485,9 +768,17 @@ func _refresh_inspector() -> void:
 				_hud.inspector.show_invention(_sim.InventionInfo(_pinned_card[1]))
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if world == null:
 		return
+	# The screen shakes after a meteor, a bomb, a quake (settings).
+	if _shake_left > 0.0:
+		_shake_left -= delta
+		var k := _shake_strength * clampf(_shake_left, 0.0, 1.0)
+		_camera.offset = Vector2(randf_range(-k, k), randf_range(-k, k)) / maxf(_camera.zoom.x, 0.1)
+		if _shake_left <= 0.0:
+			_camera.offset = Vector2.ZERO
+			_shake_strength = 0.0
 	# What the simulation draws follows the flat camera; the tilt view asks for what it needs.
 	if not tilt_on:
 		_sim.SetZoom(_camera.zoom.x)
@@ -515,7 +806,7 @@ func _process(_delta: float) -> void:
 	var brushing: bool = _hud.powers.power != "inspect" and not _hud.blocking()
 	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle", "wildfire",
 			"drought", "earthquake", "flood", "eruption", "plague", "heal", "raise", "lower", "water", "seeds", "curse", "madness",
-			"resurrect", "trait"] else 0.6
+			"resurrect", "trait", "hail"] else 0.6
 	match _hud.powers.power:
 		"nuke":
 			reach = 6.0
@@ -537,6 +828,7 @@ func _process(_delta: float) -> void:
 	var tagged: PackedStringArray = _sim.TakeTaggedEvents()
 	for k in range(0, tagged.size(), 2):
 		_hud.add_event(tagged[k + 1], tagged[k])
+		_event_sound(tagged[k], tagged[k + 1])
 	_stats_frames += 1
 	if _stats_frames >= 30:
 		_stats_frames = 0
@@ -566,10 +858,25 @@ func _process(_delta: float) -> void:
 		_hud.set_cultures(_sim.CultureTable())
 		_hud.set_legends(_sim.LegendTable())
 		_hud.set_nature(_sim.NatureTable())
-		_hud.set_ages(_sim.WorldAges(), _sim.ProgressTable())
+		var world_now: Dictionary = _sim.WorldAges()
+		_hud.set_ages(world_now, _sim.ProgressTable())
+		sound.set_mood("winter" if float(world_now.winter) >= 2.0 else _sim.EraId())
+		var era: String = _sim.EraId()
+		weather.set_weather("ash" if float(world_now.winter) >= 2.0 else {"rainy": "rain", "cold": "snow", "magical": "motes"}.get(era, ""))
 		if _hud.stats.visible:
 			_hud.stats.set_history(_sim.History())
 		_stats_rounds += 1
+		_hud.set_faith(_sim.GodFaith, _sim.LawTable().get("faith_mode", false))
+		if not _favourites.is_empty():
+			_favourite_rows()
+		if _sim.KingdomCount() > 0:
+			for won in achievements.check(_sim.Facts()):
+				_hud.notice("Achievement: %s · %s" % [won.name, won.text], 6.0)
+				sound.play("achievement")
+		# The autosave, every ten years of a world with peoples.
+		if autosave and _sim.Year() % 10 == 0 and _sim.Year() != _autosaved_year and _sim.KingdomCount() > 0:
+			_autosaved_year = _sim.Year()
+			save_world(WorldStore.AUTO)
 		if _stats_rounds % 3 == 0 and current_layer != "Biomes" and not current_layer in MapRenderer.LAYERS:
 			_refresh_political()
 		_hud.set_chronicle(_sim.AgeName(), _sim.ChronicleTable())

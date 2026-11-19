@@ -512,7 +512,8 @@ public partial class Simulation
 					continue;
 				int nt = World.Index(nx, ny);
 				// (dry land burns far more easily)
-				if (TileBurn[nt] == 0f && _rng.NextDouble() < _burnChance[World.Biome[nt]] * damp * dt * (Parched[nt] > 0 ? 2.5f : 1f))
+				// (dry land burns far more easily; the wind the player called carries it)
+				if (TileBurn[nt] == 0f && _rng.NextDouble() < _burnChance[World.Biome[nt]] * damp * dt * (Parched[nt] > 0 ? 2.5f : 1f) * WindFactor(nx - x, ny - y))
 					IgniteTile(nt);
 			}
 			for (int p = _tileFirst[t]; p >= 0; p = _pNext[p])

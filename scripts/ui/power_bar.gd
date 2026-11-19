@@ -60,6 +60,10 @@ const POWERS := {
 	"forget_culture": ["Forget customs", "Click a kingdom's land: it forgets its customs, its tales and its memories.", false],
 	"forget_faith": ["Forget faith", "Click a kingdom's land: its gods are forgotten and a new faith is born.", false],
 	"trait": ["Trait", "Click or drag to make the people under the brush %s.", true],
+	"hail": ["Hail", "Click to beat the land with hail: wheat flattened, small beasts killed, fires out.", false],
+	"wind": ["Wind", "Click where the wind comes from, then where it blows: for a year fire runs with it.", false],
+	"forget_language": ["Forget a language", "Click a kingdom's land: its people wake speaking a new tongue.", false],
+	"story": ["Storyteller", "Click near the kingdoms the story is about: %s.", false],
 	"enlighten": ["Enlighten", "Click a kingdom's land: its scholars understand at once (half an age of knowledge).", false],
 	"dark_age": ["Dark age", "Click a kingdom's land: it forgets what it knew and falls back an age.", false],
 	"nuke": ["Atomic bomb", "Click to drop the bomb: all around it dies, the land blights, ash fills the sky.", false],
@@ -94,6 +98,7 @@ const PLACE := {
 	"seeds": ["nature", "sprout"], "blizzard": ["nature", "blizzard"], "curse": ["divine", "curse"], "madness": ["divine", "spiral"],
 	"resurrect": ["divine", "grave"], "rebellion": ["whispers", "flag"], "inspire": ["whispers", "bulb"],
 	"forget_culture": ["whispers", "book"], "forget_faith": ["whispers", "forget"], "trait": ["whispers", "people"],
+	"hail": ["nature", "rain"], "wind": ["nature", "tornado"], "forget_language": ["whispers", "scroll"], "story": ["whispers", "book"],
 	"enlighten": ["ages", "bulb"], "dark_age": ["ages", "forget"], "nuke": ["ages", "atom"], "era": ["ages", "hourglass"],
 }
 
@@ -107,14 +112,12 @@ const ERA_ICONS := {"calm": "sprout", "bright": "summer", "dark": "moon", "rainy
 ## Disasters: powers that call the simulation's PowerDisaster with their own name.
 const DISASTERS := ["wildfire", "drought", "tornado", "earthquake", "flood", "eruption"]
 
-## Powers to come (docs/ROADMAP.md, 1.0): tab, name, icon, what they will do.
-const SOON := [
-	["nature", "Hail and wind", "tornado", "Weather of your own: hail on the fields, winds that carry fire."],
-	["divine", "Avatar", "people", "Walk the world in a body of your own."],
-	["divine", "Faith mode", "ankh", "Let the peoples' faith in you feed your powers."],
-	["whispers", "Forget a language", "forget", "Make a people forget its tongue and speak anew."],
-	["whispers", "Storyteller", "book", "Choose the stories the world tells: a war, a hero, a plague."],
-]
+## Powers to come: none left (the list stays for mods and later versions): tab, name, icon, what.
+const SOON := []
+
+## The stories of the storyteller (sim/Storyteller.cs Stories) and their pictures.
+const STORIES := {"war": "swords", "hero": "star", "plague": "plague", "legend": "legend", "golden_age": "summer",
+		"rebellion": "flag", "discovery": "bulb", "fall": "quake"}
 
 ## The picture of each trait the Trait power gives (sim/MorePowers.cs TraitNames).
 const TRAIT_ICONS := {"brave": "swords", "lazy": "pause", "kind": "heart", "greedy": "coin", "wise": "book", "strong": "hammer"}
@@ -131,8 +134,8 @@ var brush := 2
 ## A button per power (for the powers that bring or paint, the button of their tab).
 var _buttons := {}
 ## Buttons of what a power brings or paints: power → {value: button}.
-var _arg_buttons := {"spawn": {}, "settle": {}, "biome": {}, "era": {}, "stamp": {}, "trait": {}}
-var _args := {"spawn": "", "settle": "", "biome": "", "era": "", "stamp": "", "trait": ""}
+var _arg_buttons := {"spawn": {}, "settle": {}, "biome": {}, "era": {}, "stamp": {}, "trait": {}, "story": {}}
+var _args := {"spawn": "", "settle": "", "biome": "", "era": "", "stamp": "", "trait": "", "story": ""}
 ## The stamps' names by id (the player's own are "My stamp 3").
 var _stamp_names := {}
 var _tab := "life"
@@ -276,7 +279,7 @@ func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedS
 		stamps := {}) -> void:
 	_stamp_names = stamps
 	for pair in [["spawn", species], ["settle", races], ["biome", biomes], ["era", eras], ["stamp", PackedStringArray(stamps.keys())],
-			["trait", PackedStringArray(TRAITS)]]:
+			["trait", PackedStringArray(TRAITS)], ["story", PackedStringArray(STORIES.keys())]]:
 		var id: String = pair[0]
 		var grid: HFlowContainer = _grids[PLACE[id][0]]
 		for b in _arg_buttons[id].values():
@@ -306,6 +309,9 @@ func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedS
 func _arg_name(id: String, value: String) -> String:
 	if id == "stamp":
 		return String(_stamp_names.get(value, value.capitalize()))
+	if id == "story":
+		return {"war": "A war", "hero": "A hero", "plague": "A plague", "legend": "A legend wakes", "golden_age": "A golden age",
+				"rebellion": "A rebellion", "discovery": "A discovery", "fall": "The fall of the great"}.get(value, value.capitalize())
 	return value.capitalize() + (" era" if id == "era" else "")
 
 
@@ -342,6 +348,8 @@ func _picture_of(id: String, value: String) -> Texture2D:
 		return UI.icon(STAMP_ICONS.get(value, "stamp"))
 	if id == "trait":
 		return UI.icon(TRAIT_ICONS.get(value, "people"))
+	if id == "story":
+		return UI.icon(STORIES.get(value, "book"))
 	return UI.creature(value, 38)
 
 

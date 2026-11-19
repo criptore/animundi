@@ -110,6 +110,7 @@ public partial class Simulation
 		int k = KingdomOfUnit(i);
 		if (k < 0 || !_heroes.Add(i))
 			return;
+		CountHero();
 		string from = Villages[Units.Village[i]].Name;
 		LogEvent($"{NameOf(i)} of {from} is hailed a hero of {Kingdoms[k].Name}, with {HeroKills} foes slain.", "heroes");
 		Remember(k, "hero", $"{NameOf(i)} of {from} slew {HeroKills} foes and was hailed a hero", 1.5f);

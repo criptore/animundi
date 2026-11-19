@@ -236,6 +236,8 @@ public partial class Simulation
 	{
 		_history.Clear();
 		_historyYear = 0;
+		HeroesHailed = 0;
+		TilesReshaped = 0;
 	}
 
 	/// <summary>Every second with the eras: a line of history at the turn of each year.</summary>
@@ -275,6 +277,68 @@ public partial class Simulation
 			d[HistoryColumns[c]] = col;
 		}
 		return d;
+	}
+
+	// ------------------------------------------------------------------ mods
+
+	/// <summary>The mods loaded and what each brought (or why it was refused): name → text.</summary>
+	public Godot.Collections.Dictionary ModTable()
+	{
+		var d = new Godot.Collections.Dictionary();
+		foreach (var (name, note) in Assets.ModNotes)
+			d[name] = note;
+		return d;
+	}
+
+	/// <summary>Reads the data again with the mods of `dir` (tests, the settings' "reload mods");
+	/// takes effect with the next world.</summary>
+	public void ReloadAssets(string dir)
+	{
+		AssetLibrary.ModsDir = string.IsNullOrEmpty(dir) ? "user://mods" : dir;
+		Assets = AssetLibrary.Load();
+	}
+
+	// ------------------------------------------------------------------ facts (achievements)
+
+	/// <summary>Heroes hailed since the world began, and tiles the player reshaped (achievements).</summary>
+	public int HeroesHailed { get; private set; }
+	public int TilesReshaped { get; private set; }
+
+	private void CountHero() => HeroesHailed++;
+
+	/// <summary>What the world has come to, in numbers, for the achievements (scripts/world/achievements.gd):
+	/// year, people, villages, cities, kingdoms, wars, max_age, beyond, moon, rockets, nukes, winter,
+	/// warming, legends_slain, legends_awake, plagues, worshipped, feared, hated, heroes, eras, inventions,
+	/// reshaped, spirits_wrathful.</summary>
+	public Godot.Collections.Dictionary Facts()
+	{
+		int cities = 0, maxAge = 0, worshipped = 0, feared = 0, hated = 0;
+		bool moon = false;
+		foreach (var v in Villages)
+			if (v.Alive && v.Rank >= 3)
+				cities++;
+		foreach (var k in Kingdoms)
+			if (k.Alive)
+			{
+				maxAge = Math.Max(maxAge, k.Age);
+				moon |= k.Moon;
+				worshipped += k.Culture.Stance == "worshipped" ? 1 : 0;
+				feared += k.Culture.Stance == "feared" ? 1 : 0;
+				hated += k.Culture.Stance == "hated" ? 1 : 0;
+			}
+		int plagues = 0;
+		foreach (var d in Diseases)
+			if (d.PeopleDead >= PlagueMilestones[0])
+				plagues++;
+		return new Godot.Collections.Dictionary
+		{
+			["year"] = Year(), ["people"] = PeopleCount(), ["villages"] = VillageCount(), ["cities"] = cities, ["kingdoms"] = KingdomCount(),
+			["wars"] = Wars.Count, ["max_age"] = maxAge, ["beyond"] = maxAge >= AgeCount, ["moon"] = moon, ["rockets"] = RocketsLaunched,
+			["nukes"] = NukesFallen, ["winter"] = NuclearWinter, ["warming"] = Warming, ["legends_slain"] = Legends.FindAll(l => l.State == "slain").Count,
+			["legends_awake"] = Legends.FindAll(l => l.State == "awake").Count, ["plagues"] = plagues, ["worshipped"] = worshipped, ["feared"] = feared,
+			["hated"] = hated, ["heroes"] = HeroesHailed, ["eras"] = PastEras.Count, ["inventions"] = Inventions.Count, ["reshaped"] = TilesReshaped,
+			["spirits_wrathful"] = Spirits.FindAll(s => s.Mood <= WrathBelow).Count,
+		};
 	}
 
 	/// <summary>Records a line of history now (tests).</summary>

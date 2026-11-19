@@ -415,11 +415,16 @@ public partial class Simulation
 		return best;
 	}
 
+	/// <summary>People of each job in each village, counted once while inventions spread (Spread).</summary>
+	private int[,] _jobCounts;
+
 	private float JobShare(int v, string job)
 	{
 		int j = Array.IndexOf(JobNames, job ?? "");
 		if (j < 0 || Villages[v].Population == 0)
 			return 0f;
+		if (_jobCounts != null && v < _jobCounts.GetLength(0))
+			return (float)_jobCounts[v, j] / Villages[v].Population;
 		int n = 0;
 		for (int i = 0; i < Units.Capacity; i++)
 			if (Units.Alive[i] && Units.Village[i] == v && Units.Job[i] == j)
@@ -434,6 +439,36 @@ public partial class Simulation
 	{
 		if (Inventions.Count == 0)
 			return;
+		// The jobs of every village, counted once for all the usefulness asked below.
+		_jobCounts = new int[Villages.Count, JobNames.Length];
+		for (int i = 0; i < Units.Capacity; i++)
+			if (Units.Alive[i] && Units.Village[i] >= 0 && Units.Village[i] < Villages.Count)
+				_jobCounts[Units.Village[i], Units.Job[i]]++;
+		_useful.Clear();
+		try
+		{
+			SpreadCounted();
+		}
+		finally
+		{
+			_jobCounts = null;
+			_useful.Clear();
+		}
+	}
+
+	/// <summary>How useful each invention is to each village, worked out once per spread.</summary>
+	private readonly Dictionary<long, float> _useful = new();
+
+	private float UsefulnessCached(int v, int id)
+	{
+		long key = (long)v << 32 | (uint)id;
+		if (!_useful.TryGetValue(key, out float u))
+			_useful[key] = u = Usefulness(v, Inventions[id]);
+		return u;
+	}
+
+	private void SpreadCounted()
+	{
 		var learned = new List<(int v, int id, int from)>();
 		for (int v = 0; v < Villages.Count; v++)
 		{
@@ -452,7 +487,7 @@ public partial class Simulation
 				if (chance <= 0f)
 					continue;
 				foreach (int id in other.Known)
-					if (!village.Known.Contains(id) && _rng.NextDouble() < chance * (0.3f + Usefulness(v, Inventions[id])))
+					if (!village.Known.Contains(id) && _rng.NextDouble() < chance * (0.3f + UsefulnessCached(v, id)))
 						learned.Add((v, id, w));
 			}
 		}
@@ -468,6 +503,14 @@ public partial class Simulation
 				LogEvent($"{Villages[v].Name} of {Kingdoms[Villages[v].Kingdom].Name} copies the {inv.Name} from {Villages[from].Name}.", "inventions");
 		}
 		// Forgetting what does not help (an improved version replaces its parent too).
+		var children = new Dictionary<int, List<int>>();
+		foreach (var c in Inventions)
+			if (c.Parent >= 0)
+			{
+				if (!children.TryGetValue(c.Parent, out var list))
+					children[c.Parent] = list = new List<int>();
+				list.Add(c.Id);
+			}
 		for (int v = 0; v < Villages.Count; v++)
 		{
 			var village = Villages[v];
@@ -476,8 +519,8 @@ public partial class Simulation
 			foreach (int id in new List<int>(village.Known))
 			{
 				var inv = Inventions[id];
-				bool replaced = Inventions.Exists(c => c.Parent == id && village.Known.Contains(c.Id));
-				float u = Usefulness(v, inv);
+				bool replaced = children.TryGetValue(id, out var kids) && kids.Exists(c => village.Known.Contains(c));
+				float u = UsefulnessCached(v, id);
 				if (replaced && _rng.NextDouble() < 0.5 || u < 0.2f && _rng.NextDouble() < 0.25)
 					Forget(v, id);
 			}

@@ -70,6 +70,7 @@ public partial class Simulation : Node2D
 		SetupEras(worldData.Get("seed_value").AsInt32());
 		SetupMorePowers();
 		SetupHistory();
+		SetupStoryteller();
 		ClearDrawing();
 
 		// Walking and chasing: every step, every unit.
@@ -105,6 +106,7 @@ public partial class Simulation : Node2D
 		{
 			EraStep();
 			HistoryStep();
+			FaithIncome();
 		} });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });

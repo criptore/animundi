@@ -135,7 +135,7 @@ Nothing here before the world lives on its own (see the order of work above). Sp
 - [x] Miracle (Wrath & Mercy) and Convert (Whispers) powers
 - [x] Disasters and sickness as powers (done with 0.7): wildfire, drought, tornado, earthquake, flood, eruption, plague, heal
 - [x] More powers: terrain (raise, lower, water), seeds, blizzard, curse, madness, resurrect
-- [ ] Later (1.0): hail and wind, faith mode, avatar, gestures, storyteller
+- [x] Hail and wind, faith mode, the storyteller, forgetting a language (done with 1.0, [POLISH.md](POLISH.md)); no avatar: the player stays a hand from the sky
 - [x] Inspector cards for a creature and a village: click to pin, refreshed while it lives
 - [x] Inspector cards: kingdom, species, spirit, invention (with its script and lineage), from the dock's books and the land
 - [x] Political map layers (kingdoms, cultures, religions, peoples, alliances, wars and their fronts), war lines between capitals, statistics through the years (`sim/Cards.cs`, `scripts/ui/stats_window.gd`)
@@ -146,10 +146,14 @@ Nothing here before the world lives on its own (see the order of work above). Sp
 - [x] Powers that act on minds: rain traits, stir a rebellion, inspire an invention, make a kingdom forget its customs or its faith (forgetting a language: later)
 - [x] The whole interface in one look (`scripts/ui/ui.gd`, icons by `art/ui_icons.py`): title screen, world setup, top bar, dock of books (kingdoms, villages, life, inventions, chronicle), tabbed powers bar, inspector, map layers, laws, settings and pause windows; every feature to come already has its locked button
 - [x] Share a world: a code of its settings, copied and pasted in the world setup
-- [ ] Save and load a whole world (1.0)
+- [x] Save and load a whole world (done with 1.0): six slots and an autosave
 
 ## 1.0 Polish
-- [ ] Balancing and performance
-- [ ] Sound and music
-- [ ] Achievements, scenarios, mod support
-- [ ] A playable build to distribute
+See [POLISH.md](POLISH.md).
+- [x] Saved worlds (`sim/SaveState.cs`): everything the simulation holds, in six slots and an autosave every ten years; Continue and Load on the title screen
+- [x] Balancing and performance: the spread of inventions 40 times faster over long histories (400 ms to 10 ms a year with 2,600 inventions); the pace of the ages checked over 500 years
+- [x] Sound and music (`scripts/audio/soundscape.gd`): effects, a generative music that follows the mood of the world, an ambience, all made by the game; volumes in the settings
+- [x] Achievements (23, `data/achievements.json`), scenarios (7, `data/scenarios.json`), mod support ([MODS.md](MODS.md): species, buildings, moods of the world, words of the ages, scenarios, stamps, sprites)
+- [x] The last locked features: favourites, the inspector's family, story and mind, hail and wind, faith mode, the storyteller, forgetting a language; pause on great events, screen shake, weather on screen
+- [x] A playable build to distribute ([BUILD.md](BUILD.md)): export presets for Linux, Windows and macOS, `tools/build.sh`, a release workflow on version tags
+- [ ] Later: the game in French, gestures

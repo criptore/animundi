@@ -132,6 +132,26 @@ func _process(_delta: float) -> bool:
 			if _zoom == 0.0:
 				_main._hud._open(_main._hud.stats)
 				_main._hud.stats.set_history(sim.History())
+		elif _where == "saves" and _main._sim.VillageCount() > 0:
+			# 1.0: the world saved into a slot, then the saved worlds and the achievements.
+			_main.save_world("slot_6")
+			_main._hud.saves.can_save = true
+			_main._hud._open(_main._hud.saves)
+		elif _where == "reload" and _main._sim.VillageCount() > 0:
+			# 1.0: saved, a new world made, the saved one loaded back in its place.
+			var before := "%d %d %s" % [_main._sim.Year(), _main._sim.PeopleCount(), _main._sim.KingdomTable().map(func(k): return k.name)]
+			_main.save_world("slot_5")
+			_main.settings.seed_text = "another world"
+			_main.generate()
+			var error: String = _main.load_world("slot_5")
+			var after := "%d %d %s" % [_main._sim.Year(), _main._sim.PeopleCount(), _main._sim.KingdomTable().map(func(k): return k.name)]
+			print("RELOAD error='%s' before=%s after=%s" % [error, before, after])
+			var v: Dictionary = _main._sim.VillageTable()[0]
+			point = Vector2(v.x + 0.5, v.y + 0.5) * WorldMap.TILE
+		elif _where == "achievements":
+			_main.achievements.check(_main._sim.Facts())
+			_main._hud.achievements.show_list(_main.achievements.list, _main.achievements.won)
+			_main._hud._open(_main._hud.achievements)
 		elif _where == "inspect" and _main._sim.VillageCount() > 0:
 			var first: Dictionary = _main._sim.VillageTable()[0]
 			point = Vector2(first.x + 0.5, first.y + 0.5) * WorldMap.TILE

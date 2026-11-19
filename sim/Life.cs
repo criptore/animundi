@@ -58,6 +58,7 @@ public partial class Simulation
 		["customs"] = true,       // cultures write customs and myths (Culture.cs)
 		["seasons"] = true,       // winter stops growth and frost creeps from the poles (Nature.cs)
 		["fire_spread"] = true,   // fire spreads from tile to tile (Nature.cs)
+		["faith_mode"] = false,   // the player's powers cost the faith the peoples put in them (Storyteller.cs)
 	};
 
 	/// <summary>Living units per species.</summary>
