@@ -58,6 +58,8 @@ var enabled := true
 var effects := true
 
 var _main: Node
+## The light of the mood of the world (sim/Eras.cs), over the hour's.
+var _world_tint := Vector3.ONE
 var _terrain := ShaderMaterial.new()
 var _sprites := ShaderMaterial.new()
 var _shadows := ShaderMaterial.new()
@@ -267,6 +269,15 @@ func set_time(t: float) -> String:
 	return a.name if k < 0.5 else b.name
 
 
+## The light of the mood of the world (a bright era warms it, a nuclear winter greys it).
+func set_world_tint(c: Color) -> void:
+	var t := Vector3(c.r, c.g, c.b)
+	if t.is_equal_approx(_world_tint):
+		return
+	_world_tint = t
+	_apply_look()
+
+
 ## Sends the hour's look to the shaders, toned down by the camera's distance: far away, the plain
 ## colours of the flat map (no tint, no fires, no clouds, no haze) and nothing over the image.
 func _apply_look() -> void:
@@ -279,7 +290,7 @@ func _apply_look() -> void:
 	# The haze starts beyond the place looked at, and moves out of sight as the camera rises.
 	var haze_from: float = camera.distance * 1.4 + 14.0 + (1.0 - near) * 5000.0
 	for m in [_terrain, _sprites, _shadows, _reflections]:
-		m.set_shader_parameter("ambient", plain.lerp(_look.ambient, near))
+		m.set_shader_parameter("ambient", plain.lerp(_look.ambient, near) * _world_tint)
 		m.set_shader_parameter("fog_color", haze)
 		m.set_shader_parameter("fog_range", Vector2(haze_from, haze_from + 60.0 + camera.distance * 1.5))
 		m.set_shader_parameter("light_power", _look.fires * near)

@@ -45,6 +45,10 @@ const POWERS := {
 	"peace": ["Peace", "Click the lands of two kingdoms at war to make peace.", false],
 	"alliance": ["Alliance", "Click the lands of two kingdoms to ally them.", false],
 	"convert": ["Convert", "Click a kingdom's land, then the kingdom whose faith it will take up.", false],
+	"enlighten": ["Enlighten", "Click a kingdom's land: its scholars understand at once (half an age of knowledge).", false],
+	"dark_age": ["Dark age", "Click a kingdom's land: it forgets what it knew and falls back an age.", false],
+	"nuke": ["Atomic bomb", "Click to drop the bomb: all around it dies, the land blights, ash fills the sky.", false],
+	"era": ["Era", "Click the world to bring on a %s: it lasts a few decades.", false],
 }
 
 ## The tabs: id, name, icon.
@@ -55,6 +59,7 @@ const TABS := [
 	["nature", "Nature", "sprout"],
 	["divine", "Wrath & Mercy", "bless"],
 	["whispers", "Whispers", "scroll"],
+	["ages", "Ages & Eras", "hourglass"],
 ]
 
 ## Tab and icon of each power. Powers that bring or paint something fill their whole tab with
@@ -68,7 +73,12 @@ const PLACE := {
 	"wildfire": ["nature", "summer"], "drought": ["nature", "drought"], "tornado": ["nature", "tornado"],
 	"earthquake": ["nature", "quake"], "flood": ["nature", "flood"], "eruption": ["nature", "volcano"],
 	"plague": ["nature", "plague"], "heal": ["divine", "heal"],
+	"enlighten": ["ages", "bulb"], "dark_age": ["ages", "forget"], "nuke": ["ages", "atom"], "era": ["ages", "hourglass"],
 }
+
+## The picture of each mood of the world (data/eras.json).
+const ERA_ICONS := {"calm": "sprout", "bright": "summer", "dark": "moon", "rainy": "rain", "cold": "winter",
+		"scorching": "drought", "magical": "sparkle"}
 
 ## Disasters: powers that call the simulation's PowerDisaster with their own name.
 const DISASTERS := ["wildfire", "drought", "tornado", "earthquake", "flood", "eruption"]
@@ -100,8 +110,8 @@ var brush := 2
 ## A button per power (for the powers that bring or paint, the button of their tab).
 var _buttons := {}
 ## Buttons of what a power brings or paints: power → {value: button}.
-var _arg_buttons := {"spawn": {}, "settle": {}, "biome": {}}
-var _args := {"spawn": "", "settle": "", "biome": ""}
+var _arg_buttons := {"spawn": {}, "settle": {}, "biome": {}, "era": {}}
+var _args := {"spawn": "", "settle": "", "biome": "", "era": ""}
 var _tab := "life"
 var _open := true
 var _tab_buttons := {}
@@ -237,9 +247,10 @@ func _add_soon(soon: Array) -> void:
 	_grids[soon[0]].add_child(b)
 
 
-## Fills the tabs of creatures, peoples and biomes: creatures and peoples by id, biomes by name.
-func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedStringArray) -> void:
-	for pair in [["spawn", species], ["settle", races], ["biome", biomes]]:
+## Fills the tabs of creatures, peoples and biomes: creatures and peoples by id, biomes by name;
+## and the moods of the world (data/eras.json ids) in the tab of the ages.
+func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedStringArray, eras := PackedStringArray()) -> void:
+	for pair in [["spawn", species], ["settle", races], ["biome", biomes], ["era", eras]]:
 		var id: String = pair[0]
 		var grid: HFlowContainer = _grids[PLACE[id][0]]
 		for b in _arg_buttons[id].values():
@@ -249,6 +260,8 @@ func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedS
 		var at := 0
 		for value in pair[1]:
 			var text := String(value).capitalize()
+			if id == "era":
+				text = text + " era"
 			var tex := _picture_of(id, value)
 			var b := UI.tool_button(tex, POWERS[id][1] % text.to_lower(), TOOL)
 			if tex == null:
@@ -270,6 +283,8 @@ func _picture_of(id: String, value: String) -> Texture2D:
 	if id == "biome":
 		var b := Biomes.NAMES.find(value)
 		return UI.biome_swatch(Biomes.TILES[b] if b >= 0 else value, 36)
+	if id == "era":
+		return UI.icon(ERA_ICONS.get(value, "hourglass"))
 	return UI.creature(value, 38)
 
 
@@ -298,7 +313,8 @@ func drags() -> bool:
 ## What the game says about the current power.
 func hint() -> String:
 	var text: String = POWERS[power][1]
-	return text % arg.capitalize().to_lower() if "%s" in text else text
+	var what := arg.capitalize().to_lower() + (" era" if power == "era" else "")
+	return text % what if "%s" in text else text
 
 
 ## Radius of the brush in tiles.
@@ -340,7 +356,7 @@ func _refresh() -> void:
 	for t in _tab_buttons:
 		_tab_buttons[t].set_pressed_no_signal(_open and t == _tab)
 	if _name_label != null:
-		var named := arg.capitalize() if arg != "" else String(POWERS[power][0])
+		var named := (arg.capitalize() + (" era" if power == "era" else "")) if arg != "" else String(POWERS[power][0])
 		_name_label.text = named
 		_name_label.tooltip_text = named
 		_hint_label.text = hint()

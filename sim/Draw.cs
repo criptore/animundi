@@ -285,7 +285,29 @@ public partial class Simulation
 			return BonfireFrames[(int)(time * 6f + bld.X) % 3];
 		if (bld.Type == _tWindmill)
 			return WindmillFrames[(int)(time * 3f + bld.X) % 2];
+		// Great homes of the later ages (Ages.cs): brick rows, blocks, towers, arcologies.
+		int era = HomeEra(VillageAge(bld.Village));
+		if (era >= 0 && bld.Done && (bld.Type == _tStoneHouse || bld.Type == _tBigHouse))
+			return $"effects/Home_{era}_{(bld.Type == _tBigHouse ? 1 : 0)}_{(uint)(bld.X * 31 + bld.Y * 17) % 2}";
 		return SpriteId(bld.Type, Villages[bld.Village].Species, bld.X, bld.Y);
+	}
+
+	/// <summary>The look of great homes in an age: -1 as the people builds them, then 0 brick
+	/// (Industrial), 1 blocks (Modern, Atomic), 2 glass towers (Space), 3 arcologies (Future, beyond).</summary>
+	private static int HomeEra(int age) => age switch { < 5 => -1, 5 => 0, <= 7 => 1, 8 => 2, _ => 3 };
+
+	/// <summary>The sprite of a cart or a boat of trade by its kingdom's age: carts, wagons, steam
+	/// trains, cars, hovercars; boats, sailing ships, galleons, steamships, liners, hoverships.</summary>
+	private string VehicleSprite(Vehicle veh)
+	{
+		int age = VillageAge(veh.Village);
+		if (veh.Boat)
+		{
+			int s = age switch { <= 1 => -1, <= 3 => 1, 4 => 2, 5 => 3, <= 8 => 4, _ => 5 };
+			return s < 0 ? "buildings/boat" : $"effects/Vehicle_sea_{s}";
+		}
+		int l = VehicleAge(age);
+		return l == 0 ? "buildings/cart" : $"effects/Vehicle_land_{l}";
 	}
 
 	/// <summary>The sprite of a standing building of `type` of `species` at tile (x, y): homes
@@ -295,6 +317,9 @@ public partial class Simulation
 		// Buildings invented in the game: their assembled sprite.
 		if (Assets.Buildings[type].Sprite != "")
 			return "buildings/" + Assets.Buildings[type].Sprite;
+		// Buildings of later ages (Ages.cs): drawn in the atlas (sprite_atlas.gd era_building).
+		if (Assets.Buildings[type].Age > 0)
+			return "effects/Era_" + Assets.Buildings[type].Id;
 		// Animated buildings: their first frame.
 		if (type == _tBonfire)
 			return BonfireFrames[0];
@@ -428,6 +453,24 @@ public partial class Simulation
 		foreach (var d in Disasters)
 			if (d.Kind == "tornado" && (!cull || InView(d.X, d.Y, margin)))
 				_fx.Add((TornadoFrames[(int)(AnimTime * 10f) % 3], d.X, d.Y + 0.4f, 16f, 27f, -1));
+		// Mushroom clouds and rockets (Ages.cs): they rise and fade.
+		foreach (var (kind, sx, sy, at) in _skyFx)
+		{
+			float age = (float)(Scheduler.Time - at);
+			if (cull && !InView(sx, sy, margin + 40f))
+				continue;
+			if (kind == "mushroom")
+			{
+				float grow = Math.Min(1f, 0.25f + age / 2.5f);
+				_fx.Add(($"effects/Mushroom_{Math.Min(2, (int)(age / 3f))}", sx, sy + 0.01f, 46f * grow, 58f * grow, -1));
+			}
+			else
+			{
+				// The rocket climbs faster and faster on its flame.
+				float up = age * age * 1.2f;
+				_fx.Add(($"effects/Rocket_{(int)(AnimTime * 12f) % 2}", sx, sy - up + 0.01f, 7f, 22f, -1));
+			}
+		}
 		if (_sickTotal > 0)
 			for (int i = 0; i < Units.Capacity; i++)
 				if (Units.Alive[i] && Units.Sick[i] > 0 && Units.Task[i] != (byte)Task.Sail && (!cull || InView(Units.X[i], Units.Y[i], margin)))
@@ -542,7 +585,7 @@ public partial class Simulation
 					// A cart or a boat of trade: the boat's sail in its kingdom's colour.
 					var veh = _vehicles[i];
 					var (vx, vy, left) = VehiclePos(veh);
-					var (vsize, vrect, _) = SpriteInfo(veh.Boat ? "buildings/boat" : "buildings/cart");
+					var (vsize, vrect, _) = SpriteInfo(VehicleSprite(veh));
 					var vcolor = Villages[veh.Village].Color;
 					WriteSprite(_unitBuffer, k * Stride, left ? -vsize.X : vsize.X, vsize.Y, vx * Tile, vy * Tile, vrect, vcolor, vsize.Y);
 					WriteShadow(_unitShadowBuffer, k * 8, veh.Boat ? 0f : vsize.X, vx * Tile, vy * Tile);

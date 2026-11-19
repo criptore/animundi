@@ -488,7 +488,7 @@ The AI is the game's edge, so it arrives as soon as there are peoples and settle
 | **0.5 AI minds** | local model + invention language: cultures invent **objects and buildings**, which spread, get copied and evolve |
 | **0.6 Culture** | AI-shaped cultures, religions, gods, laws, rituals, AI-written chronicle |
 | **0.7 Monsters & nature** | monster species and nature spirits with AI minds, lairs, disasters, diseases |
-| **0.8 Ages** | endless progress from Stone to Space and beyond, AI-driven evolution of objects, buildings and vehicles, consequences (pollution, nuclear war) |
+| **0.8 Ages** | endless progress from Stone to Space and beyond, AI-driven evolution of objects, buildings and vehicles, consequences (pollution, nuclear war), moods of the world (done: [AGES.md](AGES.md)) |
 | **0.9 God powers & UI** | full power set, inspector, chronicle views, save/load |
 | **1.0** | balancing, performance, audio, polish |
 

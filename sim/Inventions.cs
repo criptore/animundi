@@ -65,8 +65,13 @@ public partial class Simulation
 		["homes"] = (new[] { "building" }, 12f, false),
 		["food"] = (new[] { "technique", "building" }, 10f, false),
 		["loyalty"] = (new[] { "building", "technique" }, 15f, false),
+		// Blocks of later ages (data/ages.json, Ages.cs): carts and boats, learning, engines, clean air.
+		["speed"] = (new[] { "vehicle" }, 40f, false),
+		["knowledge"] = (new[] { "building", "technique" }, 12f, false),
+		["power"] = (new[] { "energy" }, 30f, false),
+		["clean"] = (new[] { "energy", "technique" }, 50f, false),
 	};
-	public static readonly string[] InventionKinds = { "tool", "weapon", "armour", "technique", "building" };
+	public static readonly string[] InventionKinds = { "tool", "weapon", "armour", "technique", "building", "vehicle", "energy" };
 	/// <summary>Jobs an effect can name (work_speed, yield).</summary>
 	public static readonly string[] WorkJobs = { "gatherer", "woodcutter", "hunter", "builder", "farmer", "miner", "fisher", "blacksmith" };
 	public const int InventionSprites = 32;
@@ -94,7 +99,8 @@ public partial class Simulation
 	/// <summary>Checks a draft against the language's rules: known kind and blocks, amounts within
 	/// their caps, the power of the whole within the people's budget, a cost that pays for it.
 	/// Returns null when valid, else why it is rejected.</summary>
-	public static string ValidateDraft(InventionDraft d, float budget)
+	/// `open` holds the blocks the people's age has unlocked (Ages.cs); null allows them all.
+	public static string ValidateDraft(InventionDraft d, float budget, ICollection<string> open = null)
 	{
 		if (d == null)
 			return "empty";
@@ -114,13 +120,15 @@ public partial class Simulation
 				return $"unknown effect '{e.Do}'";
 			if (Array.IndexOf(block.kinds, d.Kind) < 0)
 				return $"a {d.Kind} cannot '{e.Do}'";
+			if (open != null && !open.Contains(e.Do))
+				return $"'{e.Do}' is beyond their age";
 			if (block.job && Array.IndexOf(WorkJobs, e.Job ?? "") < 0)
 				return $"'{e.Do}' needs a job ({string.Join(", ", WorkJobs)})";
 			if (!(e.Amount > 0f) || e.Amount > block.max)
 				return $"'{e.Do}' amount must be in 0-{block.max}";
 			power += e.Amount / block.max;
 		}
-		if (d.Kind == "building" && !d.Effects.Exists(e => e.Do == "homes" || e.Do == "food" || e.Do == "defense" || e.Do == "loyalty"))
+		if (d.Kind == "building" && !d.Effects.Exists(e => e.Do == "homes" || e.Do == "food" || e.Do == "defense" || e.Do == "loyalty" || e.Do == "knowledge"))
 			return "a building needs an effect";
 		if (power > budget)
 			return $"too powerful ({power:0.00} > budget {budget:0.00})";
@@ -150,7 +158,33 @@ public partial class Simulation
 		foreach (var v in Villages)
 			if (v.Alive && v.Kingdom == k)
 				rank = Math.Max(rank, v.Rank);
-		return 1.0f + 0.5f * rank;
+		// Later ages build greater things (Ages.cs).
+		return 1.0f + 0.5f * rank + 0.3f * Math.Min(Kingdoms[k].Age, 12);
+	}
+
+	/// <summary>The blocks of the invention language kingdom k's age has unlocked.</summary>
+	private HashSet<string> OpenBlocks(int k)
+	{
+		var open = new HashSet<string>();
+		foreach (var name in EffectBlocks.Keys)
+			if (BlockOpen(name, Kingdoms[k].Age))
+				open.Add(name);
+		return open;
+	}
+
+	/// <summary>The kinds of inventions kingdom k's age allows: those with an open block.</summary>
+	private List<string> OpenKinds(int k)
+	{
+		var open = OpenBlocks(k);
+		var kinds = new List<string>();
+		foreach (var kind in InventionKinds)
+			foreach (var (name, block) in EffectBlocks)
+				if (open.Contains(name) && Array.IndexOf(block.kinds, kind) >= 0)
+				{
+					kinds.Add(kind);
+					break;
+				}
+		return kinds;
 	}
 
 	/// <summary>A mind's answer (JSON in the invention language) for kingdom k: parsed, validated
@@ -174,7 +208,7 @@ public partial class Simulation
 	{
 		if (k < 0 || k >= Kingdoms.Count || !Kingdoms[k].Alive)
 			return "no such kingdom";
-		string error = ValidateDraft(d, Budget(k));
+		string error = ValidateDraft(d, Budget(k), OpenBlocks(k));
 		if (error != null)
 		{
 			InventionsRejected++;
@@ -229,6 +263,10 @@ public partial class Simulation
 				"homes" => $"{e.Amount:0} homes",
 				"food" => $"+{e.Amount:0} food a month",
 				"loyalty" => $"+{e.Amount:0} loyalty",
+				"speed" => $"carts and boats {e.Amount:0}% faster",
+				"knowledge" => $"+{e.Amount:0} knowledge a year",
+				"power" => $"all work {e.Amount:0}% faster",
+				"clean" => $"{e.Amount:0}% less smoke",
 				_ => e.Do,
 			});
 		return string.Join(", ", parts);
@@ -259,6 +297,7 @@ public partial class Simulation
 		Array.Clear(village.JobSpeed);
 		Array.Clear(village.JobYield);
 		village.Attack = village.Defense = village.FoodBonus = village.LoyaltyBonus = 0f;
+		village.Speed = village.KnowledgeBonus = village.Power = village.Clean = 0f;
 		foreach (int id in village.Known)
 		{
 			var inv = Inventions[id];
@@ -282,6 +321,10 @@ public partial class Simulation
 		}
 		village.Attack = Math.Clamp(village.Attack, -40f, 80f);
 		village.Defense = Math.Clamp(village.Defense, -40f, 60f);
+		village.Speed = Math.Clamp(village.Speed, 0f, 100f);
+		village.KnowledgeBonus = Math.Clamp(village.KnowledgeBonus, 0f, 20f);
+		village.Power = Math.Clamp(village.Power, 0f, 60f);
+		village.Clean = Math.Clamp(village.Clean, 0f, 90f);
 	}
 
 	private static void ApplyEffects(Village village, Invention inv, float f)
@@ -297,12 +340,31 @@ public partial class Simulation
 				case "defense": village.Defense += e.Amount * f; break;
 				case "food": village.FoodBonus += e.Amount * f; break;
 				case "loyalty": village.LoyaltyBonus += e.Amount * f; break;
+				case "speed": village.Speed += e.Amount * f; break;
+				case "knowledge": village.KnowledgeBonus += e.Amount * f; break;
+				case "power": village.Power += e.Amount * f; break;
+				case "clean": village.Clean += e.Amount * f; break;
 			}
 		}
 	}
 
 	/// <summary>Work speed of a job in a village from its inventions (1 = none).</summary>
-	private float InventedSpeed(int v, int job) => v < 0 ? 1f : 1f + Villages[v].JobSpeed[job] / 100f;
+	/// The age of its kingdom (Ages.cs) and its energy inventions make every job faster.
+	private float InventedSpeed(int v, int job) => v < 0 ? 1f : (1f + Villages[v].JobSpeed[job] / 100f + Villages[v].Power / 100f) * AgeWork(v);
+
+	/// <summary>How fast a village's carts and boats go: the vehicles of its age and its
+	/// invented ones.</summary>
+	private float VehicleSpeed(int v)
+	{
+		if (v < 0 || v >= Villages.Count)
+			return 1f;
+		int a = Math.Min(VehicleAge(VillageAge(v)), 5);
+		return (1f + 0.3f * a) * (1f + Villages[v].Speed / 100f);
+	}
+
+	/// <summary>The step of vehicles an age has: 0 carts, 1 wagons, 2 trains, 3 cars, 4 maglevs and
+	/// hovercars (Draw.cs picks their sprites by it).</summary>
+	private int VehicleAge(int age) => age switch { <= 1 => 0, <= 4 => 1, 5 => 2, <= 7 => 3, _ => 4 };
 
 	/// <summary>Yield of a job in a village from its inventions (1 = none).</summary>
 	private float InventedYield(int v, int job) => v < 0 ? 1f : 1f + Villages[v].JobYield[job] / 100f;
@@ -341,6 +403,10 @@ public partial class Simulation
 				"homes" => village.Population + 3 > Homes(v) ? 1f : 0.4f,
 				"food" => village.Food < village.Population * 3f ? 1f : 0.3f,
 				"loyalty" => village.Loyalty < 20f ? 1f : 0.3f,
+				"speed" => _trade.Exists(r => r.A == v || r.B == v) ? 0.8f : 0.3f,
+				"knowledge" => 0.6f,
+				"power" => 0.7f,
+				"clean" => SmogAt(village.X, village.Y) > 10f ? 1f : 0.25f,
 				_ => 0.2f,
 			};
 			best = Math.Max(best, u);

@@ -45,6 +45,10 @@ public partial class Simulation
 		["trees_growth"] = true,  // plants grow and spread
 		["legends"] = true,       // legendary monsters wake in their lairs (data/legends.json)
 		["faiths"] = true,        // kingdoms convert to their neighbours' faiths, and faiths split in heresies
+		["ages"] = true,          // peoples gain knowledge and climb the ages, or fall back (Ages.cs)
+		["pollution"] = true,     // industry fills the air with smog and warms the world (Ages.cs)
+		["nuclear_war"] = true,   // atomic kingdoms may drop the bomb in their wars (Ages.cs)
+		["eras"] = true,          // the mood of the world changes every few decades (Eras.cs)
 	};
 
 	/// <summary>Living units per species.</summary>

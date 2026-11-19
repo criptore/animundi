@@ -46,13 +46,13 @@ const SPEEDS := [0.0, 1.0, 2.0, 5.0, 10.0, 100.0]
 ## The dock's books: id, name, icon.
 const BOOKS := [["kingdoms", "Kingdoms", "crown"], ["villages", "Villages", "house"], ["life", "Life", "paw"],
 		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["legends", "Legends", "legend"],
-		["nature", "Nature", "sprout"], ["chronicle", "Chronicle", "scroll"]]
+		["nature", "Nature", "sprout"], ["ages", "Ages", "hourglass"], ["chronicle", "Chronicle", "scroll"]]
 const LAYER_ICONS := {"Biomes": "biome", "Height": "height", "Temperature": "thermo", "Humidity": "humidity", "Rivers": "river"}
 ## Map layers to come (docs/ROADMAP.md, 0.9): name, icon.
 const LAYERS_SOON := [["Kingdoms", "crown"], ["Cultures", "book"], ["Religions", "ankh"], ["Armies", "swords"]]
 const SEASON_ICONS := ["spring", "summer", "autumn", "winter"]
 const EVENT_FILTERS := [["", "All", "scroll"], ["kings", "Kings", "crown"], ["wars", "Wars", "swords"], ["cities", "Cities", "house"],
-		["inventions", "Inventions", "bulb"], ["culture", "Gods and customs", "ankh"], ["heroes", "Heroes", "star"],
+		["inventions", "Inventions", "bulb"], ["ages", "Ages", "hourglass"], ["culture", "Gods and customs", "ankh"], ["heroes", "Heroes", "star"],
 		["legends", "Legends", "legend"], ["nature", "Spirits and monsters", "sprout"], ["disasters", "Disasters", "fire"]]
 const DOCK_WIDTH := 330
 const DOCK_MAX_HEIGHT := 360.0
@@ -102,6 +102,11 @@ var _mind_label: Label
 var _cultures_label: Label
 var _legends_label: Label
 var _nature_label: Label
+var _era_label: Label
+var _world_ages_label: Label
+var _ages_box: VBoxContainer
+## The ages book: kingdom name → [card, title, bar, about, things].
+var _age_rows := {}
 var _age_label: Label
 var _chapters_label: Label
 ## Kingdom rows by name: banner and text are updated in place.
@@ -395,6 +400,17 @@ func _build_dock() -> void:
 	# Nature (0.7): its spirits and their moods, disasters, sicknesses, monsters and their lairs.
 	_nature_label = _text("Nature is quiet.", UI.CREAM)
 	_pages["nature"].add_child(_nature_label)
+
+	# Ages (0.8): the mood of the world, the state of the air, and each people's age, its
+	# knowledge towards the next and the things it makes.
+	_era_label = UI.label("Calm Era", "Heading")
+	_pages["ages"].add_child(_era_label)
+	_world_ages_label = _text("", UI.MUTED)
+	_pages["ages"].add_child(_world_ages_label)
+	_pages["ages"].add_child(HSeparator.new())
+	_ages_box = VBoxContainer.new()
+	_ages_box.add_theme_constant_override("separation", 4)
+	_pages["ages"].add_child(_ages_box)
 
 	# The chronicle: the age, the chapters the chronicler wrote, then the events as they come.
 	_age_label = UI.label("The Age of Dawn", "Heading")
@@ -754,7 +770,7 @@ func set_kingdoms(kingdoms: Array) -> void:
 			row = [card, name_label, about, state]
 			_kingdom_rows[k.name] = row
 		row[1].text = "%s · %s" % [k.name, k.people]
-		row[2].text = "%d villages · %d people · %d soldiers" % [k.villages, k.population, k.soldiers]
+		row[2].text = "%s · %d villages · %d people · %d soldiers" % [k.get("age_name", ""), k.villages, k.population, k.soldiers]
 		if k.wars != "":
 			row[3].text = "At war with " + k.wars
 			row[3].add_theme_color_override("font_color", UI.CRIMSON.lightened(0.2))
@@ -875,6 +891,97 @@ func set_nature(nature: Dictionary) -> void:
 	if not monsters.is_empty():
 		parts.append("Monsters\n" + "\n".join(monsters))
 	_nature_label.text = "\n\n".join(parts) if not parts.is_empty() else "Nature is quiet: no spirit dwells here, and nothing stirs."
+
+
+## Ages (0.8, sim/Ages.cs, Eras.cs): the mood of the world and how long it lasts, the air and the
+## climate, then a card per people: its age and the way to the next, the things it makes, its feats.
+func set_ages(world: Dictionary, kingdoms: Array) -> void:
+	var era: Dictionary = world.get("era", {})
+	_era_label.text = "%s · %d years left" % [era.get("name", "Calm Era"), era.get("years_left", 0)] if era.get("years_left", 0) > 0 else String(era.get("name", "Calm Era"))
+	var lines := PackedStringArray()
+	if era.get("lore", "") != "":
+		lines.append("%s%s" % [era.lore, " (by your will)" if era.get("by_player", false) else ""])
+	var air := PackedStringArray()
+	if world.get("warming", 0.0) >= 0.05:
+		air.append("the world is %.1f° warmer" % world.warming)
+	if world.get("smoggy_zones", 0) > 0:
+		air.append("smog chokes %s" % _count(world.smoggy_zones, "land", "lands"))
+	if world.get("winter", 0.0) >= 2.0:
+		air.append("nuclear winter, %s more" % _count(int(world.winter), "year", "years"))
+	if world.get("nukes", 0) > 0:
+		air.append("%s fallen" % _count(world.nukes, "bomb has", "bombs have"))
+	if world.get("rockets", 0) > 0:
+		air.append("%s launched" % _count(world.rockets, "rocket", "rockets"))
+	if not air.is_empty():
+		lines.append(", ".join(air).capitalize().left(1) + ", ".join(air).substr(1) + ".")
+	if world.get("beyond", "") != "":
+		lines.append("Ages beyond the future: %s." % world.beyond)
+	var past: Array = era.get("past", [])
+	if not past.is_empty():
+		lines.append("Before: " + "; ".join(past.slice(0, 3)))
+	_world_ages_label.text = "\n".join(lines)
+
+	var seen := {}
+	kingdoms = kingdoms.duplicate()
+	kingdoms.sort_custom(func(a, b): return a.age > b.age or a.age == b.age and a.knowledge > b.knowledge)
+	for k in kingdoms.slice(0, 12):
+		seen[k.name] = true
+		var row: Array = _age_rows.get(k.name, [])
+		if row.is_empty():
+			var card := PanelContainer.new()
+			card.theme_type_variation = "Card"
+			var box := VBoxContainer.new()
+			box.add_theme_constant_override("separation", 1)
+			card.add_child(box)
+			var title := UI.label("")
+			title.clip_text = true
+			box.add_child(title)
+			var bar := ProgressBar.new()
+			bar.show_percentage = false
+			bar.custom_minimum_size = Vector2(DOCK_WIDTH - 30, 8)
+			box.add_child(bar)
+			var about := UI.label("", "Small")
+			about.clip_text = true
+			about.add_theme_color_override("font_color", UI.MUTED)
+			box.add_child(about)
+			var things := _text("", UI.CREAM)
+			box.add_child(things)
+			_ages_box.add_child(card)
+			row = [card, title, bar, about, things]
+			_age_rows[k.name] = row
+		row[1].text = "%s · %s" % [k.name, k.age_name]
+		row[1].add_theme_color_override("font_color", Color(k.color).lightened(0.35))
+		row[2].value = k.knowledge * 100.0
+		var to_next := "%d%% to the %s (+%d a year)" % [int(k.knowledge * 100.0), k.next_name, int(k.gain)]
+		if k.peak > k.age:
+			to_next += " · once in the %s" % k.peak_name
+		row[3].text = to_next
+		var d: Dictionary = k.designs
+		var text := "%s · %s · %s · %s" % [d.get("vehicle", ""), d.get("ship", ""), d.get("home", ""), d.get("weapon", "")]
+		var space := PackedStringArray()
+		if k.rockets > 0:
+			space.append(_count(k.rockets, "rocket", "rockets"))
+		if k.satellites > 0:
+			space.append(_count(k.satellites, "satellite", "satellites"))
+		if k.moon:
+			space.append("has walked on the moon")
+		if k.silo:
+			space.append("has the bomb")
+		if not space.is_empty():
+			text += "\n" + ", ".join(space)
+		if k.words != "":
+			text += "\n\"%s\"" % k.words
+		var feats := String(k.feats).split("\n", false)
+		if not feats.is_empty():
+			text += "\n" + "\n".join(feats.slice(-2))
+		row[4].text = text
+		var lineage: Dictionary = k.lineage
+		row[0].tooltip_text = "%s %s\nvehicles: %s\nships: %s\nhomes: %s\nweapons: %s" % [k.people, k.name, lineage.get("vehicle", ""),
+				lineage.get("ship", ""), lineage.get("home", ""), lineage.get("weapon", "")]
+	for name in _age_rows.keys():
+		if not seen.has(name):
+			_age_rows[name][0].queue_free()
+			_age_rows.erase(name)
 
 
 func set_cultures(cultures: Array) -> void:
@@ -1077,6 +1184,11 @@ func _show_book(id: String, from_click: bool) -> void:
 
 
 ## Text of a book's page: small, wrapped to the dock's width.
+## "1 bomb has", "3 bombs have".
+static func _count(n: int, one: String, many: String) -> String:
+	return "%d %s" % [n, one if n == 1 else many]
+
+
 func _text(text: String, colour: Color) -> Label:
 	var l := UI.label(text, "Small")
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

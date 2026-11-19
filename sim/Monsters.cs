@@ -141,7 +141,10 @@ public partial class Simulation
 				strain.ChangeAt = Math.Max(strain.ChangeAt, Scheduler.Time + YearSeconds * 3.0);
 			else if (Scheduler.Time >= strain.ChangeAt && Unused(strain).Count > 0)
 				ThinkStrain(strain, force: false);
-			if (pop >= 4 && _monsterRng.NextDouble() < 0.04 * dt)
+			// Dark and magical eras (Eras.cs) bring monsters out: their clock runs faster too.
+			if (EraMonsters() > 1f)
+				strain.ChangeAt -= dt * (EraMonsters() - 1f);
+			if (pop >= 4 && _monsterRng.NextDouble() < 0.04 * dt * EraMonsters())
 				TryFoundLair(strain);
 		}
 		foreach (var lair in Lairs)
@@ -231,7 +234,7 @@ public partial class Simulation
 				: $"the {lair.Name} {lair.Place} grows.", "nature");
 		if (Scheduler.Time >= lair.NextSpawn)
 		{
-			lair.NextSpawn = Scheduler.Time + 34.0 / lair.Size / (strain?.Spawn ?? 1f) * (0.8 + 0.4 * _monsterRng.NextDouble());
+			lair.NextSpawn = Scheduler.Time + 34.0 / lair.Size / (strain?.Spawn ?? 1f) * (0.8 + 0.4 * _monsterRng.NextDouble()) / EraMonsters();
 			if (Guards(lair) < 3 + 3 * (int)lair.Size && Population[lair.Species] < 50)
 			{
 				float x = lair.X + 0.5f + (float)_monsterRng.NextDouble() - 0.5f, y = lair.Y + 0.9f;

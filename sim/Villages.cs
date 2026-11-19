@@ -64,6 +64,9 @@ public partial class Simulation
 		public readonly float[] JobSpeed = new float[JobNames.Length];
 		public readonly float[] JobYield = new float[JobNames.Length];
 		public float Attack, Defense, FoodBonus, LoyaltyBonus;
+		/// <summary>From inventions of later ages (Ages.cs): faster carts and boats (%), knowledge a
+		/// year, work of every job (%), less smoke (%).</summary>
+		public float Speed, KnowledgeBonus, Power, Clean;
 		/// <summary>Its standing buildings by type, refreshed every two seconds (fast lookups:
 		/// the nearest store, well, mine...).</summary>
 		public readonly Dictionary<int, List<int>> ByType = new();
@@ -109,6 +112,7 @@ public partial class Simulation
 	private int _tBonfire, _tHut, _tStockpile, _tWell, _tWindmill, _tMine, _tDock, _tTownHall, _tBarracks,
 		_tTower, _tDummy, _tRuin;
 	private readonly HashSet<int> _houseTypes = new();
+	private int _tStoneHouse = -1, _tBigHouse = -1;
 	private readonly HashSet<int> _storeTypes = new();
 
 	/// <summary>Villages one people may have (kingdoms will hold them together in 0.4).</summary>
@@ -151,6 +155,8 @@ public partial class Simulation
 		_tTower = T("watch_tower");
 		_tDummy = T("dummy");
 		_tRuin = T("ruin");
+		_tStoneHouse = T("stone_house");
+		_tBigHouse = T("big_house");
 		_houseTypes.Clear();
 		foreach (var id in new[] { "hut", "house", "stone_house", "big_house" })
 			_houseTypes.Add(T(id));
@@ -463,6 +469,9 @@ public partial class Simulation
 		// An invented building is built only where its invention is known.
 		if (rec.Invention >= 0 && !Villages[v].Known.Contains(rec.Invention))
 			return false;
+		// Buildings of later ages (Ages.cs): universities, factories, silos...
+		if (rec.Age > VillageAge(v))
+			return false;
 		foreach (var req in rec.Requires)
 			if (CountOf(v, Assets.BuildingIndex(req), true) == 0)
 				return false;
@@ -754,6 +763,8 @@ public partial class Simulation
 		float rate = Season() switch { 0 => 1f / 18f, 1 => 1f / 14f, 2 => 1f / 30f, _ => 0f };
 		if (rate == 0f)
 			return;
+		// Good years and bad (Eras.cs), and the ash of a nuclear winter.
+		rate *= EraHarvest();
 		foreach (var village in Villages)
 		{
 			if (!village.Alive)
@@ -860,6 +871,8 @@ public partial class Simulation
 		var village = Villages[bld.Village];
 		if (village.Site == b)
 			village.Site = -1;
+		if (village.Alive)
+			KnowledgeLost(b);
 		if (bld.Type == _tWindmill)
 		{
 			// Its fields go back to the wild.
@@ -1069,7 +1082,7 @@ public partial class Simulation
 		if (_ground[t] == GroundRoad)
 			return 1;
 		if (_ground[t] != GroundField)
-			return Parched.Length > t && Parched[t] > 0 ? 7 : 0;
+			return Parched.Length > t && Parched[t] > 0 ? 7 : Blight.Length > t && Blight[t] > 0 ? 8 : 0;
 		float w = _wheat[t];
 		return w <= 0f ? 2 : w < 0.5f ? 3 : w < 1f ? 4 : 5;
 	}

@@ -66,6 +66,8 @@ public partial class Simulation : Node2D
 		SetupPlagues(worldData.Get("seed_value").AsInt32());
 		SetupSpirits(worldData.Get("seed_value").AsInt32());
 		SetupMonsters(worldData.Get("seed_value").AsInt32());
+		SetupAges(worldData.Get("seed_value").AsInt32());
+		SetupEras(worldData.Get("seed_value").AsInt32());
 		ClearDrawing();
 
 		// Walking and chasing: every step, every unit.
@@ -91,6 +93,8 @@ public partial class Simulation : Node2D
 		// Nature spirits think once a year each; monsters' lairs and mutations every two seconds.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spirits", Global = true, Interval = 1f, Batches = 1, Run = (_, _, dt) => SpiritStep(dt) });
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "monsters", Global = true, Interval = 2f, Batches = 1, Run = (_, _, dt) => MonsterStep(dt) });
+		// The mood of the world changes every few decades (Eras.cs); the ages turn with the kingdoms.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "eras", Global = true, Interval = 1f, Batches = 1, Run = (_, _, _) => EraStep() });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}

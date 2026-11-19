@@ -218,7 +218,7 @@ public partial class Simulation
 	{
 		foreach (var v in _vehicles)
 		{
-			v.At += dt * (v.Boat ? BoatSpeed : CartSpeed);
+			v.At += dt * (v.Boat ? BoatSpeed : CartSpeed) * VehicleSpeed(v.Village);
 			if (v.Crew != null)
 			{
 				// The crew sails with the boat (hidden aboard), and goes ashore at the end.

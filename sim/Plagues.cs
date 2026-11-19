@@ -255,7 +255,7 @@ public partial class Simulation
 	{
 		if (Scheduler.Time >= _nextPlague)
 		{
-			_nextPlague = Scheduler.Time + YearSeconds * (10.0 + 12.0 * _plagueRng.NextDouble());
+			_nextPlague = Scheduler.Time + YearSeconds * (10.0 + 12.0 * _plagueRng.NextDouble()) / EraDisaster("plague");
 			if (Law("plagues"))
 				NaturalOutbreak();
 		}

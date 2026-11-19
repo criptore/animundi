@@ -40,6 +40,22 @@ public partial class Simulation
 		public int Kings;
 		/// <summary>What its people value, their customs, gods and myths (Culture.cs).</summary>
 		public Culture Culture;
+
+		// Ages (Ages.cs): the age it is in (index in data/ages.json, and beyond), its knowledge
+		// towards the next, the highest age it ever reached, and since when.
+		public int Age, Peak, AgeSince = 1;
+		public float Knowledge, LastGain;
+		/// <summary>What its people make in this age: vehicle, ship, home, weapon; and the line
+		/// of each through the ages.</summary>
+		public readonly Dictionary<string, string> Designs = new();
+		public readonly Dictionary<string, List<string>> Lineage = new();
+		public string DesignWords = "", DesignMind = "";
+		public Question AgeAsking;
+		public readonly List<string> Feats = new();
+		public int Rockets, Satellites;
+		/// <summary>No bomb from it before then: a bomb is not dropped lightly twice.</summary>
+		public double NextBomb;
+		public bool Moon, Orbital;
 	}
 
 	public sealed class KingPlan
@@ -96,6 +112,7 @@ public partial class Simulation
 			Division = _rng.Next(6), Symbol = _rng.Next(8),
 		};
 		k.Culture = NewCulture(species);
+		StartAge(k, null);
 		Kingdoms.Add(k);
 		int id = Kingdoms.Count - 1;
 		JoinKingdom(v, id);
@@ -222,6 +239,7 @@ public partial class Simulation
 		TradeStep(dt);
 		InventionStep(dt);
 		CultureStep(dt);
+		AgesStep(dt);
 	}
 
 	private void Fall(int k)
@@ -518,6 +536,7 @@ public partial class Simulation
 		int k = CreateKingdom(village.Species, v);
 		var rebels = Kingdoms[k];
 		InheritCulture(old, k);
+		StartAge(rebels, Kingdoms[old]);
 		Remember(k, "freedom", $"{village.Name} broke free of {Kingdoms[old].Name}", 2f);
 		int joined = 0;
 		for (int o = 0; o < Villages.Count; o++)
@@ -573,7 +592,8 @@ public partial class Simulation
 				["villages"] = villages, ["population"] = people, ["soldiers"] = Strength(k), ["founded"] = kingdom.Founded,
 				["wars"] = string.Join(", ", wars), ["allies"] = string.Join(", ", allies), ["color"] = kingdom.Color,
 				["banner2"] = kingdom.Banner2, ["division"] = kingdom.Division, ["symbol"] = kingdom.Symbol,
-				["kings"] = kingdom.Kings,
+				["kings"] = kingdom.Kings, ["age"] = kingdom.Age, ["age_name"] = AgeTitle(kingdom.Age),
+				["knowledge"] = Math.Clamp(kingdom.Knowledge / AgeRec(kingdom.Age).Knowledge, 0f, 1f),
 			});
 		}
 		return list;

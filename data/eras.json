@@ -1,0 +1,19 @@
+{
+	"_about": "Moods of the world, read by sim/Eras.cs (docs/AGES.md): eras of a few decades that change weather, growth and monsters. The player can bring one on. growth: how fast plants and grass grow. cold: added to the cold of the seasons (frost on the map). fire: how easily fire spreads and lightning strikes. disasters: weights of natural disasters. monsters: how fast monsters breed, dig lairs and mutate. spirits: how quickly spirits' moods heal. knowledge: how fast peoples learn. harvest: wheat and gathering. tint: the light over the world. weight: how likely it comes on its own.",
+	"eras": [
+		{ "id": "calm", "name": "Calm Era", "weight": 3, "growth": 1.0, "cold": 0, "fire": 1.0, "monsters": 1.0, "spirits": 1.0, "knowledge": 1.0, "harvest": 1.0,
+			"disasters": {}, "tint": [1.0, 1.0, 1.0], "lore": "The seasons turn as they always have." },
+		{ "id": "bright", "name": "Bright Era", "weight": 2, "growth": 1.3, "cold": -0.15, "fire": 0.9, "monsters": 0.7, "spirits": 1.3, "knowledge": 1.2, "harvest": 1.25,
+			"disasters": { "earthquake": 0.6, "eruption": 0.6 }, "tint": [1.06, 1.03, 0.94], "lore": "Golden summers, full granaries; minds open." },
+		{ "id": "dark", "name": "Dark Era", "weight": 1.2, "growth": 0.8, "cold": 0.1, "fire": 1.0, "monsters": 2.0, "spirits": 0.6, "knowledge": 0.7, "harvest": 0.85,
+			"disasters": { "plague": 2.0 }, "tint": [0.72, 0.7, 0.86], "lore": "Long shadows; monsters breed and legends stir." },
+		{ "id": "rainy", "name": "Rainy Era", "weight": 1.5, "growth": 1.2, "cold": 0, "fire": 0.4, "monsters": 1.0, "spirits": 1.1, "knowledge": 1.0, "harvest": 1.05,
+			"disasters": { "flood": 2.5, "drought": 0.1, "wildfire": 0.2 }, "tint": [0.86, 0.92, 1.0], "lore": "Rivers swell and never quite fall back." },
+		{ "id": "cold", "name": "Cold Era", "weight": 1.3, "growth": 0.7, "cold": 0.4, "fire": 0.6, "monsters": 0.9, "spirits": 1.0, "knowledge": 0.9, "harvest": 0.75,
+			"disasters": { "drought": 0.3, "wildfire": 0.4 }, "tint": [0.86, 0.94, 1.06], "lore": "Winters creep longer; the snow stays." },
+		{ "id": "scorching", "name": "Scorching Era", "weight": 1, "growth": 0.85, "cold": -0.35, "fire": 1.8, "monsters": 1.1, "spirits": 0.9, "knowledge": 1.0, "harvest": 0.8,
+			"disasters": { "drought": 2.5, "wildfire": 2.5, "flood": 0.4 }, "tint": [1.08, 0.97, 0.84], "lore": "The sun burns white; fields crack and woods burn." },
+		{ "id": "magical", "name": "Magical Era", "weight": 0.8, "growth": 1.15, "cold": 0, "fire": 1.0, "monsters": 1.5, "spirits": 1.6, "knowledge": 1.3, "harvest": 1.1,
+			"disasters": { "eruption": 1.5 }, "tint": [1.0, 0.9, 1.08], "lore": "Strange lights in the sky; beasts change, spirits speak." }
+	]
+}

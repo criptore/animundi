@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature, 0.8 Ages
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -124,6 +124,18 @@ Nature makes history too ([docs/NATURE.md](docs/NATURE.md)). Each rule is a law 
 - **Nature spirits** (`sim/Spirits.cs`): every large forest, sea, mountain range, plain, desert, swamp or snowfield has a spirit with a name and a mood. Felling, burning, hunting, building and mining in its lands anger it; worship calms it. Its mind (the local model, or a procedural one) warns, punishes the kingdom it blames with the disasters of its kind, or blesses.
 - **Monsters that change** (`sim/Monsters.cs`): common monsters dig lairs that grow and bring more of them until warriors burn them out, and each species mutates every few years (venomous, giant, swift, swarming...), with a new name and a lineage.
 
+## 0.8 Ages
+
+![The ages at work](docs/images/ages.png)
+
+Peoples climb the **ages** ([docs/AGES.md](docs/AGES.md), `sim/Ages.cs`, `data/ages.json`): Stone, Bronze, Iron, Medieval, Renaissance, Industrial, Modern, Atomic, Space, Future, and then ages beyond that no one has seen, named by the first people to reach them.
+- **Knowledge** comes every year from the people, their temples, libraries and universities, trade, and neighbours further ahead. Each age makes soldiers stronger and work faster, opens new blocks of the invention language (vehicles, energy, clean air) and new buildings (universities, factories, power plants, missile silos, launch pads).
+- **Things evolve**: when a people enters an age, its mind names its vehicle, ship, home and weapon, each grown from the one before ("Ox Cart → Wagon → Steam Train → War Motor Car"). On the map, carts become wagons, trains, cars and hovercars; boats become galleons, steamships and liners; great homes become brick rows, blocks of flats, towers of glass and arcologies.
+- Peoples **fall back** when their capital is taken, their libraries burn or the bomb falls, and find their way again faster.
+- **The price of progress**: smog that withers the land and angers the spirits, a warming world (milder winters, more droughts and fires, melting snow), the **bomb** dropped by atomic kingdoms in their wars, and the **nuclear winter** that follows. Space kingdoms send rockets, satellites and people to the moon.
+- **Moods of the world** (`sim/Eras.cs`, `data/eras.json`): every few decades the world turns calm, bright, dark, rainy, cold, scorching or magical, which changes the weather, growth, harvests, fire, monsters, spirits, learning and the light over the map. The player can bring one on.
+- The **Ages** book, the **Ages & Eras** powers (enlighten a kingdom, plunge one into a dark age, drop the bomb, bring an era on), four new laws.
+
 ## 0.9 God powers (first part)
 
 The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.cs`, `scripts/ui/power_bar.gd`):
@@ -131,24 +143,25 @@ The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.c
 - **Nature**: fire, lightning, rain (puts fires out, the grass grows back, ends a drought), the six disasters (wildfire, drought, tornado, earthquake, flood, eruption), plague, and a **biome brush** that paints any land biome, mushroom land, cursed land, volcanic rock and lava included.
 - **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds), heal (cures the sick), miracle (heals, and the peoples who see it grow in faith and worship you).
 - **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands, or make one take up the other's faith (convert).
+- **Ages & Eras** (0.8): enlighten a kingdom, plunge one into a dark age, drop the bomb, bring an era on.
 - **Inspector**: click a creature or a village to keep its card on screen. **Laws**: switch the rules of the world on and off.
 
 ### The interface
 
 ![The title screen](docs/images/interface_title.png)
 
-The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a thick ink outline, bone-white text, crimson and gold, in the mood of Cult of the Lamb, around pixel-art icons and a tabbed bar of powers as in WorldBox. The 81 icons are drawn by `art/ui_icons.py`; creatures, peoples and biomes show their own sprites. The font is Jersey (OFL, `assets/fonts/`).
+The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a thick ink outline, bone-white text, crimson and gold, in the mood of Cult of the Lamb, around pixel-art icons and a tabbed bar of powers as in WorldBox. The 87 icons are drawn by `art/ui_icons.py`; creatures, peoples and biomes show their own sprites. The font is Jersey (OFL, `assets/fonts/`).
 
 - **Title screen**, then the **world setup** on the left of the map: the land (seed, size, continents, water, climate: the map is redrawn as you change them) and its peoples.
 - **Top bar**: menu, date and season, speed of time and "go to year", the world's numbers (people, villages, kingdoms, animals), laws, settings.
-- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), legends, nature (spirits, disasters, sicknesses, monsters and lairs), the chronicle (the age, the written chapters, the events and their filters).
+- **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), legends, nature (spirits, disasters, sicknesses, monsters and lairs), ages (the mood of the world, the air, each people's age and things), the chronicle (the age, the written chapters, the events and their filters).
 - **Powers bar**: tabs for terrain, creatures, peoples, nature, wrath and mercy, whispers; the chosen power and the brush beside them. **Inspector** card with a portrait, the village's stores and a button to follow with the camera. **Map layers** on the right.
 - **Windows**: laws of the world (grouped, one line each), settings (game, display, sound, controls), pause menu (Esc).
 - Buttons of features to come are there already, **locked**: more powers (terrain, blizzards, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
 
 ![The game](docs/images/interface_game.png)
 
-Next: 0.8 Ages (from stone to space, with their consequences). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+Next: the rest of 0.9, god powers and the interface (terrain tools, map layers, saving). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -242,6 +255,12 @@ A world with peoples over the years (villages, stores, homes, buildings, jobs, e
 godot --headless --path . --script res://tools/village_check.gd -- 10 humans,elves,orcs animundi
 ```
 
+The peoples through the ages (each kingdom's age every few decades, its things, the air, the bombs and rockets):
+
+```bash
+godot --headless --path . --script res://tools/ages_check.gd -- 500 192 humans,elves,orcs animundi 50
+```
+
 Living world over the years (populations, deaths by cause, plants):
 
 ```bash
@@ -261,7 +280,7 @@ godot --headless --path . --script res://tools/render_preview.gd -- <seed> <size
 Screenshot of the game (needs a display; on a headless machine wrap it in `xvfb-run`). `zoom` is screen pixels per world pixel, a tile being 8 world pixels; 0 shows the whole map:
 
 ```bash
-godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle] [years]
+godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle|nature|ages] [years]
 ```
 
 To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, NumPy, SciPy):

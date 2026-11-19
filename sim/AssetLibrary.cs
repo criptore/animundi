@@ -132,6 +132,56 @@ public sealed class SpiritRecord
 	[JsonPropertyName("late")] public bool Late { get; set; }
 }
 
+/// <summary>An age of a people (data/ages.json, Ages.cs).</summary>
+public sealed class AgeRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	[JsonPropertyName("name")] public string Name { get; set; }
+	/// <summary>Knowledge it takes to leave this age for the next.</summary>
+	[JsonPropertyName("knowledge")] public float Knowledge { get; set; } = 100f;
+	[JsonPropertyName("strength")] public float Strength { get; set; } = 1f;
+	[JsonPropertyName("work")] public float Work { get; set; } = 1f;
+	/// <summary>What each person gives to the air in a year.</summary>
+	[JsonPropertyName("pollution")] public float Pollution { get; set; }
+	/// <summary>Effects of the invention language this age unlocks.</summary>
+	[JsonPropertyName("blocks")] public List<string> Blocks { get; set; } = new();
+	/// <summary>vehicle, ship, home, weapon: the age's designs before a people renames them.</summary>
+	[JsonPropertyName("designs")] public Dictionary<string, string> Designs { get; set; } = new();
+	[JsonPropertyName("lore")] public string Lore { get; set; } = "";
+}
+
+/// <summary>What the ages past the future are made of (data/ages.json "beyond").</summary>
+public sealed class BeyondRecord
+{
+	[JsonPropertyName("first")] public List<string> First { get; set; } = new();
+	[JsonPropertyName("second")] public List<string> Second { get; set; } = new();
+	[JsonPropertyName("growth")] public float Growth { get; set; } = 1.33f;
+	[JsonPropertyName("vehicle")] public List<string> Vehicle { get; set; } = new();
+	[JsonPropertyName("home")] public List<string> Home { get; set; } = new();
+	[JsonPropertyName("weapon")] public List<string> Weapon { get; set; } = new();
+}
+
+/// <summary>A mood of the world (data/eras.json, Eras.cs).</summary>
+public sealed class EraRecord
+{
+	[JsonPropertyName("id")] public string Id { get; set; }
+	[JsonPropertyName("name")] public string Name { get; set; }
+	[JsonPropertyName("weight")] public float Weight { get; set; } = 1f;
+	[JsonPropertyName("growth")] public float Growth { get; set; } = 1f;
+	[JsonPropertyName("cold")] public float Cold { get; set; }
+	[JsonPropertyName("fire")] public float Fire { get; set; } = 1f;
+	[JsonPropertyName("monsters")] public float Monsters { get; set; } = 1f;
+	[JsonPropertyName("spirits")] public float Spirits { get; set; } = 1f;
+	[JsonPropertyName("knowledge")] public float Knowledge { get; set; } = 1f;
+	[JsonPropertyName("harvest")] public float Harvest { get; set; } = 1f;
+	/// <summary>Kind of disaster -> how much likelier (1 = as usual).</summary>
+	[JsonPropertyName("disasters")] public Dictionary<string, float> Disasters { get; set; } = new();
+	[JsonPropertyName("tint")] public List<float> Tint { get; set; } = new() { 1f, 1f, 1f };
+	[JsonPropertyName("lore")] public string Lore { get; set; } = "";
+
+	public float DisasterWeight(string kind) => Disasters.TryGetValue(kind, out float w) ? w : 1f;
+}
+
 /// <summary>A symptom diseases are generated from (data/diseases.json).</summary>
 public sealed class SymptomRecord
 {
@@ -201,6 +251,8 @@ public sealed class BuildingRecord
 	[JsonPropertyName("material")] public string Material { get; set; } = "wood";
 	[JsonPropertyName("upgrade")] public string Upgrade { get; set; } = "";
 	[JsonPropertyName("job")] public string Job { get; set; } = "";
+	/// <summary>The age (index in data/ages.json) its kingdom must have reached to build it (Ages.cs).</summary>
+	[JsonPropertyName("age")] public int Age { get; set; }
 	/// <summary>Sprite name for buildings invented in the game (buildings/inv_N), else "".</summary>
 	public string Sprite { get; set; } = "";
 	/// <summary>The invention this building comes from (Inventions.cs), or -1.</summary>
@@ -261,6 +313,17 @@ public sealed class AssetLibrary
 		[JsonPropertyName("mutations")] public List<MutationRecord> Mutations { get; set; } = new();
 	}
 
+	private sealed class AgesFile
+	{
+		[JsonPropertyName("ages")] public List<AgeRecord> Ages { get; set; } = new();
+		[JsonPropertyName("beyond")] public BeyondRecord Beyond { get; set; } = new();
+	}
+
+	private sealed class ErasFile
+	{
+		[JsonPropertyName("eras")] public List<EraRecord> Eras { get; set; } = new();
+	}
+
 	private sealed class BuildingsFile
 	{
 		[JsonPropertyName("buildings")] public List<BuildingRecord> Buildings { get; set; } = new();
@@ -301,6 +364,11 @@ public sealed class AssetLibrary
 	/// <summary>Common monsters and the changes they can go through (data/monsters.json).</summary>
 	public List<MonsterRecord> Monsters = new();
 	public List<MutationRecord> Mutations = new();
+	/// <summary>The ages of the peoples and the ages beyond (data/ages.json).</summary>
+	public List<AgeRecord> Ages = new();
+	public BeyondRecord Beyond = new();
+	/// <summary>Moods of the world (data/eras.json).</summary>
+	public List<EraRecord> Eras = new();
 
 	public static AssetLibrary Load(string speciesPath = "res://data/species.json",
 		string plantsPath = "res://data/plants.json", string biomesPath = "res://data/biomes.json")
@@ -343,6 +411,14 @@ public sealed class AssetLibrary
 			lib.Monsters = monsters.Monsters;
 			lib.Mutations = monsters.Mutations;
 		}
+		if (FileAccess.FileExists("res://data/ages.json"))
+		{
+			var ages = JsonSerializer.Deserialize<AgesFile>(FileAccess.GetFileAsString("res://data/ages.json"));
+			lib.Ages = ages.Ages;
+			lib.Beyond = ages.Beyond ?? new BeyondRecord();
+		}
+		if (FileAccess.FileExists("res://data/eras.json"))
+			lib.Eras = JsonSerializer.Deserialize<ErasFile>(FileAccess.GetFileAsString("res://data/eras.json")).Eras;
 		return lib;
 	}
 

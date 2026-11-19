@@ -59,6 +59,9 @@ func _initialize() -> void:
 	test_plagues()
 	test_spirits()
 	test_monsters()
+	test_ages()
+	test_eras()
+	test_progress_costs()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -338,6 +341,11 @@ func test_sprite_atlas() -> void:
 	check(known, "every plant of the flora table has a sprite")
 	var oak: Color = atlas.colors["trees/Oak"]
 	check(oak.g > oak.b and oak.a == 1.0, "every sprite has an average colour for its far-away dot (oak is green)")
+	var ages_drawn := true
+	for id in ["effects/Vehicle_land_1", "effects/Vehicle_land_4", "effects/Vehicle_sea_5", "effects/Era_factory", "effects/Era_launch_pad",
+			"effects/Home_0_0_0", "effects/Home_3_1_1", "effects/Mushroom_2", "effects/Rocket_1"]:
+		ages_drawn = ages_drawn and atlas.has(id) and atlas.sizes[id].x > 4
+	check(ages_drawn, "the vehicles, buildings and homes of the ages, the bomb and the rocket are drawn in the atlas")
 
 
 func test_sprite_batch() -> void:
@@ -752,9 +760,10 @@ func test_inventions() -> void:
 	check(built or table.size() > 0, "invented buildings can be built where they are known (built: %s)" % built)
 
 	# A local model (a fake llama.cpp server here): asked in the background, its answer validated.
-	# (spirits and monsters ask the same model once a year: they keep quiet here)
+	# (spirits, monsters and peoples entering a new age ask the same model: they keep quiet here)
 	sim.SetLaw("spirits", false)
 	sim.SetLaw("monsters", false)
+	sim.SetLaw("ages", false)
 	var server := TCPServer.new()
 	if server.listen(18087, "127.0.0.1") == OK:
 		sim.SetMindEndpoint("http://127.0.0.1:18087")
@@ -833,9 +842,10 @@ func test_inventions() -> void:
 	sim.StopMind()
 	# The JSON schema sent to model servers carries the same rules.
 	var schema: Dictionary = JSON.parse_string(sim.MindSchema())
-	var schema_ok: bool = schema.has("anyOf") and schema.anyOf.size() == 5
+	var schema_ok: bool = schema.has("anyOf") and schema.anyOf.size() == 7
 	var allowed := {"tool": ["work_speed", "yield"], "weapon": ["attack"], "armour": ["defense"],
-			"technique": ["work_speed", "yield", "food", "loyalty"], "building": ["defense", "homes", "food", "loyalty"]}
+			"technique": ["work_speed", "yield", "food", "loyalty", "knowledge", "clean"], "building": ["defense", "homes", "food", "loyalty", "knowledge"],
+			"vehicle": ["speed"], "energy": ["power", "clean"]}
 	if schema_ok:
 		for branch in schema.anyOf:
 			var kind: String = branch.properties.kind.enum[0]
@@ -1461,9 +1471,10 @@ func test_culture() -> void:
 
 	# A local model (a fake llama.cpp server): its custom is validated like any other, and a
 	# broken answer falls back to the procedural writer.
-	# (spirits and monsters ask the same model once a year: they keep quiet here)
+	# (spirits, monsters and peoples entering a new age ask the same model: they keep quiet here)
 	sim.SetLaw("spirits", false)
 	sim.SetLaw("monsters", false)
+	sim.SetLaw("ages", false)
 	var server := TCPServer.new()
 	if server.listen(18088, "127.0.0.1") == OK:
 		sim.SetMindEndpoint("http://127.0.0.1:18088")
@@ -2097,4 +2108,253 @@ func test_monsters() -> void:
 	sim.Start(w, PackedStringArray(Biomes.NAMES))
 	sim.SpawnAt("spider", at.x, at.y, false)
 	check(sim.PopulationTable().has("Spider") and sim.StrainTable()[0].generation == 1 and sim.LairTable().is_empty(), "a new world starts with the monsters as they were")
+	sim.queue_free()
+
+
+## The id (index) of the kingdom named `name` in the simulation's kingdom table, or -1.
+func kingdom_index(sim: Node2D, name: String) -> int:
+	for row in sim.KingdomTable():
+		if row.name == name:
+			return row.index
+	return -1
+
+
+func progress_row(sim: Node2D, k: int) -> Dictionary:
+	for row in sim.ProgressTable():
+		if row.index == k:
+			return row
+	return {}
+
+
+## 0.8 Ages: knowledge, the ages one by one, things that evolve, falling back, the ages beyond.
+func test_ages() -> void:
+	var made := make_quiet_sim("ages", 128)
+	var sim: Node2D = made[1]
+	check(sim.LawTable().has("ages") and sim.LawTable().has("pollution") and sim.LawTable().has("nuclear_war") and sim.LawTable().has("eras"),
+			"the ages, pollution, nuclear war and the moods of the world are laws")
+	var names: PackedStringArray = sim.AgeNames()
+	check(names.size() >= 10 and names[0] == "Stone Age" and "Industrial Age" in names and "Space Age" in names,
+			"the ages run from the Stone Age to the stars (%s)" % [", ".join(names)])
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60)
+	var kingdoms: Array = sim.KingdomTable()
+	var k: int = kingdoms[0].index
+	var row := progress_row(sim, k)
+	check(kingdoms[0].age_name == "Stone Age" and row.designs.vehicle == "Sledge" and row.designs.weapon == "Stone Spear",
+			"a people starts in the Stone Age, with its sledges and stone spears (%s)" % [row.designs])
+	var gain: float = sim.KnowledgeGainOf(k)
+	var before: float = sim.KingdomKnowledge(k)
+	sim.AgesYearNow()
+	check(gain > 0.0 and sim.KingdomKnowledge(k) > before, "a people gains knowledge every year (%.1f a year)" % gain)
+
+	# Into the Bronze Age: the things of the age change, and the change is told.
+	sim.TakeEvents()
+	sim.AddKnowledge(k, 1000.0)
+	row = progress_row(sim, k)
+	var events := "\n".join(sim.TakeEvents())
+	check(row.age >= 1 and "enter the Bronze Age" in events, "enough knowledge takes a people into the next age (%s)" % row.age_name)
+	check(row.designs.vehicle != "Sledge" and "→" in String(row.lineage.vehicle) and row.mind == "procedural" and row.words != "",
+			"its mind names the things of the new age, each grown from the old (%s)" % row.lineage.vehicle)
+	check(row.strength > 1.0, "its soldiers strike harder than in the Stone Age (x%.2f)" % row.strength)
+
+	# What a mind may write.
+	check(sim.SubmitDesigns(k, "a cart") != "" and sim.SubmitDesigns(k, '{"age": "", "vehicle": "C4rt!", "ship": "Boat", "home": "Hut", "weapon": "Axe", "words": "Hm."}') != ""
+			and sim.SubmitDesigns(k, '{"age": "", "vehicle": "Cart", "ship": "Boat", "home": "Hut", "weapon": "Axe", "words": ""}') != "",
+			"designs that break the rules are refused")
+	check(sim.SubmitDesigns(k, '{"age": "", "vehicle": "Thunder Wagon", "ship": "Reed Skiff", "home": "Clay Hall", "weapon": "Sun Blade", "words": "The wheel turns for us."}') == ""
+			and sim.KingdomDesign(k, "vehicle") == "Thunder Wagon", "a mind's designs are taken")
+	var prompt: String = sim.DesignPrompt(k)
+	check(row.age_name in prompt and "Thunder Wagon" in prompt, "the model is told the age and what the people used until now")
+
+	# Inventions of later ages: vehicles once the wheel is known, engines from the Industrial Age.
+	var other: int = kingdoms[1].index
+	var cart := '{"name": "Swift Wheel", "kind": "vehicle", "cost": {"wood": 20, "metal": 10}, "effects": [{"do": "speed", "amount": 20}], "sprite": 0}'
+	var engine := '{"name": "Fire Engine", "kind": "energy", "cost": {"wood": 20, "metal": 10}, "effects": [{"do": "power", "amount": 15}], "sprite": 0}'
+	var refused: String = sim.SubmitInventionJson(other, cart, "model")
+	check("beyond their age" in refused or "budget" in refused, "a Stone Age people cannot invent a vehicle (%s)" % refused)
+	check(sim.SubmitInventionJson(k, cart, "model") == null or sim.SubmitInventionJson(k, cart, "model") == "", "a Bronze Age people can")
+	check(sim.SubmitInventionJson(k, engine, "model") != "", "engines wait for the Industrial Age")
+
+	# Buildings of later ages.
+	var v: int = sim.VillageTable()[0].index
+	for r in sim.VillageTable():
+		if r.kingdom == kingdoms[0].name:
+			v = r.index
+	check(not sim.AgeAllows(v, "factory") and sim.AgeAllows(v, "hut"), "factories wait for the Industrial Age")
+	sim.SetKingdomAge(k, 5)
+	check(sim.KingdomAgeName(k) == "Industrial Age" and sim.AgeAllows(v, "factory") and not sim.AgeAllows(v, "silo"),
+			"an industrial people may build factories, not yet missile silos")
+	check(sim.SubmitInventionJson(k, engine, "model") == null or sim.SubmitInventionJson(k, engine, "model") == "", "an industrial people invents engines")
+	row = progress_row(sim, k)
+	check(String(row.lineage.vehicle).split("→").size() >= 5 and row.designs.vehicle != "", "its vehicles have come a long way (%s)" % row.lineage.vehicle)
+
+	# Falling back, and finding the way again.
+	sim.TakeEvents()
+	sim.SetbackNow(k, 2.0, "a great fire")
+	row = progress_row(sim, k)
+	events = "\n".join(sim.TakeEvents())
+	check(row.age == 4 and row.peak == 5 and "falls back" in events and "a great fire" in row.feats,
+			"a people that loses its knowledge falls back an age, and remembers how far it had come (%s)" % row.age_name)
+	var regained: float = sim.KnowledgeGainOf(k)
+	sim.SetKingdomAge(k, 5)
+	check(regained > 0.0 and sim.KingdomAge(k) == 5, "what was lost is found again")
+
+	# Beyond the future: ages without end, named as they are reached.
+	var count: int = sim.AgeNames().size()
+	sim.SetKingdomAge(k, count)
+	var beyond: String = sim.KingdomAgeName(k)
+	check(not (beyond in sim.AgeNames()) and beyond != "" and sim.WorldAges().beyond == beyond, "past the last age come ages no one has seen (%s)" % beyond)
+	check(sim.SubmitDesigns(k, '{"age": "Glass Dawn", "vehicle": "Thought Sled", "ship": "Star Skiff", "home": "Dream Hall", "weapon": "Hush Lance", "words": "We have gone further than any."}') == ""
+			and sim.KingdomAgeName(k) == "The Glass Dawn", "the first people to reach an age beyond may name it (%s)" % sim.KingdomAgeName(k))
+	sim.SetKingdomAge(k, count + 1)
+	check(sim.KingdomAgeName(k) != "The Glass Dawn" and sim.WorldAges().beyond.contains("The Glass Dawn"), "and the ages go on")
+
+	# The built-in model with a tiny random model: the grammar keeps its designs well-formed.
+	check("name ::=" in sim.DesignGrammarOf(k) and "\\\"vehicle\\\"" in sim.DesignGrammarOf(k), "the designs have a grammar for the built-in model")
+	sim.StartMind(ProjectSettings.globalize_path("res://tests/data/tiny_random.gguf"), "", false)
+	for wait in 400:
+		if sim.MindStatus().status in ["ready", "failed", "missing"]:
+			break
+		OS.delay_msec(25)
+	if sim.MindStatus().status == "ready":
+		var asked: int = sim.ModelAnswers + sim.ModelFailures
+		sim.AskDesigns(k)
+		var got = null
+		for wait in 1200:
+			sim.RunSteps(5)
+			OS.delay_msec(25)
+			if sim.ModelAnswers + sim.ModelFailures > asked:
+				got = JSON.parse_string(sim.LastModelAnswer)
+				if got is Dictionary and got.has("vehicle"):
+					break
+				asked = sim.ModelAnswers + sim.ModelFailures
+		var why: String = sim.LastModelError
+		check(got is Dictionary and got.has_all(["age", "vehicle", "ship", "home", "weapon", "words"]) and not why.begins_with("not valid JSON")
+				and not ("forbidden character" in why), "the grammar keeps the built-in model's designs well-formed (%s; %s)" % [sim.LastModelAnswer.left(100), why])
+	else:
+		check(false, "the built-in mind loads its model (%s)" % [sim.MindStatus()])
+	sim.StopMind()
+	sim.queue_free()
+
+
+## 0.8 Moods of the world: eras that change the weather and growth, brought on by the player.
+func test_eras() -> void:
+	var made := make_quiet_sim("eras", 96)
+	var sim: Node2D = made[1]
+	var ids: PackedStringArray = sim.EraIds()
+	check(ids.size() >= 6 and "dark" in ids and "magical" in ids and sim.EraName() == "Calm Era", "a world begins calm, with eras to come (%s)" % [", ".join(ids)])
+	sim.TakeEvents()
+	check(sim.PowerEra("cold") and sim.EraId() == "cold" and "cold era" in "\n".join(sim.TakeEvents()), "the player brings a cold era on, and the chronicle tells it")
+	var cold: float = sim.Coldness()
+	var cold_growth: float = sim.EraTable().growth
+	sim.PowerEra("scorching")
+	check(sim.Coldness() < cold or cold == 0.0, "a cold era is colder than a scorching one (%.2f, %.2f)" % [cold, sim.Coldness()])
+	sim.PowerEra("bright")
+	check(sim.EraTable().growth > cold_growth and sim.EraTable().knowledge > 1.0, "a bright era grows more and learns faster")
+	sim.PowerEra("dark")
+	var tint: Color = sim.EraTint()
+	check(tint.b > tint.r and tint.r < 0.9 and sim.EraTable().monsters > 1.0, "a dark era darkens the land and brings monsters out (%s)" % tint)
+	check(not sim.PowerEra("nonsense") and sim.EraId() == "dark", "an unknown era changes nothing")
+	var table: Dictionary = sim.EraTable()
+	check(table.by_player and table.years_left >= 15 and table.past.size() >= 3, "an era lasts decades, and the past ones are kept (%s)" % [table.past])
+	sim.SetLaw("eras", false)
+	sim.EraNextNow()
+	check(sim.EraId() == "calm", "with the law off, the world stays calm")
+	sim.SetLaw("eras", true)
+	var seen := {}
+	for n in 12:
+		sim.EraNextNow()
+		seen[sim.EraId()] = true
+	check(seen.size() >= 3, "eras change on their own, by their weights (%s)" % [seen.keys()])
+	sim.queue_free()
+
+
+## 0.8 The price of progress: smog, warming, the bomb and its winter; rockets.
+func test_progress_costs() -> void:
+	var made := make_quiet_sim("progress", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.StartPeoples(PackedStringArray(["humans", "dwarves"]), 16)
+	sim.RunSteps(30 * 90)
+	var kingdoms: Array = sim.KingdomTable()
+	var k: int = kingdoms[0].index
+	var foe: int = kingdoms[1].index
+	var capital: Dictionary = {}
+	var foe_village: Dictionary = {}
+	for r in sim.VillageTable():
+		if r.kingdom == kingdoms[0].name and capital.is_empty():
+			capital = r
+		if r.kingdom == kingdoms[1].name and foe_village.is_empty():
+			foe_village = r
+
+	# Smog over the land of an industrial people.
+	sim.SetKingdomAge(k, 6)
+	sim.BuildNow(capital.index, "factory")
+	sim.BuildNow(capital.index, "power_plant")
+	for n in 3:
+		sim.AgesYearNow()
+	var air: Dictionary = sim.WorldAges()
+	check(air.carbon > 0.0 and sim.SmogAt(capital.x, capital.y) > 0.0, "factories and power plants fill the air (carbon %.0f, smog %.1f)" % [air.carbon, sim.SmogAt(capital.x, capital.y)])
+	sim.AddSmog(capital.x, capital.y, 400.0)
+	sim.AgesYearNow()
+	var blighted := 0
+	for dy in range(-8, 9):
+		for dx in range(-8, 9):
+			if sim.BlightAt(capital.x + dx, capital.y + dy) > 0:
+				blighted += 1
+	check(blighted > 0 and sim.WorldAges().smoggy_zones > 0, "thick smog withers the land (%d tiles blighted)" % blighted)
+
+	# A warmer world: milder winters, told by the degree.
+	var cold: float = sim.Coldness()
+	sim.TakeEvents()
+	sim.AddCarbon(15000.0 * 3.0)
+	sim.AgesYearNow()
+	check(sim.Warming >= 2.5 and "warmer" in "\n".join(sim.TakeEvents()) and (sim.Coldness() < cold or cold == 0.0),
+			"the world warms and winters grow milder (%.1f degrees)" % sim.Warming)
+
+	# The bomb.
+	sim.SetKingdomAge(foe, 7)
+	var people: int = sim.PeopleCount()
+	var ruins := count_ruins(sim)
+	var age_before: int = sim.KingdomAge(foe)
+	var know_before: float = sim.KingdomKnowledge(foe)
+	sim.TakeEvents()
+	var killed: int = sim.Nuke(foe_village.x + 0.5, foe_village.y + 0.5, k)
+	var events := "\n".join(sim.TakeEvents())
+	check(killed > 0 and sim.PeopleCount() < people and count_ruins(sim) > ruins and "drops the bomb" in events,
+			"the bomb kills and flattens (%d dead, %d ruins)" % [killed, count_ruins(sim) - ruins])
+	check(sim.BlightAt(foe_village.x, foe_village.y) > 0 and sim.WorldAges().nukes == 1 and sim.SkyEffects() > 0,
+			"it leaves blighted land and a mushroom cloud")
+	check(sim.KingdomAge(foe) < age_before or sim.KingdomKnowledge(foe) < know_before or kingdom_index(sim, kingdoms[1].name) < 0,
+			"the struck people loses knowledge")
+	var tint_before: Color = sim.EraTint()
+	sim.PowerNuke(foe_village.x + 0.5, foe_village.y + 0.5)
+	events = "\n".join(sim.TakeEvents())
+	check(sim.WorldAges().winter >= 2.0 and "nuclear winter" in events and sim.EraTint().s < tint_before.s + 0.001 and sim.Coldness() > 0.3,
+			"bombs bring the nuclear winter: grey skies, cold, failing harvests")
+	check(sim.PowerNuke(1.0, 1.0) == -1 or not w.is_water(w.index(1, 1)), "the bomb falls on land")
+
+	# Kingdoms at war may drop the bomb themselves.
+	sim.SetKingdomAge(k, 7)
+	var silo: int = sim.BuildNow(capital.index, "silo")
+	sim.PowerWhisper("war", k, foe)
+	var dropped := false
+	for n in 80:
+		var before: int = sim.WorldAges().nukes
+		# The winter of the bombs costs knowledge every year: keep them in the Atomic Age.
+		sim.SetKingdomAge(k, 7)
+		sim.AgesYearNow()
+		if sim.WorldAges().nukes > before:
+			dropped = true
+			break
+	check(silo >= 0 and (dropped or kingdom_index(sim, kingdoms[1].name) < 0), "an atomic kingdom at war, with a silo, may drop the bomb on its own (silo %d)" % silo)
+
+	# To the stars.
+	sim.SetLaw("nuclear_war", false)
+	sim.SetKingdomAge(k, 8)
+	var pad: int = sim.BuildNow(capital.index, "launch_pad")
+	var first: String = sim.LaunchNow(k)
+	var second: String = sim.LaunchNow(k)
+	check(pad >= 0 and "first rocket" in first and "satellite" in second and sim.WorldAges().rockets == 2,
+			"a Space Age people with a launch pad sends rockets and satellites up (%s; %s)" % [first, second])
 	sim.queue_free()

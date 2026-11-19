@@ -338,7 +338,10 @@ public partial class Simulation
 		Remember(old, "loss", $"{village.Name} fell to {Kingdoms[k].Name}", 2f);
 		LogEvent($"{Kingdoms[k].Name} takes {village.Name} from {Kingdoms[old].Name}{(capital ? ", its capital" : "")}!", "wars");
 		if (capital)
+		{
 			Kingdoms[old].Capital = -1;
+			Setback(old, 0.35f, $"the fall of {village.Name}");
+		}
 		for (int i = 0; i < Units.Capacity; i++)
 			if (Units.Alive[i] && Units.Army[i] == v)
 				Units.Army[i] = -1;
@@ -452,11 +455,22 @@ public partial class Simulation
 		int vi = Units.Village[i];
 		if (vi >= 0)
 			d *= 1f + Villages[vi].Attack / 100f;
+		// The weapons of its age (Ages.cs): a rifle against a spear.
+		if (vi >= 0 && Villages[vi].Kingdom >= 0)
+			d *= AgeStrength(Villages[vi].Kingdom);
 		return d * (0.7f + 0.6f * (float)_rng.NextDouble());
 	}
 
 	/// <summary>Share of a blow that gets through a person's invented armour.</summary>
-	private float Through(int i) => Units.Village[i] >= 0 ? 1f - Villages[Units.Village[i]].Defense / 100f : 1f;
+	private float Through(int i)
+	{
+		int v = Units.Village[i];
+		if (v < 0)
+			return 1f;
+		// Armour of its age takes some of the edge off a stronger age's weapons.
+		float age = Villages[v].Kingdom >= 0 ? MathF.Sqrt(AgeStrength(Villages[v].Kingdom)) : 1f;
+		return (1f - Villages[v].Defense / 100f) / age;
+	}
 
 	/// <summary>Two people of kingdoms at war in reach: blows are exchanged, a second apart.
 	/// Returns true while the fight goes on (the attacker stays on its target).</summary>

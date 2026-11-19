@@ -24,6 +24,10 @@ const LAWS := [
 	["Civilisations", "settlers", "Settlers", "Crowded villages send people to found new ones."],
 	["Civilisations", "inventions", "Minds invent", "Each people's mind invents tools, weapons and buildings."],
 	["Civilisations", "faiths", "Faiths spread and split", "Kingdoms take up the faith of fervent neighbours; faiths split in heresies."],
+	["Civilisations", "ages", "Peoples climb the ages", "Knowledge takes them from the Stone Age to the stars; disasters throw them back."],
+	["Civilisations", "nuclear_war", "Nuclear war", "Atomic kingdoms with a missile silo may drop the bomb when a war goes badly."],
+	["Nature", "pollution", "Pollution and warming", "Industry fills the air with smog, plants wither, the world warms."],
+	["Nature", "eras", "Moods of the world", "Every few decades the world turns bright, dark, rainy, cold, scorching or magical."],
 ]
 
 var _law_ids: Array = []

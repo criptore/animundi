@@ -53,11 +53,14 @@ var _pinned_village := -1
 var _following := false
 ## People a settled village starts with.
 const SETTLERS := 10
+## The light of the mood of the world over the flat map (sim/Eras.cs).
+var _world_tint := CanvasModulate.new()
 
 
 func _ready() -> void:
 	RenderingServer.set_default_clear_color(Biomes.COLORS[Biomes.DEEP_WATER].darkened(0.4))
 	add_child(_map)
+	add_child(_world_tint)
 	add_child(_sim)
 	add_child(_brush)
 	add_child(_camera)
@@ -109,7 +112,7 @@ func generate() -> void:
 	# A new world: nothing of the old one is followed, the powers know its creatures and laws.
 	_hud.inspector.close()
 	_whisper_from = -1
-	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes())
+	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes(), _sim.EraIds())
 	_hud.laws.set_laws(_sim.LawTable())
 	# The world waits while the player chooses its peoples.
 	_sim.SetTimeScale(0.0)
@@ -283,6 +286,18 @@ func _use_power(screen_pos: Vector2) -> void:
 				_hud.notice("A village needs free land: not the sea, not another village's ground.")
 		"war", "peace", "alliance", "convert":
 			_whisper(powers.power, _sim.KingdomAt(at.x, at.y))
+		"enlighten":
+			if not _sim.PowerEnlighten(at.x, at.y):
+				_hud.notice("No kingdom owns this land.")
+		"dark_age":
+			if not _sim.PowerDarkAge(at.x, at.y):
+				_hud.notice("No kingdom owns this land.")
+		"nuke":
+			if _sim.PowerNuke(at.x, at.y) < 0:
+				_hud.notice("The bomb needs land to fall on.")
+		"era":
+			if _sim.PowerEra(powers.arg):
+				_hud.notice("The world turns: a %s era begins." % powers.arg)
 
 
 ## Whispers take two clicks: the kingdom that acts, then the other one.
@@ -336,6 +351,9 @@ func _process(_delta: float) -> void:
 	_map.set_scorch(_sim.TakeScorchChanges())
 	_map.set_overlay(_sim.TakeOverlayChanges())
 	_map.set_frost(_sim.Coldness())
+	var tint: Color = _sim.EraTint()
+	_world_tint.color = Color.WHITE if tilt_on else tint
+	_tilt.set_world_tint(tint)
 	# Land repainted by the biome brush.
 	var repainted: PackedInt32Array = _sim.TakeBiomeChanges()
 	if not repainted.is_empty():
@@ -347,7 +365,7 @@ func _process(_delta: float) -> void:
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
 	var brushing: bool = _hud.powers.power != "inspect" and not _hud.blocking()
-	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle", "wildfire", "drought", "earthquake", "flood", "eruption", "plague", "heal"] else 0.6
+	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle", "wildfire", "drought", "earthquake", "flood", "eruption", "plague", "heal"] else (6.0 if _hud.powers.power == "nuke" else 0.6)
 	var at := _ground_at(pointer)
 	_brush.visible = brushing and not tilt_on
 	_tilt_brush.visible = brushing and tilt_on
@@ -374,7 +392,8 @@ func _process(_delta: float) -> void:
 			if _going:
 				_going = false
 				_hud.show_speed(speed)
-			_hud.set_time("Year %d · %s · %s%s" % [_sim.Year(), _sim.SeasonName(), _sim.AgeName().trim_prefix("The "), "  (paused)" if speed == 0.0 else ""])
+			_hud.set_time("Year %d · %s · %s · %s%s" % [_sim.Year(), _sim.SeasonName(), _sim.AgeName().trim_prefix("The "),
+					_sim.EraName(), "  (paused)" if speed == 0.0 else ""])
 		_hud.set_season(_sim.Season())
 		var people: int = _sim.PeopleCount()
 		_hud.set_counts(people, _sim.VillageCount(), _sim.KingdomCount(), _sim.UnitCount() - people)
@@ -388,6 +407,7 @@ func _process(_delta: float) -> void:
 		_hud.set_cultures(_sim.CultureTable())
 		_hud.set_legends(_sim.LegendTable())
 		_hud.set_nature(_sim.NatureTable())
+		_hud.set_ages(_sim.WorldAges(), _sim.ProgressTable())
 		_hud.set_chronicle(_sim.AgeName(), _sim.ChronicleTable())
 		_refresh_inspector()
 	# The camera stays on the creature or the village the player follows.
