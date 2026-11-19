@@ -40,6 +40,11 @@ const Inspector = preload("res://scripts/ui/inspector.gd")
 const LawsWindow = preload("res://scripts/ui/laws_window.gd")
 const SettingsWindow = preload("res://scripts/ui/settings_window.gd")
 const StatsWindow = preload("res://scripts/ui/stats_window.gd")
+const SavesWindow = preload("res://scripts/ui/saves_window.gd")
+const WorldStore = preload("res://scripts/world/world_store.gd")
+const AchievementsWindow = preload("res://scripts/ui/achievements_window.gd")
+const ScenariosWindow = preload("res://scripts/ui/scenarios_window.gd")
+const FavouritesWindow = preload("res://scripts/ui/favourites_window.gd")
 const PauseMenu = preload("res://scripts/ui/pause_menu.gd")
 const MainMenu = preload("res://scripts/ui/main_menu.gd")
 
@@ -70,6 +75,19 @@ var inspector := Inspector.new()
 var laws := LawsWindow.new()
 ## The world's numbers through the years (0.9).
 var stats := StatsWindow.new()
+## Saved worlds (1.0): main.gd saves and loads when a slot is chosen.
+var saves := SavesWindow.new()
+## Achievements and scenarios (1.0): main.gd fills them.
+var achievements := AchievementsWindow.new()
+var scenarios := ScenariosWindow.new()
+var favourites := FavouritesWindow.new()
+var _faith_chip: Array = []
+## The player opened the favourites (main.gd lists them).
+signal favourites_requested
+## The player opened the achievements (main.gd shows what was won).
+signal achievements_requested
+## The player opened the scenarios (main.gd lists them).
+signal scenarios_requested
 
 var _root: Control
 var _game: Control
@@ -206,7 +224,7 @@ func _ready() -> void:
 	_title = MainMenu.new()
 	_title.chosen.connect(_on_title)
 	root.add_child(_title)
-	for window in [laws, _pause, _settings_window, stats]:
+	for window in [laws, _pause, _settings_window, stats, saves, achievements, scenarios, favourites]:
 		window.closed.connect(_refresh_screens)
 		root.add_child(window)
 	_pause.closed.connect(_leave_pause)
@@ -288,6 +306,12 @@ func _build_top() -> void:
 		bar.add_child(chip[0])
 		_counts[count[0]] = chip[1]
 
+	# Faith mode (1.0): what the player has to spend.
+	var faith: Array = UI.chip("halo", "Your faith: what your powers cost in faith mode (a law of the world)")
+	faith[1].custom_minimum_size.x = 30
+	faith[0].visible = false
+	bar.add_child(faith[0])
+	_faith_chip = faith
 	var gap2 := Control.new()
 	gap2.custom_minimum_size.x = 8
 	bar.add_child(gap2)
@@ -298,12 +322,21 @@ func _build_top() -> void:
 	var stats_button := UI.tool_button(UI.icon("chart"), "Statistics: the world through the years", 40)
 	stats_button.pressed.connect(func(): _open(stats))
 	bar.add_child(stats_button)
-	for soon in [["star", "Favourites", "The creatures and villages you follow."],
-			["save", "Save the world", "Keep this world and come back to it later."]]:
-		var b := UI.tool_button(UI.icon(soon[0]), "%s (coming later)\n%s" % [soon[1], soon[2]], 40)
-		UI.mark_soon(b)
-		b.pressed.connect(func(): _soon(soon[1], soon[2]))
-		bar.add_child(b)
+	var save_button := UI.tool_button(UI.icon("save"), "Save the world, or load another", 40)
+	save_button.pressed.connect(func():
+		saves.can_save = true
+		_open(saves))
+	bar.add_child(save_button)
+	var trophy := UI.tool_button(UI.icon("star"), "Achievements", 40)
+	trophy.pressed.connect(func():
+		achievements_requested.emit()
+		_open(achievements))
+	bar.add_child(trophy)
+	var heart := UI.tool_button(UI.icon("heart"), "Favourites: the creatures and villages you follow", 40)
+	heart.pressed.connect(func():
+		favourites_requested.emit()
+		_open(favourites))
+	bar.add_child(heart)
 	var settings_button := UI.tool_button(UI.icon("gear"), "Settings", 40)
 	settings_button.pressed.connect(func(): _open(_settings_window))
 	bar.add_child(settings_button)
@@ -525,7 +558,7 @@ func _build_bottom() -> void:
 
 ## Whether something stands between the player and the map: the title, the setup, a window.
 func blocking() -> bool:
-	return _at_title or setup_visible() or laws.visible or _pause.visible or _settings_window.visible or stats.visible
+	return _at_title or setup_visible() or laws.visible or _pause.visible or _settings_window.visible or stats.visible or saves.visible or achievements.visible or scenarios.visible or favourites.visible
 
 
 func setup_visible() -> bool:
@@ -544,6 +577,16 @@ func leave_title() -> void:
 	_at_title = false
 
 
+## Shows the game itself (a saved world came back): no title, no setup, no window.
+func show_game() -> void:
+	_at_title = false
+	_setup.visible = false
+	for window in [laws, _pause, _settings_window, stats, saves, achievements, scenarios, favourites]:
+		window.visible = false
+	_speed_before_menu = -1.0
+	_refresh_screens()
+
+
 func _show_title() -> void:
 	_at_title = true
 	_setup.visible = false
@@ -554,7 +597,8 @@ func _show_title() -> void:
 func _refresh_screens() -> void:
 	_title.visible = _at_title
 	_game.visible = not _at_title and not setup_visible()
-	_shade.visible = not _at_title and (laws.visible or _pause.visible or _settings_window.visible or stats.visible)
+	_shade.visible = not _at_title and (laws.visible or _pause.visible or _settings_window.visible or stats.visible or saves.visible
+			or achievements.visible or scenarios.visible or favourites.visible)
 	for l in _name_labels:
 		l.visible = l.visible and _game.visible
 
@@ -577,8 +621,18 @@ func _on_title(what: String) -> void:
 			notice("Animundi · a god sandbox in the spirit of WorldBox and Cult of the Lamb · font Pixelify Sans (OFL)", 6.0)
 		"quit":
 			get_tree().quit()
-		_:
-			_soon("Saved worlds", "Keep a world and come back to it later.")
+		"continue":
+			var last := WorldStore.latest()
+			if last == "":
+				notice("No world has been saved yet.")
+			else:
+				saves.load_requested.emit(last)
+		"load":
+			saves.can_save = false
+			_open(saves)
+		"scenarios":
+			scenarios_requested.emit()
+			_open(scenarios)
 
 
 func _open_pause() -> void:
@@ -614,8 +668,9 @@ func _on_pause(what: String) -> void:
 			_show_title()
 		"quit":
 			get_tree().quit()
-		_:
-			_soon("Saved worlds", "Keep a world and come back to it later.")
+		"save", "load":
+			saves.can_save = true
+			_open(saves)
 
 
 ## Says what a feature to come will do.
@@ -633,6 +688,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_settings_window.close()
 		elif stats.visible:
 			stats.close()
+		elif saves.visible:
+			saves.close()
+		elif achievements.visible:
+			achievements.close()
+		elif scenarios.visible:
+			scenarios.close()
+		elif favourites.visible:
+			favourites.close()
 		elif laws.visible:
 			laws.close()
 		elif _pause.visible:
@@ -670,6 +733,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var layer: String = MapRenderer.LAYERS[key.keycode - KEY_1]
 		_layer_buttons[layer].button_pressed = true
 		layer_selected.emit(layer)
+
+
+## Faith mode: the player's faith, shown only while the law is on.
+func set_faith(value: float, on: bool) -> void:
+	if _faith_chip.is_empty():
+		return
+	_faith_chip[0].visible = on
+	_faith_chip[1].text = str(int(value))
 
 
 ## Shows which view is on, without asking for it again.

@@ -15,6 +15,7 @@ const FIRE_FRAMES := 3
 const TORNADO_FRAMES := 3
 const LAIRS := ["nest", "crypt", "pit", "cave", "pool", "cairn"]
 const PAD := 4
+const MODS_DIR := "user://mods"
 ## Vehicles of the ages beyond the cart and the boat (sim/Draw.cs VehicleSprite): wagon, steam
 ## train, motor car, hovercar; sailing ship, galleon, steamship, liner, hovership.
 const LAND_VEHICLES := 4
@@ -77,6 +78,10 @@ func _init() -> void:
 		images["effects/Mushroom_%d" % k] = mushroom_frame(k)
 	for k in 2:
 		images["effects/Rocket_%d" % k] = rocket_frame(k)
+	# Sprites of mods (docs/MODS.md): user://mods/<mod>/sprites/<name>.png is "effects/Mod_<name>".
+	var modded := mod_sprites()
+	for id in modded:
+		images[id] = modded[id]
 	var ids := images.keys()
 	ids.sort_custom(func(a, b): return images[a].get_height() > images[b].get_height())
 
@@ -105,6 +110,28 @@ func _init() -> void:
 		regions[id] = Rect2(Vector2(places[id]) / Vector2(WIDTH, height), Vector2(img.get_size()) / Vector2(WIDTH, height))
 	atlas.generate_mipmaps()
 	texture = ImageTexture.create_from_image(atlas)
+
+
+## The sprites of the mods: "effects/Mod_<name>" → image, from every mod's sprites folder.
+static func mod_sprites(dir := MODS_DIR) -> Dictionary:
+	var out := {}
+	var mods := DirAccess.open(dir)
+	if mods == null:
+		return out
+	for mod in mods.get_directories():
+		var folder := dir.path_join(mod).path_join("sprites")
+		var d := DirAccess.open(folder)
+		if d == null:
+			continue
+		for f in d.get_files():
+			if not f.ends_with(".png"):
+				continue
+			var img := Image.load_from_file(folder.path_join(f))
+			if img == null or img.get_width() > 128 or img.get_height() > 128:
+				continue
+			img.convert(Image.FORMAT_RGBA8)
+			out["effects/Mod_" + f.get_basename()] = img
+	return out
 
 
 func has(id: String) -> bool:

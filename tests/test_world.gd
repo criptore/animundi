@@ -65,6 +65,10 @@ func _initialize() -> void:
 	test_terrain()
 	test_more_powers()
 	test_world_views()
+	test_saves()
+	test_sound()
+	test_achievements_and_mods()
+	test_last_powers()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -1302,7 +1306,7 @@ func test_power_bar() -> void:
 		for child in bar._grids[tab].get_children():
 			if child.has_meta("soon"):
 				child.pressed.emit()
-	check(soon.size() >= 5 and bar.power == "inspect", "powers to come say so and change nothing (%s)" % [soon])
+	check(soon.size() == bar.SOON.size() and bar.power == "inspect", "powers to come say so and change nothing (%s)" % [soon])
 	var laws := []
 	var laws_window: PanelContainer = load("res://scripts/ui/laws_window.gd").new()
 	root.add_child(laws_window)
@@ -2586,4 +2590,195 @@ func test_world_views() -> void:
 	check(missing.is_empty(), "every law of the laws window is a rule of the simulation (missing: %s)" % [missing])
 	sim.SetLaw("seasons", false)
 	check(sim.Coldness() == 0.0 or sim.EraTable().cold > 0.0, "without seasons, no winter")
+	sim.queue_free()
+
+
+## 1.0 Saved worlds: everything the simulation holds comes back, and the world goes on.
+func test_saves() -> void:
+	var made := make_sim("saves", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.SetMindEndpoint("")
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60 * 4)
+	sim.PowerEra("dark")
+	var started := Time.get_ticks_msec()
+	var blob: PackedByteArray = sim.SaveState()
+	var save_ms := Time.get_ticks_msec() - started
+	check(blob.size() > 1000, "a world is saved (%d KB in %d ms)" % [blob.size() / 1024, save_ms])
+	var other: Node2D = load("res://sim/Simulation.cs").new()
+	root.add_child(other)
+	other.Start(w, PackedStringArray(Biomes.NAMES))
+	started = Time.get_ticks_msec()
+	var error: String = other.LoadState(blob)
+	check(error == "", "and loaded into another simulation (%s, %d ms)" % [error, Time.get_ticks_msec() - started])
+	var same := {
+		"year": [sim.Year(), other.Year()], "people": [sim.PeopleCount(), other.PeopleCount()], "units": [sim.UnitCount(), other.UnitCount()],
+		"plants": [sim.PlantCount(), other.PlantCount()], "villages": [sim.VillageCount(), other.VillageCount()],
+		"kingdoms": [sim.KingdomTable().map(func(k): return k.name), other.KingdomTable().map(func(k): return k.name)],
+		"creeds": [sim.CultureTable().map(func(c): return c.creed), other.CultureTable().map(func(c): return c.creed)],
+		"inventions": [sim.InventionTable().size(), other.InventionTable().size()],
+		"spirits": [sim.SpiritTable().map(func(s): return [s.name, snappedf(s.mood, 0.001)]), other.SpiritTable().map(func(s): return [s.name, snappedf(s.mood, 0.001)])],
+		"era": [sim.EraName(), other.EraName()], "ages": [sim.ProgressTable().map(func(k): return k.age_name), other.ProgressTable().map(func(k): return k.age_name)],
+		"buildings": [sim.BuildingTable().size(), other.BuildingTable().size()], "chronicle": [sim.ChronicleTable().size(), other.ChronicleTable().size()],
+	}
+	var differ := []
+	for key in same:
+		if str(same[key][0]) != str(same[key][1]):
+			differ.append("%s: %s / %s" % [key, str(same[key][0]).left(80), str(same[key][1]).left(80)])
+	check(differ.is_empty(), "everything comes back as it was (%s)" % [differ])
+	other.RunSteps(30 * 60 * 2)
+	sim.RunSteps(30 * 60 * 2)
+	check(other.Year() == sim.Year() and other.PeopleCount() > 0 and other.VillageCount() > 0, "the loaded world goes on living (%d people)" % other.PeopleCount())
+	var people: int = other.PeopleCount()
+	check(other.LoadState(PackedByteArray([1, 2, 3])) != "" and other.PeopleCount() == people, "a broken save is refused and changes nothing")
+
+	# The slots on disk: the land, the settings, the simulation.
+	var Store = load("res://scripts/world/world_store.gd")
+	var dir := "user://test_saves"
+	var settings := WorldSettings.new()
+	settings.seed_text = "saves"
+	var error2: String = Store.save("slot_2", w, settings, blob, {"year": sim.Year(), "people": 5, "kingdoms": 2, "era": "Dark Era"}, dir)
+	var back: Dictionary = Store.read("slot_2", dir)
+	var slots: Array = Store.list(dir)
+	check(error2 == "" and not back.is_empty() and back.world.biome == w.biome and back.world.level == w.level and back.sim == blob
+			and back.code == settings.to_code(), "a slot keeps the land, the settings and the simulation")
+	check(slots.size() == 7 and slots[0].slot == "autosave" and not slots.filter(func(e): return e.slot == "slot_2")[0].empty
+			and Store.latest(dir) == "slot_2", "the slots are listed, the one saved last is known")
+	var SavesWindow = load("res://scripts/ui/saves_window.gd")
+	check("Year" in SavesWindow.describe(slots.filter(func(e): return e.slot == "slot_2")[0]), "and described in the list")
+	Store.remove("slot_2", dir)
+	check(Store.read("slot_2", dir).is_empty(), "a slot can be emptied")
+	sim.queue_free()
+	other.queue_free()
+
+
+## 1.0 Sound: every effect and note is made, and the music follows the mood of the world.
+func test_sound() -> void:
+	var Soundscape = load("res://scripts/audio/soundscape.gd")
+	var s: Node = Soundscape.new()
+	root.add_child(s)
+	var made := []
+	for name in Soundscape.SOUNDS:
+		var w: AudioStreamWAV = s.call(Soundscape.SOUNDS[name])
+		if w != null and w.data.size() > 1000 and w.get_length() > 0.05:
+			made.append(name)
+	check(made.size() == Soundscape.SOUNDS.size(), "every sound effect is made (%d)" % made.size())
+	var loud := 0.0
+	var bomb: AudioStreamWAV = s._bomb()
+	for i in range(0, bomb.data.size(), 200):
+		loud = maxf(loud, absf(bomb.data.decode_s16(i)))
+	check(loud > 3000.0 and bomb.get_length() > 3.0, "the bomb is long and loud")
+	var tone: AudioStreamWAV = s.tone(60, 1.0)
+	check(tone == s.tone(60, 1.0) and absf(Soundscape.midi_hz(69) - 440.0) < 0.01, "notes are made once and tuned")
+	for bus in ["Music", "Effects", "Ambience"]:
+		check(AudioServer.get_bus_index(bus) >= 0, "the %s bus exists" % bus)
+	s.set_volume("Music", 0.0)
+	check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Music")), "a volume at nothing mutes its bus")
+	s.set_volume("Music", 0.5)
+	s.start()
+	s.set_mood("dark")
+	check(s._mood == "dark" and s._drone.stream != null, "the music takes the mood of the world")
+	s.play("fire")
+	s.play("nonsense")
+	s.queue_free()
+
+
+## 1.0 Achievements, scenarios and mods.
+func test_achievements_and_mods() -> void:
+	var Achievements = load("res://scripts/world/achievements.gd")
+	var a = Achievements.new("user://test_achievements.json")
+	a.reset()
+	var won: Array = a.check({"year": 150, "cities": 1, "max_age": 0, "moon": false})
+	var ids := won.map(func(x): return x.id)
+	check("century" in ids and "first_city" in ids and not ("iron" in ids) and not ("moon" in ids), "achievements are won when the world meets them (%s)" % [ids])
+	check(a.check({"year": 200}).is_empty() and Achievements.new("user://test_achievements.json").won.has("century"), "once, for good, kept on disk")
+	var made := make_quiet_sim("achievements", 96)
+	var sim: Node2D = made[1]
+	var facts: Dictionary = sim.Facts()
+	var missing: Array = a.list.filter(func(x): return not facts.has(x.fact)).map(func(x): return x.fact)
+	check(a.list.size() >= 20 and missing.is_empty(), "every achievement reads a fact of the world (missing %s)" % [missing])
+
+	# Scenarios: their peoples, eras and laws exist.
+	var data = JSON.parse_string(FileAccess.get_file_as_string("res://data/scenarios.json"))
+	var races: PackedStringArray = sim.RaceIds()
+	var eras: PackedStringArray = sim.EraIds()
+	var laws: Dictionary = sim.LawTable()
+	var wrong := []
+	for sc in data.scenarios:
+		for p in sc.peoples:
+			if not (p in races):
+				wrong.append("%s: people %s" % [sc.id, p])
+		if sc.has("era") and not (sc.era in eras):
+			wrong.append("%s: era %s" % [sc.id, sc.era])
+		for law in sc.get("laws", {}):
+			if not laws.has(law):
+				wrong.append("%s: law %s" % [sc.id, law])
+	check(data.scenarios.size() >= 6 and wrong.is_empty(), "every scenario names peoples, eras and laws that exist (%s)" % [wrong])
+
+	# A mod: a species, a mood of the world, a building, a sprite.
+	var dir := "user://test_mods/mymod"
+	DirAccess.make_dir_recursive_absolute(dir.path_join("sprites"))
+	var put := func(path: String, text: String):
+		var f := FileAccess.open(dir.path_join(path), FileAccess.WRITE)
+		f.store_string(text)
+		f.close()
+	put.call("species.json", '{"species": [{"id": "glowbeast", "name": "Glowbeast", "sprite": "effects/Mod_glowbeast", "natural": {"Grassland": 0.2}, "diet": "herbivore", "size": 3, "lifespan": 8}]}')
+	put.call("eras.json", '{"eras": [{"id": "foggy", "name": "Foggy Era", "weight": 1, "growth": 0.9, "tint": [0.9, 0.9, 0.95], "lore": "Grey mornings."}]}')
+	put.call("buildings.json", '{"buildings": [{"id": "shrine_of_fog", "name": "Shrine of fog", "homes": 0, "cost": {"stone": 5}, "build": 5, "pop": 12, "limit": 1, "place": "cluster", "material": "stone"}]}')
+	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	img.fill(Color.GREEN)
+	img.save_png(dir.path_join("sprites/glowbeast_idle.png"))
+	sim.ReloadAssets("user://test_mods")
+	var mods: Dictionary = sim.ModTable()
+	check(mods.has("mymod") and "1 species" in String(mods.mymod) and "1 buildings" in String(mods.mymod), "a mod is read (%s)" % [mods])
+	var w2 := make("mods", 96)
+	sim.Start(w2, PackedStringArray(Biomes.NAMES))
+	check("foggy" in sim.EraIds() and not sim.SpeciesInfo("glowbeast").is_empty() and sim.SetEra("foggy") and sim.EraName() == "Foggy Era",
+			"its species and its mood of the world are in the game")
+	var SpriteAtlas2 = load("res://scripts/render2d/sprite_atlas.gd")
+	check(SpriteAtlas2.mod_sprites("user://test_mods").has("effects/Mod_glowbeast_idle"), "its sprites are read")
+	put.call("eras.json", "not json")
+	sim.ReloadAssets("user://test_mods")
+	check("refused" in String(sim.ModTable().mymod), "a broken mod is refused, the game goes on")
+	sim.ReloadAssets("")
+	sim.queue_free()
+
+
+## 1.0 The last powers: hail, wind, a forgotten language, the storyteller, faith mode, and what the
+## inspector says of family, story and mind.
+func test_last_powers() -> void:
+	var made := make_quiet_sim("last powers", 128)
+	var sim: Node2D = made[1]
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60 * 2)
+	var home: Dictionary = sim.VillageTable()[0]
+	var hx: float = home.x + 0.5
+	var hy: float = home.y + 0.5
+	sim.TakeEvents()
+	sim.PowerHail(hx + 6.0, hy, 3.0)
+	check("hail" in "\n".join(sim.TakeEvents()), "hail beats the land")
+	check(sim.PowerWind(hx, hy, hx + 10.0, hy) and sim.WindSeconds > 0.0 and sim.WindX > 0.9, "a wind blows where the player points")
+	check(sim.PowerForgetLanguage(hx, hy) and "new tongue" in "\n".join(sim.TakeEvents()), "a kingdom forgets its language")
+	var told := []
+	for story in ["war", "hero", "plague", "golden_age", "discovery"]:
+		var said: String = sim.PowerStory(story, hx, hy)
+		if said != "":
+			told.append(story)
+	check(told.size() >= 4 and sim.EraId() == "bright", "the storyteller makes stories happen (%s)" % [told])
+	# Faith mode.
+	check(sim.SpendFaith("nuke"), "outside faith mode, powers are free")
+	sim.SetLaw("faith_mode", true)
+	var faith: float = sim.GodFaith
+	check(sim.SpendFaith("fire") and sim.GodFaith < faith and not sim.SpendFaith("nuke"), "in faith mode a power costs faith, and a costly one waits (%.0f)" % sim.GodFaith)
+	sim.AddGodFaith(1000.0)
+	check(sim.SpendFaith("nuke") and sim.GodFaith <= 300.0 - 80.0, "faith is spent, and has a ceiling")
+	# The inspector's family, story and mind.
+	var person := -1
+	for i in sim.UnitCount() * 4:
+		if sim.UnitAlive(i) and sim.UnitVillage(i) == home.index:
+			person = i
+			break
+	check(person >= 0 and "Partner" in sim.FamilyOf(person) or "No partner" in sim.FamilyOf(person), "a person's family")
+	check("Doing:" in sim.MindOf(person) and sim.StoryOf(home.name) != "", "a person's mind, a village's story")
 	sim.queue_free()

@@ -82,7 +82,12 @@ static func list(group: String) -> PackedStringArray:
 	if dir == null:
 		return out
 	for f in dir.get_files():
-		if f.ends_with(".png"):
-			out.append("%s/%s" % [group, f.get_basename()])
+		# In an exported game only the import files are listed ("x.png.import"): the picture is
+		# loaded through them all the same.
+		var name := f.trim_suffix(".import")
+		if name.ends_with(".png"):
+			var id := "%s/%s" % [group, name.get_basename()]
+			if not out.has(id):
+				out.append(id)
 	out.sort()
 	return out

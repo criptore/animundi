@@ -179,6 +179,9 @@ public partial class Simulation
 		};
 	}
 
+	/// <summary>Brings era `id` on, as nature would (scenarios). False for an unknown era.</summary>
+	public bool SetEra(string id) => NextEra(id, false) != null;
+
 	/// <summary>Ends the era now: the next one comes (tests).</summary>
 	public void EraNextNow() => NextEra(null, false);
 }

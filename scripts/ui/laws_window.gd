@@ -27,6 +27,7 @@ const LAWS := [
 	["Civilisations", "trade", "Trade", "Carts and boats carry goods between friendly villages."],
 	["Civilisations", "customs", "Customs and myths", "Each culture writes laws, rituals, taboos and the myths of what it lived through."],
 	["Civilisations", "faiths", "Faiths spread and split", "Kingdoms take up the faith of fervent neighbours; faiths split in heresies."],
+	["Gods", "faith_mode", "Faith mode", "Your powers cost faith, given each year by the peoples who worship or fear you."],
 	["Civilisations", "ages", "Peoples climb the ages", "Knowledge takes them from the Stone Age to the stars; disasters throw them back."],
 	["Civilisations", "nuclear_war", "Nuclear war", "Atomic kingdoms with a missile silo may drop the bomb when a war goes badly."],
 	["Nature", "pollution", "Pollution and warming", "Industry fills the air with smog, plants wither, the world warms."],

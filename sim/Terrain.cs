@@ -285,6 +285,7 @@ public partial class Simulation
 		SettleTerrain(from, by > 0);
 		AfterTerrain(from);
 		int changed = _terrainChanged.Count - from;
+		TilesReshaped += changed;
 		if (changed > 0)
 		{
 			Grieve(World.Index(Math.Clamp((int)x, 0, World.Width - 1), Math.Clamp((int)y, 0, World.Height - 1)), changed * 0.1f, "struck");
@@ -331,6 +332,7 @@ public partial class Simulation
 		}
 		AfterTerrain(from);
 		int changed = _terrainChanged.Count - from;
+		TilesReshaped += changed;
 		if (changed > 0)
 			GodActs("flood", x, y, radius, 1);
 		return changed;
@@ -440,6 +442,7 @@ public partial class Simulation
 		SettleTerrain(from, false);
 		AfterTerrain(from);
 		int changed = _terrainChanged.Count - from;
+		TilesReshaped += changed;
 		if (changed > 0)
 		{
 			if (id.StartsWith("volcano"))

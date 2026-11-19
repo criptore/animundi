@@ -11,6 +11,8 @@ signal closed
 signal follow_toggled(on: bool)
 ## An action that is not in the game yet: its name and what it will do.
 signal soon_requested(action: String, what: String)
+## favourite, family, story or mind (1.0): main.gd answers with show_extra.
+signal action_requested(action: String)
 
 ## Stores shown as icons on a village's card: key of the village's row, icon, name.
 const STORES := [["food", "bread", "Food"], ["wood", "log", "Wood"], ["stone", "stone", "Stone"],
@@ -23,6 +25,8 @@ var _portrait: TextureRect
 var _stores: HFlowContainer
 var _store_labels := {}
 var _follow: Button
+var _actions := {}
+var _extra: Label
 
 
 func _init() -> void:
@@ -72,14 +76,21 @@ func _init() -> void:
 	_follow.toggle_mode = true
 	_follow.toggled.connect(func(on): follow_toggled.emit(on))
 	actions.add_child(_follow)
-	for action in [["star", "Favourite", "Keep it in your favourites and hear of what happens to it."],
-			["people", "Family", "Its parents, partner and children."],
-			["scroll", "Story", "What it lived through, written by the chronicle."],
-			["bulb", "Mind", "What it wants and how it decides."]]:
-		var b := UI.tool_button(UI.icon(action[0], 1), "%s (coming later)\n%s" % [action[1], action[2]], 34)
-		b.modulate = Color(0.62, 0.58, 0.62)
-		b.pressed.connect(func(): soon_requested.emit(action[1], action[2]))
+	for action in [["heart", "favourite", "Favourite: keep it in your favourites and hear of what happens to it."],
+			["people", "family", "Family: its parents, partner and children."],
+			["scroll", "story", "Story: what the chronicle tells of it."],
+			["bulb", "mind", "Mind: what it does and what it needs."]]:
+		var b := UI.tool_button(UI.icon(action[0], 1), action[2], 34)
+		var id: String = action[1]
+		b.pressed.connect(func(): action_requested.emit(id))
 		actions.add_child(b)
+		_actions[id] = b
+	_extra = UI.label("", "Small")
+	_extra.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_extra.custom_minimum_size.x = 300
+	_extra.add_theme_color_override("font_color", UI.GOLD)
+	_extra.visible = false
+	box.add_child(_extra)
 
 
 ## A creature: `info` is the simulation's line about it ("Name · people · role · …").
@@ -207,8 +218,21 @@ func show_invention(info: Dictionary) -> void:
 	show_card(info.name, UI.icon("bulb"), lines, info.script)
 
 
+## What an action shows under the card (the family, the story, the mind); "" hides it.
+func show_extra(text: String) -> void:
+	_extra.text = text
+	_extra.visible = text != ""
+
+
+## Whether what the card shows is among the favourites (the heart lights up).
+func set_favourite(on: bool) -> void:
+	if _actions.has("favourite"):
+		_actions["favourite"].modulate = UI.CRIMSON.lightened(0.3) if on else Color.WHITE
+
+
 func close() -> void:
 	if visible:
+		show_extra("")
 		visible = false
 		_follow.set_pressed_no_signal(false)
 		closed.emit()

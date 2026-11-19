@@ -45,7 +45,8 @@ public partial class Simulation
 			_sparks.Add(new Spark
 			{
 				X = x + (float)Math.Cos(a) * radius * 0.5f, Y = y + (float)Math.Sin(a) * radius * 0.5f, Z = 0.4f,
-				Vx = (float)Math.Cos(a) * speed, Vy = (float)Math.Sin(a) * speed, Vz = 2.5f + 2f * (float)_rng.NextDouble(),
+				Vx = (float)Math.Cos(a) * speed + WindX * (WindSeconds > 0f ? 3f : 0f), Vy = (float)Math.Sin(a) * speed + WindY * (WindSeconds > 0f ? 3f : 0f),
+				Vz = 2.5f + 2f * (float)_rng.NextDouble(),
 			});
 		}
 	}

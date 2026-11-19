@@ -3,6 +3,14 @@
 extends "res://scripts/ui/window.gd"
 
 ## Developer figures in the bottom bar (seed, plants, step time, frames per second).
+## The autosave (1.0) was switched.
+## A volume was moved (1.0): bus (Master, Music, Effects, Ambience) and 0..1.
+## Switches of 1.0: pause on great events, screen shake, weather particles.
+signal pause_on_events_toggled(on: bool)
+signal shake_toggled(on: bool)
+signal weather_toggled(on: bool)
+signal volume_changed(bus: String, value: float)
+signal autosave_toggled(on: bool)
 signal dev_stats_toggled(on: bool)
 ## Village names over the map.
 signal map_labels_toggled(on: bool)
@@ -25,6 +33,7 @@ const CONTROLS := [
 	["Menu", "Esc"],
 ]
 
+var _mods_label: Label
 var _pages := {}
 var _page_buttons := {}
 
@@ -74,8 +83,25 @@ func _game(box: VBoxContainer) -> void:
 	_row(box, "Interface size", scale[1])
 	_switch(box, "Village names on the map", true, false).toggled.connect(func(on): map_labels_toggled.emit(on))
 	_switch(box, "Developer figures in the bottom bar", true, false).toggled.connect(func(on): dev_stats_toggled.emit(on))
-	_switch(box, "Save the world every year", false, true)
-	_switch(box, "Pause when a great event happens", false, true)
+	_switch(box, "Save the world every ten years", true, false).toggled.connect(func(on): autosave_toggled.emit(on))
+	_switch(box, "Pause when a great event happens", false, false).toggled.connect(func(on): pause_on_events_toggled.emit(on))
+	_mods_label = UI.label("No mods: put them in the game's data folder, under mods/.", "Muted")
+	_mods_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_mods_label.custom_minimum_size.x = 380
+	box.add_child(_mods_label)
+
+
+## The mods found and what each brought (the simulation's ModTable).
+func set_mods(mods: Dictionary) -> void:
+	if _mods_label == null:
+		return
+	if mods.is_empty():
+		_mods_label.text = "No mods: put them in %s (docs/MODS.md)." % ProjectSettings.globalize_path("user://mods")
+		return
+	var lines := PackedStringArray(["Mods:"])
+	for name in mods:
+		lines.append("%s · %s" % [name, mods[name]])
+	_mods_label.text = "\n".join(lines)
 
 
 func _display(box: VBoxContainer) -> void:
@@ -90,16 +116,17 @@ func _display(box: VBoxContainer) -> void:
 		fps.set_item_metadata(fps.item_count - 1, limit)
 	fps.item_selected.connect(func(k): Engine.max_fps = fps.get_item_metadata(k))
 	_row(box, "Frames per second", fps)
-	_switch(box, "Screen shake on disasters", true, true)
-	_switch(box, "Weather and magic particles", true, true)
+	_switch(box, "Screen shake on disasters", true, false).toggled.connect(func(on): shake_toggled.emit(on))
+	_switch(box, "Weather and magic particles", true, false).toggled.connect(func(on): weather_toggled.emit(on))
 
 
 func _sound(box: VBoxContainer) -> void:
-	for channel in ["Master", "Music", "Effects", "Ambience"]:
-		var s := _slider(0, 100, 5, 80, "%d%%")
-		s[0].editable = false
-		_row(box, channel, s[1])
-	var note := UI.label("The world is silent for now: sounds and music come with version 1.0.", "Muted")
+	for channel in [["Master", 80], ["Music", 55], ["Effects", 80], ["Ambience", 35]]:
+		var s := _slider(0, 100, 5, channel[1], "%d%%")
+		var bus: String = channel[0]
+		s[0].value_changed.connect(func(v): volume_changed.emit(bus, v / 100.0))
+		_row(box, bus, s[1])
+	var note := UI.label("Every sound and the music are made by the game as it plays; the music follows the mood of the world.", "Muted")
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(note)
 

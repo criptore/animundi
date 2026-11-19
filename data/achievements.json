@@ -1,0 +1,28 @@
+{
+	"_about": "Achievements (1.0, docs/POLISH.md), read by scripts/world/achievements.gd. Each is won once, for good, when the world's facts (sim/Cards.cs Facts) meet its test: `fact` compared with `at_least` (a number, or true). icon: of art/ui_icons.py.",
+	"achievements": [
+		{ "id": "first_city", "name": "Walls of Stone", "text": "A village grows into a city.", "fact": "cities", "at_least": 1, "icon": "house" },
+		{ "id": "five_kingdoms", "name": "Many Crowns", "text": "Five kingdoms share the world.", "fact": "kingdoms", "at_least": 5, "icon": "crown" },
+		{ "id": "thousand", "name": "A Thousand Souls", "text": "A thousand people live at once.", "fact": "people", "at_least": 1000, "icon": "people" },
+		{ "id": "century", "name": "A Hundred Years", "text": "The world reaches its hundredth year.", "fact": "year", "at_least": 100, "icon": "hourglass" },
+		{ "id": "millennium", "name": "The Long Count", "text": "The world reaches its thousandth year.", "fact": "year", "at_least": 1000, "icon": "hourglass" },
+		{ "id": "iron", "name": "Iron and Roads", "text": "A people enters the Iron Age.", "fact": "max_age", "at_least": 2, "icon": "ingot" },
+		{ "id": "steam", "name": "Steam and Smoke", "text": "A people enters the Industrial Age.", "fact": "max_age", "at_least": 5, "icon": "factory" },
+		{ "id": "atom", "name": "The Split Atom", "text": "A people enters the Atomic Age.", "fact": "max_age", "at_least": 7, "icon": "atom" },
+		{ "id": "moon", "name": "Footprints on the Moon", "text": "A people walks on the moon.", "fact": "moon", "at_least": true, "icon": "moon" },
+		{ "id": "beyond", "name": "Beyond", "text": "A people reaches an age no one has seen.", "fact": "beyond", "at_least": true, "icon": "sparkle" },
+		{ "id": "bomb", "name": "Now I Am Become Death", "text": "A bomb falls.", "fact": "nukes", "at_least": 1, "icon": "atom" },
+		{ "id": "long_night", "name": "The Long Night", "text": "The ash of the bombs hides the sun.", "fact": "winter", "at_least": 2, "icon": "winter" },
+		{ "id": "warm", "name": "A Warmer World", "text": "The world grows two degrees warmer.", "fact": "warming", "at_least": 2, "icon": "drought" },
+		{ "id": "world_war", "name": "The World at War", "text": "Three wars at once.", "fact": "wars", "at_least": 3, "icon": "swords" },
+		{ "id": "slayer", "name": "Giant-Slayer", "text": "A legendary monster is slain.", "fact": "legends_slain", "at_least": 1, "icon": "legend" },
+		{ "id": "plague", "name": "Ring Around the Rosie", "text": "A sickness becomes a plague.", "fact": "plagues", "at_least": 1, "icon": "plague" },
+		{ "id": "heroes", "name": "Songs of the Brave", "text": "Five heroes are hailed.", "fact": "heroes", "at_least": 5, "icon": "star" },
+		{ "id": "worshipped", "name": "Worshipped", "text": "A people worships you.", "fact": "worshipped", "at_least": 1, "icon": "halo" },
+		{ "id": "hated", "name": "The Cruel God", "text": "A people curses your name.", "fact": "hated", "at_least": 1, "icon": "curse" },
+		{ "id": "wrath", "name": "The Wild Remembers", "text": "A spirit of nature grows wrathful.", "fact": "spirits_wrathful", "at_least": 1, "icon": "sprout" },
+		{ "id": "eras", "name": "Turning of the World", "text": "Five moods of the world come and go.", "fact": "eras", "at_least": 5, "icon": "spiral" },
+		{ "id": "terraformer", "name": "Shaper of Lands", "text": "Reshape a thousand tiles of land.", "fact": "reshaped", "at_least": 1000, "icon": "raise" },
+		{ "id": "inventors", "name": "A Hundred Wonders", "text": "A hundred things are invented.", "fact": "inventions", "at_least": 100, "icon": "bulb" }
+	]
+}

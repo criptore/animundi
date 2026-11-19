@@ -489,8 +489,8 @@ The AI is the game's edge, so it arrives as soon as there are peoples and settle
 | **0.6 Culture** | AI-shaped cultures, religions, gods, laws, rituals, AI-written chronicle |
 | **0.7 Monsters & nature** | monster species and nature spirits with AI minds, lairs, disasters, diseases |
 | **0.8 Ages** | endless progress from Stone to Space and beyond, AI-driven evolution of objects, buildings and vehicles, consequences (pollution, nuclear war), moods of the world (done: [AGES.md](AGES.md)) |
-| **0.9 God powers & UI** | full power set, inspector, chronicle views, save/load (done but saving whole worlds: [POWERS.md](POWERS.md)) |
-| **1.0** | balancing, performance, audio, polish |
+| **0.9 God powers & UI** | full power set, inspector, chronicle views, save/load (done: [POWERS.md](POWERS.md), saves in [POLISH.md](POLISH.md)) |
+| **1.0** | balancing, performance, audio, polish (done: [POLISH.md](POLISH.md)) |
 
 ---
 

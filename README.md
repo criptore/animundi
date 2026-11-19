@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature, 0.8 Ages, 0.9 God powers and interface
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature, 0.8 Ages, 0.9 God powers and interface, 1.0
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -171,7 +171,16 @@ The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a t
 
 ![The game](docs/images/interface_game.png)
 
-Next: 1.0 polish (balancing, sound and music, saving whole worlds, achievements and scenarios, a build to share). God powers came last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+## 1.0
+
+([docs/POLISH.md](docs/POLISH.md))
+- **Saved worlds**: six slots and an autosave every ten years; everything comes back, from the land to the last myth. Continue and Load on the title screen.
+- **Sound and music**, made by the game as it plays: effects for the powers and the great events, a generative music that follows the mood of the world, wind and sea.
+- **Achievements** (23), **scenarios** (7: The Twin Isles, Age of Steam, The Brink, The Long Night, Ice Age, Golden Age, The Quiet Earth), **mods** ([docs/MODS.md](docs/MODS.md)): new creatures, buildings, moods of the world, scenarios, stamps and sprites from a folder.
+- Everything that waited: favourites, a person's family, story and mind, hail and wind, faith mode, the storyteller, forgetting a language; pause on great events, screen shake, rain and snow on the screen.
+- **Faster** over long histories, and a **build to share** for Linux, Windows and macOS ([docs/BUILD.md](docs/BUILD.md)).
+
+God powers came last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -265,6 +274,12 @@ A world with peoples over the years (villages, stores, homes, buildings, jobs, e
 godot --headless --path . --script res://tools/village_check.gd -- 10 humans,elves,orcs animundi
 ```
 
+A playable build for Linux, Windows and macOS (Godot's export templates needed, see docs/BUILD.md):
+
+```bash
+tools/build.sh all
+```
+
 The peoples through the ages (each kingdom's age every few decades, its things, the air, the bombs and rockets):
 
 ```bash
@@ -290,7 +305,7 @@ godot --headless --path . --script res://tools/render_preview.gd -- <seed> <size
 Screenshot of the game (needs a display; on a headless machine wrap it in `xvfb-run`). `zoom` is screen pixels per world pixel, a tile being 8 world pixels; 0 shows the whole map:
 
 ```bash
-godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle|nature|ages|terrain|views] [years]
+godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle|nature|ages|terrain|views|saves|reload|achievements] [years]
 ```
 
 To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, NumPy, SciPy):

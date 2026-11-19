@@ -38,7 +38,7 @@ The world has five levels: deep sea, shallow water, plain, hill, mountain. After
 | **Forget faith** | Whispers | a kingdom's gods are forgotten and a new faith is born there |
 | **Traits** | Whispers | brave, lazy, kind, greedy, wise or strong, rained on the people under the brush |
 
-Still to come (shown locked): hail and wind, an avatar, faith mode, forgetting a language, the storyteller.
+Hail and wind, faith mode, forgetting a language and the storyteller came with 1.0 ([POLISH.md](POLISH.md)).
 
 ## Seeing the world
 
@@ -57,9 +57,9 @@ Still to come (shown locked): hail and wind, an avatar, faith mode, forgetting a
 
 Every rule of the simulation has its switch: animals born over time, plants growing, seasons, hunger and thirst, old age, legends, monsters, spirits, the moods of the world, pollution, natural disasters, fire spreading, plagues, eruptions, kingdoms plotting, rebellions, settlers, minds inventing, trade, customs and myths, faiths, the ages, nuclear war.
 
-## Still to come
+## Saving
 
-Saving and loading a whole world (everything that lives in it) comes with 1.0; the Save button stays locked until then. A world's code already gives back its land.
+Saving and loading a whole world (everything that lives in it) came with 1.0 ([POLISH.md](POLISH.md)). A world's code gives back its land only.
 
 ## Checking it
 

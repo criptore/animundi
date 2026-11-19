@@ -1,22 +1,23 @@
 ## The title screen, over the first generated world: the emblem, the name of the game and the
-## main choices. Continue and Load wait for saved worlds (docs/ROADMAP.md, 0.9).
+## main choices. Continue goes back to the world saved last, Load to any saved world.
 extends Control
 
 const UI = preload("res://scripts/ui/ui.gd")
 
-## One of: "new_world", "continue", "load", "settings", "credits", "quit".
+## One of: "new_world", "continue", "load", "scenarios", "settings", "credits", "quit".
 signal chosen(what: String)
 
 const ENTRIES := [
 	["new_world", "New world", "globe", "Primary"],
 	["continue", "Continue", "play", ""],
 	["load", "Load a world", "load", ""],
+	["scenarios", "Scenarios", "book", ""],
 	["settings", "Settings", "gear", ""],
 	["credits", "Credits", "heart", ""],
 	["quit", "Quit", "door", ""],
 ]
 ## Choices that wait for a later version: shown locked.
-const SOON := ["continue", "load"]
+const SOON := []
 
 
 func _init() -> void:
@@ -72,7 +73,7 @@ func _init() -> void:
 			b.tooltip_text = "Saved worlds come in a later version"
 		menu.add_child(b)
 
-	var version := UI.label("version 0.9 · the world lives, the god awakes", "Muted")
+	var version := UI.label("version 1.0 · the world lives, the god awakes", "Muted")
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	version.position += Vector2(12, -34)
 	add_child(version)

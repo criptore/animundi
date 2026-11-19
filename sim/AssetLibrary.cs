@@ -369,6 +369,12 @@ public sealed class AssetLibrary
 	public BeyondRecord Beyond = new();
 	/// <summary>Moods of the world (data/eras.json).</summary>
 	public List<EraRecord> Eras = new();
+	/// <summary>The mods loaded (docs/MODS.md): folder names of ModsDir.</summary>
+	public List<string> Mods = new();
+	/// <summary>What each mod brought, or why it was refused: name → text.</summary>
+	public Dictionary<string, string> ModNotes = new();
+	/// <summary>Where mods are looked for: each folder in it is a mod.</summary>
+	public static string ModsDir = "user://mods";
 
 	public static AssetLibrary Load(string speciesPath = "res://data/species.json",
 		string plantsPath = "res://data/plants.json", string biomesPath = "res://data/biomes.json")
@@ -419,7 +425,109 @@ public sealed class AssetLibrary
 		}
 		if (FileAccess.FileExists("res://data/eras.json"))
 			lib.Eras = JsonSerializer.Deserialize<ErasFile>(FileAccess.GetFileAsString("res://data/eras.json")).Eras;
+		lib.LoadMods();
 		return lib;
+	}
+
+	// ------------------------------------------------------------------ mods
+
+	/// <summary>Every folder of ModsDir is a mod: its species.json, buildings.json, eras.json and
+	/// ages.json ("beyond" words) add records, or replace those with the same id. A file that does
+	/// not read is skipped and said in ModNotes; the game goes on without it.</summary>
+	private void LoadMods()
+	{
+		Mods.Clear();
+		ModNotes.Clear();
+		using var dir = DirAccess.Open(ModsDir);
+		if (dir == null)
+			return;
+		var names = new List<string>(dir.GetDirectories());
+		names.Sort(StringComparer.Ordinal);
+		foreach (var name in names)
+		{
+			string root = ModsDir.TrimEnd('/') + "/" + name;
+			var done = new List<string>();
+			try
+			{
+				string path = root + "/species.json";
+				if (FileAccess.FileExists(path))
+				{
+					int n = 0;
+					foreach (var s in JsonSerializer.Deserialize<SpeciesFile>(FileAccess.GetFileAsString(path)).Species)
+					{
+						if (string.IsNullOrEmpty(s.Id))
+							continue;
+						if (_speciesIndex.TryGetValue(s.Id, out int at))
+							Species[at] = s;
+						else
+						{
+							_speciesIndex[s.Id] = Species.Count;
+							Species.Add(s);
+						}
+						n++;
+					}
+					done.Add($"{n} species");
+				}
+				path = root + "/buildings.json";
+				if (FileAccess.FileExists(path))
+				{
+					int n = 0;
+					foreach (var b in JsonSerializer.Deserialize<BuildingsFile>(FileAccess.GetFileAsString(path)).Buildings)
+					{
+						if (string.IsNullOrEmpty(b.Id) || b.Id == "ruin")
+							continue;
+						int at = BuildingIndex(b.Id);
+						if (at >= 0)
+							Buildings[at] = b;
+						else
+						{
+							// Before the ruin, which stays last.
+							int ruin = BuildingIndex("ruin");
+							Buildings.Insert(ruin >= 0 ? ruin : Buildings.Count, b);
+						}
+						n++;
+					}
+					done.Add($"{n} buildings");
+				}
+				path = root + "/eras.json";
+				if (FileAccess.FileExists(path))
+				{
+					int n = 0;
+					foreach (var e in JsonSerializer.Deserialize<ErasFile>(FileAccess.GetFileAsString(path)).Eras)
+					{
+						if (string.IsNullOrEmpty(e.Id))
+							continue;
+						int at = Eras.FindIndex(o => o.Id == e.Id);
+						if (at >= 0)
+							Eras[at] = e;
+						else
+							Eras.Add(e);
+						n++;
+					}
+					done.Add($"{n} moods of the world");
+				}
+				path = root + "/ages.json";
+				if (FileAccess.FileExists(path))
+				{
+					var ages = JsonSerializer.Deserialize<AgesFile>(FileAccess.GetFileAsString(path));
+					if (ages.Beyond != null)
+					{
+						Beyond.First.AddRange(ages.Beyond.First);
+						Beyond.Second.AddRange(ages.Beyond.Second);
+						Beyond.Vehicle.AddRange(ages.Beyond.Vehicle);
+						Beyond.Home.AddRange(ages.Beyond.Home);
+						Beyond.Weapon.AddRange(ages.Beyond.Weapon);
+						done.Add("words for the ages beyond");
+					}
+				}
+				Mods.Add(name);
+				ModNotes[name] = done.Count > 0 ? string.Join(", ", done) : "nothing the game reads (scenarios, stamps and sprites are read by the interface)";
+			}
+			catch (Exception e)
+			{
+				ModNotes[name] = "refused: " + e.Message;
+			}
+		}
 	}
 
 	/// <summary>Index of a building in data/buildings.json, or -1.</summary>
