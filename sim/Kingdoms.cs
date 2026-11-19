@@ -364,6 +364,8 @@ public partial class Simulation
 	/// dislikes and is not weaker than, an alliance with one it likes, peace in a long or costly war.</summary>
 	private void Diplomacy()
 	{
+		if (!Law("diplomacy"))
+			return;
 		for (int a = 0; a < Kingdoms.Count; a++)
 		{
 			var ka = Kingdoms[a];
@@ -518,7 +520,7 @@ public partial class Simulation
 			village.Conquered = Math.Max(0f, village.Conquered - 0.05f);
 			village.Loyalty = Math.Clamp(village.Loyalty * 0.5f + l * 0.5f + (float)(_rng.NextDouble() * 10 - 5), -100f, 100f);
 			// Big disloyal villages plot to break away, at most once every eight years.
-			if (village.Loyalty < -5f && village.Population >= 20 && Scheduler.Time >= village.CalmUntil
+			if (Law("rebellions") && village.Loyalty < -5f && village.Population >= 20 && Scheduler.Time >= village.CalmUntil
 				&& !Plotting("rebellion", village.Kingdom, v))
 				StartPlan("rebellion", village.Kingdom, v, YearSeconds * 0.8f);
 		}

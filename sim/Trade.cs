@@ -51,7 +51,7 @@ public partial class Simulation
 			if (r.Alive && (!Villages[r.A].Alive || !Villages[r.B].Alive || !Friendly(Villages[r.A].Kingdom, Villages[r.B].Kingdom)))
 				r.Alive = false;
 		_trade.RemoveAll(r => !r.Alive);
-		if (_rng.NextDouble() < 0.15)
+		if (Law("trade") && _rng.NextDouble() < 0.15)
 			OpenRoute();
 		foreach (var r in _trade)
 			if (Scheduler.Time >= r.Next)

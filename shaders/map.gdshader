@@ -19,7 +19,7 @@ uniform bool show_patterns = true;
 uniform float frost = 0.0;
 // Villages: territory (RGB = owner colour, A = owner key, 0 = no one's) and ground made by people
 // (R * 255: 0 nothing, 1 road, 2 bare field, 3 young wheat, 4 growing wheat, 5 ripe wheat,
-// 6 flood water, 7 parched earth, 8 blighted by smog or fallout).
+// 6 flood water, 7 parched earth, 8 blighted by smog or fallout, 9 frost of a blizzard).
 uniform sampler2D territory : filter_nearest;
 uniform sampler2D ground : filter_nearest;
 uniform bool show_territory = true;
@@ -162,6 +162,11 @@ void fragment() {
 			float hd = hash(vec2(cell) * 8.0 + vec2(sub) + 31.0);
 			vec3 dust = vec3(0.76, 0.64, 0.42) * (hd > 0.9 ? 0.8 : 1.0);
 			col = mix(col, dust, mix(0.42, 0.5, detail));
+		} else if (g == 9) {
+			// Frost left by a blizzard (sim/MorePowers.cs): white, sparkling up close.
+			float hs = hash(vec2(cell) * 8.0 + vec2(sub) + 53.0);
+			vec3 snow = vec3(0.90, 0.94, 1.0) * (hs > 0.9 ? 1.08 : (hs < 0.1 ? 0.9 : 1.0));
+			col = mix(col, snow, mix(0.75, 0.85, detail));
 		} else if (g == 8) {
 			// Blighted ground under smog or fallout (sim/Ages.cs): grey-brown, dead, with dark specks.
 			float hb = hash(vec2(cell) * 8.0 + vec2(sub) + 47.0);

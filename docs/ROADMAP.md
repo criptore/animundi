@@ -127,23 +127,26 @@ See [AGES.md](AGES.md).
 ## 0.9 God powers and interface
 Nothing here before the world lives on its own (see the order of work above). Special biomes and volcanoes are never generated at random: the player places them with these tools.
 - [x] Biome brush: paint mushroom land, cursed land, volcanic rock, lava (and the natural biomes), with a brush size (land only; the old plants go and the new biome's grow; lava kills what stands on it)
-- [ ] Stamps: ready-made presets (volcanoes of several sizes, later islands, craters, oases) pasted on the map where the player clicks; levels around them are fixed so the terrain stays valid
-- [ ] The player's own presets: select an area of the map and save it as a stamp, reuse it in any world
+- [x] Stamps (`sim/Terrain.cs`, [POWERS.md](POWERS.md)): small and great volcanoes, islands, craters, oases, mountains, lakes pasted where the player clicks; levels around them are fixed so the terrain stays valid
+- [x] The player's own presets: "Copy the land" keeps the square under the brush as a stamp in `user://stamps/`, listed in every world
 - [x] Plants and the map texture update only where the terrain changed
-- [ ] Fire power drops sparks (particles) that set alight the tiles they land on, as in WorldBox (the fire power lights the tiles under the brush for now; the F test key is gone)
+- [x] Fire power throws sparks that arc out and set alight the tiles they land on, as in WorldBox
 - [x] The powers bar (`scripts/ui/power_bar.gd`, `sim/Powers.cs`): a power and a brush size, then click or drag on the map; first powers: bring creatures, settle a people (a new village and kingdom), fire, lightning, rain, meteor, smite, bless
 - [x] Miracle (Wrath & Mercy) and Convert (Whispers) powers
 - [x] Disasters and sickness as powers (done with 0.7): wildfire, drought, tornado, earthquake, flood, eruption, plague, heal
-- [ ] More powers: terrain (raise, lower, water), weather, curses, faith mode, avatar, gestures, storyteller
+- [x] More powers: terrain (raise, lower, water), seeds, blizzard, curse, madness, resurrect
+- [ ] Later (1.0): hail and wind, faith mode, avatar, gestures, storyteller
 - [x] Inspector cards for a creature and a village: click to pin, refreshed while it lives
-- [ ] Inspector cards: kingdom, species, spirit, invention (with its script and lineage)
-- [ ] Map layers (kingdoms, cultures, languages, religions, clans, families, species, alliances, armies), war lines, plot and task icons, unit arrows, and statistics
+- [x] Inspector cards: kingdom, species, spirit, invention (with its script and lineage), from the dock's books and the land
+- [x] Political map layers (kingdoms, cultures, religions, peoples, alliances, wars and their fronts), war lines between capitals, statistics through the years (`sim/Cards.cs`, `scripts/ui/stats_window.gd`)
+- [ ] Later: clans and families, armies on the march, plot and task icons, unit arrows
 - [x] World laws menu: a switch for each of the five laws the simulation has
-- [ ] World laws: one switch per simulation rule, grouped (diplomacy, civilisations, units, nature, biomes, weather, disasters), each with a one-line description
+- [x] World laws: one switch per simulation rule, grouped, each with a one-line description (plotting, rebellions, settlers, inventions, trade, customs and myths, seasons, fire spreading join the others)
 - [x] Whispers: war, peace or alliance between two kingdoms, by clicking their lands
-- [ ] Powers that act on minds: rain traits, make people forget their language, culture, faith or kingdom
+- [x] Powers that act on minds: rain traits, stir a rebellion, inspire an invention, make a kingdom forget its customs or its faith (forgetting a language: later)
 - [x] The whole interface in one look (`scripts/ui/ui.gd`, icons by `art/ui_icons.py`): title screen, world setup, top bar, dock of books (kingdoms, villages, life, inventions, chronicle), tabbed powers bar, inspector, map layers, laws, settings and pause windows; every feature to come already has its locked button
-- [ ] Save, load, share a seed
+- [x] Share a world: a code of its settings, copied and pasted in the world setup
+- [ ] Save and load a whole world (1.0)
 
 ## 1.0 Polish
 - [ ] Balancing and performance

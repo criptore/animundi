@@ -458,6 +458,9 @@ public partial class Simulation
 		// The weapons of its age (Ages.cs): a rifle against a spear.
 		if (vi >= 0 && Villages[vi].Kingdom >= 0)
 			d *= AgeStrength(Villages[vi].Kingdom);
+		// The cursed strike weaker (MorePowers.cs).
+		if (Units.Cursed[i] > 0f)
+			d *= 0.5f;
 		return d * (0.7f + 0.6f * (float)_rng.NextDouble());
 	}
 

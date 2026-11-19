@@ -26,6 +26,9 @@ signal focus_requested(tile: Vector2)
 signal tilt_toggled(on: bool)
 ## The player asked for the next hour of the day (the tilt view's light).
 signal hour_requested
+## The player clicked something the inspector can show: "kingdom" (index), "species" (name),
+## "invention" (id).
+signal card_requested(kind: String, id: Variant)
 
 const UI = preload("res://scripts/ui/ui.gd")
 const WorldSettings = preload("res://scripts/world/world_settings.gd")
@@ -36,6 +39,7 @@ const PowerBar = preload("res://scripts/ui/power_bar.gd")
 const Inspector = preload("res://scripts/ui/inspector.gd")
 const LawsWindow = preload("res://scripts/ui/laws_window.gd")
 const SettingsWindow = preload("res://scripts/ui/settings_window.gd")
+const StatsWindow = preload("res://scripts/ui/stats_window.gd")
 const PauseMenu = preload("res://scripts/ui/pause_menu.gd")
 const MainMenu = preload("res://scripts/ui/main_menu.gd")
 
@@ -48,8 +52,9 @@ const BOOKS := [["kingdoms", "Kingdoms", "crown"], ["villages", "Villages", "hou
 		["inventions", "Inventions", "bulb"], ["cultures", "Cultures", "book"], ["legends", "Legends", "legend"],
 		["nature", "Nature", "sprout"], ["ages", "Ages", "hourglass"], ["chronicle", "Chronicle", "scroll"]]
 const LAYER_ICONS := {"Biomes": "biome", "Height": "height", "Temperature": "thermo", "Humidity": "humidity", "Rivers": "river"}
-## Map layers to come (docs/ROADMAP.md, 0.9): name, icon.
-const LAYERS_SOON := [["Kingdoms", "crown"], ["Cultures", "book"], ["Religions", "ankh"], ["Armies", "swords"]]
+## Political map layers (sim/Cards.cs LayerColors): name, icon, what they show.
+const POLITICAL_LAYERS := [["Kingdoms", "crown", "kingdoms"], ["Cultures", "book", "cultures"], ["Religions", "ankh", "faiths"],
+		["Peoples", "people", "peoples and their tongues"], ["Alliances", "rings", "alliances"], ["Wars", "swords", "wars and their fronts"]]
 const SEASON_ICONS := ["spring", "summer", "autumn", "winter"]
 const EVENT_FILTERS := [["", "All", "scroll"], ["kings", "Kings", "crown"], ["wars", "Wars", "swords"], ["cities", "Cities", "house"],
 		["inventions", "Inventions", "bulb"], ["ages", "Ages", "hourglass"], ["culture", "Gods and customs", "ankh"], ["heroes", "Heroes", "star"],
@@ -63,6 +68,8 @@ var settings: WorldSettings
 var powers := PowerBar.new()
 var inspector := Inspector.new()
 var laws := LawsWindow.new()
+## The world's numbers through the years (0.9).
+var stats := StatsWindow.new()
 
 var _root: Control
 var _game: Control
@@ -98,6 +105,9 @@ var _event_filter := ""
 var _kingdoms_box: VBoxContainer
 var _plans_label: Label
 var _inventions_label: Label
+var _inventions_box: VBoxContainer
+## The inventions book: a button per invention (click: its card), and the ids they show.
+var _invention_rows: Array = []
 var _mind_label: Label
 var _cultures_label: Label
 var _legends_label: Label
@@ -196,7 +206,7 @@ func _ready() -> void:
 	_title = MainMenu.new()
 	_title.chosen.connect(_on_title)
 	root.add_child(_title)
-	for window in [laws, _pause, _settings_window]:
+	for window in [laws, _pause, _settings_window, stats]:
 		window.closed.connect(_refresh_screens)
 		root.add_child(window)
 	_pause.closed.connect(_leave_pause)
@@ -285,8 +295,10 @@ func _build_top() -> void:
 	var laws_button := UI.tool_button(UI.icon("scales"), "Laws of the world", 40)
 	laws_button.pressed.connect(func(): _open(laws))
 	bar.add_child(laws_button)
-	for soon in [["chart", "Statistics", "Graphs of populations, wars and inventions through the years."],
-			["star", "Favourites", "The creatures and villages you follow."],
+	var stats_button := UI.tool_button(UI.icon("chart"), "Statistics: the world through the years", 40)
+	stats_button.pressed.connect(func(): _open(stats))
+	bar.add_child(stats_button)
+	for soon in [["star", "Favourites", "The creatures and villages you follow."],
 			["save", "Save the world", "Keep this world and come back to it later."]]:
 		var b := UI.tool_button(UI.icon(soon[0]), "%s (coming later)\n%s" % [soon[1], soon[2]], 40)
 		UI.mark_soon(b)
@@ -389,6 +401,9 @@ func _build_dock() -> void:
 	_pages["inventions"].add_child(_mind_label)
 	_inventions_label = _text("Nothing invented yet.", UI.BLUE)
 	_pages["inventions"].add_child(_inventions_label)
+	_inventions_box = VBoxContainer.new()
+	_inventions_box.add_theme_constant_override("separation", 3)
+	_pages["inventions"].add_child(_inventions_box)
 
 	_cultures_label = _text("No people has a culture yet.", UI.CREAM)
 	_pages["cultures"].add_child(_cultures_label)
@@ -467,11 +482,14 @@ func _build_layers() -> void:
 	_tilt_button.toggled.connect(func(on): tilt_toggled.emit(on))
 	layers.add_child(_tilt_button)
 	layers.add_child(HSeparator.new())
-	for soon in LAYERS_SOON:
-		var b := UI.tool_button(UI.icon(soon[1]), "Map of %s (coming later)" % soon[0].to_lower(), 40)
-		UI.mark_soon(b)
-		b.pressed.connect(func(): _soon("The map of %s" % soon[0].to_lower(), "It will colour the land by %s." % soon[0].to_lower()))
+	for political in POLITICAL_LAYERS:
+		var layer: String = political[0]
+		var b := UI.tool_button(UI.icon(political[1]), "Map of %s" % political[2], 40)
+		b.toggle_mode = true
+		b.button_group = group
+		b.pressed.connect(func(): layer_selected.emit(layer))
 		layers.add_child(b)
+		_layer_buttons[layer] = b
 
 
 func _build_bottom() -> void:
@@ -507,7 +525,7 @@ func _build_bottom() -> void:
 
 ## Whether something stands between the player and the map: the title, the setup, a window.
 func blocking() -> bool:
-	return _at_title or setup_visible() or laws.visible or _pause.visible or _settings_window.visible
+	return _at_title or setup_visible() or laws.visible or _pause.visible or _settings_window.visible or stats.visible
 
 
 func setup_visible() -> bool:
@@ -536,7 +554,7 @@ func _show_title() -> void:
 func _refresh_screens() -> void:
 	_title.visible = _at_title
 	_game.visible = not _at_title and not setup_visible()
-	_shade.visible = not _at_title and (laws.visible or _pause.visible or _settings_window.visible)
+	_shade.visible = not _at_title and (laws.visible or _pause.visible or _settings_window.visible or stats.visible)
 	for l in _name_labels:
 		l.visible = l.visible and _game.visible
 
@@ -613,6 +631,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		# Esc closes what is open, then drops the power, then opens the menu.
 		if _settings_window.visible:
 			_settings_window.close()
+		elif stats.visible:
+			stats.close()
 		elif laws.visible:
 			laws.close()
 		elif _pause.visible:
@@ -749,6 +769,12 @@ func set_kingdoms(kingdoms: Array) -> void:
 		if row.is_empty():
 			var card := PanelContainer.new()
 			card.theme_type_variation = "Card"
+			card.mouse_filter = Control.MOUSE_FILTER_STOP
+			card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			var index: int = k.index
+			card.gui_input.connect(func(e):
+				if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+					card_requested.emit("kingdom", index))
 			var h := HBoxContainer.new()
 			h.add_theme_constant_override("separation", 8)
 			card.add_child(h)
@@ -804,13 +830,31 @@ func set_mind(status: Dictionary) -> void:
 
 ## The latest inventions of the peoples' minds (0.5).
 func set_inventions(inventions: Array) -> void:
-	var lines := PackedStringArray()
-	for inv in inventions.slice(0, 10):
-		var line := "%s (%s, %s, year %d)\n%s" % [inv.name, inv.kind, inv.people, inv.year, inv.effects]
-		if inv.parent != "":
-			line += " · from the " + inv.parent
-		lines.append(line)
-	_inventions_label.text = "\n\n".join(lines) if not lines.is_empty() else "Nothing invented yet."
+	_inventions_label.visible = inventions.is_empty()
+	var shown := inventions.slice(0, 12)
+	while _invention_rows.size() < shown.size():
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.clip_text = true
+		UI.small(b)
+		b.custom_minimum_size.x = DOCK_WIDTH - 14
+		b.add_theme_color_override("font_color", UI.BLUE)
+		var k := _invention_rows.size()
+		b.pressed.connect(func(): card_requested.emit("invention", _invention_rows[k][1]))
+		_inventions_box.add_child(b)
+		_invention_rows.append([b, -1])
+	for k in _invention_rows.size():
+		var row: Array = _invention_rows[k]
+		row[0].visible = k < shown.size()
+		if row[0].visible:
+			var inv: Dictionary = shown[k]
+			var line := "%s (%s, %s, year %d)\n%s" % [inv.name, inv.kind, inv.people, inv.year, inv.effects]
+			if inv.parent != "":
+				line += " · from the " + inv.parent
+			row[0].text = line
+			row[0].tooltip_text = "Its record and its lineage"
+			row[1] = inv.id
 
 
 ## The cultures of the kingdoms (0.6): what they value, how they rule and build, their customs,
@@ -1045,6 +1089,12 @@ func set_populations(table: Dictionary) -> void:
 	while _life_rows.size() < names.size():
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.tooltip_text = "Click to see this species"
+		var at := _life_rows.size()
+		row.gui_input.connect(func(e):
+			if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+				card_requested.emit("species", _life_rows[at][2].text))
 		var icon := UI.picture(null)
 		icon.custom_minimum_size = Vector2(30, 24)
 		row.add_child(icon)

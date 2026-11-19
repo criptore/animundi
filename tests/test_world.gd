@@ -62,6 +62,9 @@ func _initialize() -> void:
 	test_ages()
 	test_eras()
 	test_progress_costs()
+	test_terrain()
+	test_more_powers()
+	test_world_views()
 	test_powers()
 	test_interface()
 	test_power_bar()
@@ -2357,4 +2360,230 @@ func test_progress_costs() -> void:
 	var second: String = sim.LaunchNow(k)
 	check(pad >= 0 and "first rocket" in first and "satellite" in second and sim.WorldAges().rockets == 2,
 			"a Space Age people with a launch pad sends rockets and satellites up (%s; %s)" % [first, second])
+	sim.queue_free()
+
+
+## 0.9 Terrain tools: raise, lower, water, stamps and the player's own, the terrain kept valid.
+func test_terrain() -> void:
+	var made := make_quiet_sim("terrain", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	check(sim.TerrainValid(), "a new world's terrain is valid (land steps by one level, plains at the water)")
+	var at := find_tile(w, Biomes.GRASSLAND)
+	if at.x < 0:
+		at = find_tile(w, -1)
+	var x := at.x + 0.5
+	var y := at.y + 0.5
+	sim.PowerRaise(x, y, 1.5)
+	sim.PowerRaise(x, y, 1.5)
+	check(sim.LevelAt(at.x, at.y) == 4 and sim.BiomeAt(at.x, at.y) == "Mountain" and sim.TerrainValid(),
+			"raising the land twice makes a mountain, with hills around it (%d, %s)" % [sim.LevelAt(at.x, at.y), sim.BiomeAt(at.x, at.y)])
+	var deer: int = sim.SpawnAt("deer", x + 0.2, y + 0.2, false)
+	for n in 3:
+		sim.PowerLower(x, y, 1.5)
+	check(sim.WaterAt(at.x, at.y) > 0 and sim.LevelAt(at.x, at.y) <= 1 and sim.TerrainValid(), "lowering it three times brings the water in")
+	check(deer < 0 or not sim.UnitAlive(deer), "what stood there drowns")
+	check(sim.PowerWater(x, y, 1.5) > 0 and sim.WaterAt(at.x, at.y) == 0 and sim.TerrainValid(), "water dried by the Water power is land again")
+	check(sim.PowerWater(x, y, 2.0) > 0 and sim.WaterAt(at.x, at.y) == 2 and sim.TerrainValid(), "the Water power pours a lake on land")
+	var quads: PackedInt32Array = sim.TakeTerrainChanges()
+	check(quads.size() > 0 and quads.size() % 4 == 0 and sim.TakeTerrainChanges().is_empty(), "the map is told what changed, once")
+
+	# Stamps.
+	var ids: PackedStringArray = sim.StampIds()
+	check("volcano_small" in ids and "island" in ids and "oasis" in ids and sim.StampName("island") == "Island", "built-in stamps are ready (%s)" % [", ".join(ids)])
+	var land := find_tile(w, Biomes.GRASSLAND)
+	if land.x < 0:
+		land = find_tile(w, -1)
+	var far := Vector2i(-1, -1)
+	for yy in range(10, w.height - 10, 3):
+		for xx in range(10, w.width - 10, 3):
+			if far.x < 0 and w.level[w.index(xx, yy)] == WorldData.Level.DEEP_SEA:
+				far = Vector2i(xx, yy)
+	if far.x >= 0:
+		sim.PowerStamp("island", far.x + 0.5, far.y + 0.5)
+		check(sim.WaterAt(far.x, far.y) == 0 and sim.LevelAt(far.x, far.y) >= 2 and sim.TerrainValid(), "an island rises from the sea")
+	var spot := find_tile(w, Biomes.GRASSLAND)
+	spot = Vector2i(clampi(spot.x + 20, 10, w.width - 10), spot.y)
+	sim.PowerStamp("volcano_small", spot.x + 0.5, spot.y + 0.5)
+	check(sim.LevelAt(spot.x, spot.y) == 4 and sim.BiomeAt(spot.x, spot.y) == "Lava" and sim.TerrainValid(), "a volcano is pasted with lava at its heart (%s)" % sim.BiomeAt(spot.x, spot.y))
+	check(sim.PowerStamp("nonsense", 5.0, 5.0) == -1, "an unknown stamp does nothing")
+
+	# The player's own stamp: copied here, pasted there, kept on disk.
+	var json: String = sim.CopyStamp(spot.x + 0.5, spot.y + 0.5, 10)
+	check(sim.AddStamp("my_test", "My test", json) == "" and "my_test" in sim.StampIds() and sim.AddStamp("x", "Bad", "{}") != "",
+			"the land can be copied as a stamp of one's own")
+	var there := Vector2i(clampi(spot.x - 25, 10, w.width - 10), spot.y)
+	sim.PowerStamp("my_test", there.x + 0.5, there.y + 0.5)
+	check(sim.LevelAt(there.x, there.y) == sim.LevelAt(spot.x, spot.y) and sim.TerrainValid(), "and pasted elsewhere")
+	var Store = load("res://scripts/world/stamp_store.gd")
+	var dir := "user://test_stamps"
+	if DirAccess.dir_exists_absolute(dir):
+		for f in DirAccess.get_files_at(dir):
+			DirAccess.remove_absolute(dir.path_join(f))
+	var saved: Array = Store.save(json, dir)
+	var back: Array = Store.load_all(dir)
+	check(saved.size() == 2 and back.size() == 1 and back[0][0] == saved[0] and sim.AddStamp(back[0][0], back[0][1], back[0][2]) == "",
+			"stamps are kept on disk and read back in another world")
+	Store.remove(saved[0], dir)
+	check(Store.load_all(dir).is_empty(), "and can be thrown away")
+	sim.queue_free()
+
+
+## 0.9 More powers: sparks, seeds, blizzard, curse, madness, resurrect, and powers on minds.
+func test_more_powers() -> void:
+	var made := make_quiet_sim("more powers", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.StartPeoples(PackedStringArray(["humans", "orcs"]), 16)
+	sim.RunSteps(30 * 60)
+	var home: Dictionary = sim.VillageTable()[0]
+	var hx: float = home.x + 0.5
+	var hy: float = home.y + 0.5
+	var k: int = kingdom_index(sim, home.kingdom)
+
+	# The fire throws sparks that fall and light the land.
+	var wood := find_tile(w, Biomes.FOREST)
+	if wood.x < 0:
+		wood = find_tile(w, Biomes.GRASSLAND)
+	sim.PowerFire(wood.x + 0.5, wood.y + 0.5, 1.5)
+	var thrown: int = sim.SparkCount()
+	sim.RunSteps(60)
+	check(thrown > 0 and sim.SparkCount() < thrown, "the fire throws sparks that fall back on the land (%d thrown)" % thrown)
+
+	# Seeds, and the frost of a blizzard.
+	var field := Vector2(hx + 9.0, hy + 9.0)
+	var plants: int = sim.PlantCount()
+	sim.PowerSeeds(field.x, field.y, 3.0)
+	check(sim.PlantCount() >= plants, "seeds sow the plants of the land (%d → %d)" % [plants, sim.PlantCount()])
+	var rabbits := 0
+	for n in 10:
+		if sim.SpawnAt("chicken", field.x + n * 0.1, field.y, false) >= 0:
+			rabbits += 1
+	sim.PowerBlizzard(field.x, field.y, 3.0)
+	check(sim.FrostAt(int(field.x), int(field.y)) or w.is_water(w.index(int(field.x), int(field.y))), "a blizzard leaves frost on the land")
+	var stats: Dictionary = sim.LifeStats()
+	check(rabbits == 0 or stats.Disaster > 0, "the cold kills some of the creatures caught in it")
+
+	# Curse and madness.
+	var people: Array = []
+	for i in sim.UnitCount() * 4:
+		if sim.UnitAlive(i) and sim.UnitVillage(i) == home.index:
+			people.append(i)
+	check(sim.PowerCurse(hx, hy, 3.0) > 0, "the curse falls on those under the brush")
+	var cursed := people.filter(func(i): return sim.IsCursed(i))
+	check(cursed.size() > 0, "they are cursed (%d)" % cursed.size())
+	var wolves: Array = []
+	for n in 4:
+		wolves.append(sim.SpawnAt("deer", field.x + n * 0.4, field.y + 2.0, false))
+	check(sim.PowerMadness(field.x, field.y + 2.0, 2.0) > 0, "madness turns creatures on each other")
+
+	# The dead rise.
+	var victims := 0
+	for n in 4:
+		var i: int = sim.SpawnAt("deer", field.x - 4.0 + n * 0.3, field.y - 4.0, false)
+		if i >= 0:
+			victims += 1
+	sim.PowerSmite(field.x - 3.5, field.y - 4.0, 1.5)
+	check(victims == 0 or sim.PowerResurrect(field.x - 3.5, field.y - 4.0, 2.0) > 0, "the dead lying there rise again")
+
+	# Minds.
+	var inventions: int = sim.InventionTable().size()
+	check(sim.PowerInspire(hx, hy) and sim.InventionTable().size() > inventions, "an idea given to a kingdom: it invents at once")
+	var culture: Dictionary = sim.CultureTable().filter(func(c): return c.index == k)[0]
+	var creed: String = culture.creed
+	check(sim.PowerForgetFaith(hx, hy), "a kingdom forgets its faith")
+	culture = sim.CultureTable().filter(func(c): return c.index == k)[0]
+	check(culture.creed != creed and culture.myths.is_empty(), "a new faith is born there (%s → %s)" % [creed, culture.creed])
+	check(sim.PowerForgetCulture(hx, hy) and sim.CultureTable().filter(func(c): return c.index == k)[0].customs.is_empty(),
+			"a kingdom forgets its customs")
+	var given: int = sim.PowerTrait("wise", hx, hy, 3.0)
+	check(given > 0 and people.any(func(i): return sim.UnitAlive(i) and sim.HasTrait(i, "wise")), "traits rain on the people under the brush")
+	check(not sim.PowerRebellion(hx, hy), "a capital does not rebel against itself")
+	sim.queue_free()
+
+
+## 0.9 What the interface shows: inspector cards, political layers, statistics, world codes,
+## one law per rule.
+func test_world_views() -> void:
+	var made := make_quiet_sim("views", 128)
+	var w: WorldData = made[0]
+	var sim: Node2D = made[1]
+	sim.StartPeoples(PackedStringArray(["humans", "elves"]), 16)
+	sim.RunSteps(30 * 60 * 3)
+	var kingdoms: Array = sim.KingdomTable()
+	var k: int = kingdoms[0].index
+	var info: Dictionary = sim.KingdomInfo(k)
+	check(info.name == kingdoms[0].name and String(info.values).split(", ").size() == 3 and info.creed != "" and info.has("designs"),
+			"a kingdom's card: its people, ruler, values, faith and things (%s)" % info.values)
+	var species: Dictionary = sim.SpeciesInfo("Wolf")
+	if species.is_empty():
+		species = sim.SpeciesInfo("rabbit")
+	check(not species.is_empty() and species.has("habitat") and species.has("alive"), "a species' card")
+	sim.InventNow(k)
+	var inv_id: int = sim.InventionTable()[0].id
+	var inv: Dictionary = sim.InventionInfo(inv_id)
+	var script = JSON.parse_string(inv.script)
+	check(script is Dictionary and script.kind == inv.kind and String(inv.lineage).contains(inv.name), "an invention's card shows its record and lineage")
+	var spirit := {}
+	for s in sim.SpiritTable():
+		spirit = sim.SpiritInfoAt(s.x, s.y)
+		break
+	check(sim.SpiritTable().is_empty() or spirit.has("mood_word"), "a spirit's card, from a click on its land")
+
+	# The political layers.
+	var home: Dictionary = sim.VillageTable()[0]
+	var tile: int = w.index(home.x, home.y)
+	for layer in ["Kingdoms", "Cultures", "Religions", "Peoples", "Alliances", "Wars"]:
+		var colors: PackedInt32Array = sim.LayerColors(layer)
+		check(colors.size() == w.size() and colors[tile] != 0, "the %s layer colours the land of the kingdoms" % layer.to_lower())
+	var sea := -1
+	for i in w.size():
+		if w.is_water(i):
+			sea = i
+			break
+	check(sea < 0 or sim.LayerColors("Kingdoms")[sea] == 0, "the sea stays uncoloured")
+	sim.PowerWhisper("war", kingdoms[0].index, kingdoms[1].index)
+	check(sim.WarLines().size() == 4, "a war is a line between two capitals")
+	var map := WorldMap.new()
+	map.set_world(w)
+	map.show_layer("Kingdoms")
+	map.set_political(sim.LayerColors("Kingdoms"))
+	var owner: Color = map.tile_color(tile)
+	var kc: Color = kingdoms[0].color if home.kingdom == kingdoms[0].name else kingdoms[1].color
+	check(absf(owner.h - kc.h) < 0.08 or kc.s < 0.15, "the flat map paints the land in its kingdom's colour")
+	map.free()
+
+	# Statistics.
+	sim.RecordHistoryNow()
+	var history: Dictionary = sim.History()
+	check(history.year.size() >= 2 and history.people[-1] > 0 and history.has("warming"), "the world's numbers are kept every year (%d years)" % history.year.size())
+	var Stats = load("res://scripts/ui/stats_window.gd")
+	var window: PanelContainer = Stats.new()
+	root.add_child(window)
+	window.set_history(history)
+	check(window.points_of("people", Vector2(100, 50)).size() == history.year.size(), "the statistics window draws them")
+	window.queue_free()
+
+	# World codes.
+	var settings := WorldSettings.new()
+	settings.seed_text = "Les îles d'Ana"
+	settings.set_size(384)
+	settings.continents = 6
+	settings.water_ratio = 0.7
+	var code: String = settings.to_code()
+	var back := WorldSettings.new()
+	check(code.begins_with("AM1:") and back.from_code(code) and back.seed_text == settings.seed_text and back.width == 384 and back.continents == 6
+			and absf(back.water_ratio - 0.7) < 0.01, "a world's code gives back the same settings (%s)" % code)
+	check(not back.from_code("hello") and not back.from_code("AM1:####") and not back.from_code("AM1:aGVsbG8"), "a wrong code is refused")
+
+	# A law for each rule.
+	var laws: Dictionary = sim.LawTable()
+	var LawsWindow = load("res://scripts/ui/laws_window.gd")
+	var missing := []
+	for law in LawsWindow.LAWS:
+		if not laws.has(law[1]):
+			missing.append(law[1])
+	check(missing.is_empty(), "every law of the laws window is a rule of the simulation (missing: %s)" % [missing])
+	sim.SetLaw("seasons", false)
+	check(sim.Coldness() == 0.0 or sim.EraTable().cold > 0.0, "without seasons, no winter")
 	sim.queue_free()

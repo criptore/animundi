@@ -84,7 +84,8 @@ public partial class Simulation
 	/// The mood of the world (Eras.cs), the ash of a nuclear winter and the warming (Ages.cs) move it.
 	public float Coldness()
 	{
-		float season = Math.Max(0f, MathF.Cos(MathF.Tau * (YearProgress() - 0.875f)));
+		// Without seasons (a law of the world), the year stays a mild spring.
+		float season = Law("seasons") ? Math.Max(0f, MathF.Cos(MathF.Tau * (YearProgress() - 0.875f))) : 0f;
 		if (World == null)
 			return season;
 		return Math.Clamp(season + EraCold() + WinterCold() - WarmingMildness(), 0f, 1f);
@@ -94,7 +95,7 @@ public partial class Simulation
 	private float GrowthFactor()
 	{
 		float p = YearProgress();
-		float season = p < 0.25f ? 1.4f : p < 0.5f ? 1f : p < 0.75f ? 0.6f : 0.15f * (1f - Coldness());
+		float season = !Law("seasons") ? 1f : p < 0.25f ? 1.4f : p < 0.5f ? 1f : p < 0.75f ? 0.6f : 0.15f * (1f - Coldness());
 		return season * EraGrowth();
 	}
 
@@ -478,7 +479,7 @@ public partial class Simulation
 		if (_burningTiles.Count == 0 && _burning.Count == 0)
 			return;
 		// Fire spreads less in the cold.
-		float damp = Math.Min(1.6f, (1f - 0.6f * Coldness()) * EraFire());
+		float damp = Law("fire_spread") ? Math.Min(1.6f, (1f - 0.6f * Coldness()) * EraFire()) : 0f;
 
 		int plantCount = _burning.Count;
 		for (int k = 0; k < plantCount; k++)

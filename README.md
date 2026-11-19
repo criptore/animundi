@@ -6,7 +6,7 @@ A top-down pixel-art god sandbox. You shape a world, drop in peoples, animals an
 
 The twist: every people, monster species and force of nature (forest, volcano, ocean…) is driven by a small AI running locally on your machine. It invents its own culture: items, rituals, laws, architecture, and even the code of its own inventions, written in a small in-game language.
 
-## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature, 0.8 Ages
+## Status: 0.15 2D core, 0.2 Life, 0.3 Peoples, 0.35 Villages, 0.4 Civilisation, 0.5 AI minds, 0.6 Culture, 0.7 Monsters and nature, 0.8 Ages, 0.9 God powers and interface
 
 ![A generated world](docs/images/world_0.15.png)
 
@@ -136,7 +136,16 @@ Peoples climb the **ages** ([docs/AGES.md](docs/AGES.md), `sim/Ages.cs`, `data/a
 - **Moods of the world** (`sim/Eras.cs`, `data/eras.json`): every few decades the world turns calm, bright, dark, rainy, cold, scorching or magical, which changes the weather, growth, harvests, fire, monsters, spirits, learning and the light over the map. The player can bring one on.
 - The **Ages** book, the **Ages & Eras** powers (enlighten a kingdom, plunge one into a dark age, drop the bomb, bring an era on), four new laws.
 
-## 0.9 God powers (first part)
+## 0.9 God powers and interface
+
+![The terrain tools](docs/images/terrain_0.9.png)
+
+([docs/POWERS.md](docs/POWERS.md))
+- **The land**: raise and lower it, pour and dry water; paste **stamps** (volcanoes, islands, craters, oases, mountains, lakes); **copy the land** under the brush as a stamp of your own, kept on disk for every world. The terrain stays valid (levels step by one, plains at the water) and redraws flat and tilted.
+- **More powers**: the fire throws sparks, seeds, blizzards, curses, madness, the dead raised; stir a rebellion, inspire an invention, make a kingdom forget its customs or its faith, rain traits on people.
+- **Seeing the world**: cards for kingdoms, species, spirits and inventions (with their record and lineage); political map layers (kingdoms, cultures, religions, peoples, alliances, wars and their fronts); statistics through the years; a code to share a world; a law for every rule.
+
+### The first powers
 
 The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.cs`, `scripts/ui/power_bar.gd`):
 - **Life**: bring any creature (animals and monsters) under the mouse, or found a village of any people on free land, which starts a kingdom of its own.
@@ -144,6 +153,7 @@ The player acts on the world from a bar of powers, as in WorldBox (`sim/Powers.c
 - **Destruction and mercy**: a meteor the size of the brush, smite, bless (heals and feeds), heal (cures the sick), miracle (heals, and the peoples who see it grow in faith and worship you).
 - **Whispers**: push two kingdoms to war, to peace or into an alliance by clicking their lands, or make one take up the other's faith (convert).
 - **Ages & Eras** (0.8): enlighten a kingdom, plunge one into a dark age, drop the bomb, bring an era on.
+- **Terrain, Stamps** and the powers on minds (0.9): see above.
 - **Inspector**: click a creature or a village to keep its card on screen. **Laws**: switch the rules of the world on and off.
 
 ### The interface
@@ -157,11 +167,11 @@ The whole interface has one look (`scripts/ui/ui.gd`): dark wine panels with a t
 - **Dock** on the left, one book per tab: kingdoms and plots, villages (click one to go there), living creatures, inventions, cultures (values, customs, gods, myths), legends, nature (spirits, disasters, sicknesses, monsters and lairs), ages (the mood of the world, the air, each people's age and things), the chronicle (the age, the written chapters, the events and their filters).
 - **Powers bar**: tabs for terrain, creatures, peoples, nature, wrath and mercy, whispers; the chosen power and the brush beside them. **Inspector** card with a portrait, the village's stores and a button to follow with the camera. **Map layers** on the right.
 - **Windows**: laws of the world (grouped, one line each), settings (game, display, sound, controls), pause menu (Esc).
-- Buttons of features to come are there already, **locked**: more powers (terrain, blizzards, curses…), map layers (kingdoms, cultures, religions, armies), saving and loading, statistics, favourites. Clicking one says what it will do.
+- Buttons of features to come are there already, **locked**: an avatar, faith mode, the storyteller, saving and loading whole worlds, favourites. Clicking one says what it will do.
 
 ![The game](docs/images/interface_game.png)
 
-Next: the rest of 0.9, god powers and the interface (terrain tools, map layers, saving). God powers come last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
+Next: 1.0 polish (balancing, sound and music, saving whole worlds, achievements and scenarios, a build to share). God powers came last, once the world lives on its own. The 0.1 3D pixel-art view ([screenshot](docs/images/world_0.1.png)) is retired; its builders in `scripts/render3d/` are still used by the asset sheet tool, and `sprite_library.gd` there sets the sprite sizes.
 
 ## Asset sheets
 
@@ -280,7 +290,7 @@ godot --headless --path . --script res://tools/render_preview.gd -- <seed> <size
 Screenshot of the game (needs a display; on a headless machine wrap it in `xvfb-run`). `zoom` is screen pixels per world pixel, a tile being 8 world pixels; 0 shows the whole map:
 
 ```bash
-godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle|nature|ages] [years]
+godot --path . --script res://tools/screenshot.gd -- <out.png> [seed] [zoom] [setup|village|volcano|cultures|chronicle|nature|ages|terrain|views] [years]
 ```
 
 To re-cut the game sprites after editing a reference sheet (Python 3, Pillow, NumPy, SciPy):

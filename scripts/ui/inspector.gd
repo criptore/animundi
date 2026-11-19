@@ -122,6 +122,91 @@ func show_village(info: Dictionary) -> void:
 	visible = true
 
 
+## Any other card: a title, a picture and lines of text (a kingdom, a species, a spirit, an
+## invention). `code` is shown in a box of its own, in the invention language.
+func show_card(title: String, picture: Texture2D, lines: Array, code := "") -> void:
+	_title.text = title
+	_portrait.texture = picture
+	_stores.visible = false
+	var text := "\n".join(lines.filter(func(l): return String(l) != ""))
+	if code != "":
+		text += "\n\n" + code
+	_body.text = text
+	visible = true
+
+
+## A kingdom: `info` is the simulation's KingdomInfo.
+func show_kingdom(info: Dictionary) -> void:
+	if info.is_empty():
+		close()
+		return
+	var lines := [
+		"%s · %s · capital %s" % [info.people, info.get("age_name", ""), info.capital],
+		"%s · founded in year %d" % [info.ruler, info.founded],
+		"%d villages · %d people · %d soldiers" % [info.villages, info.population, info.soldiers],
+		"They prize %s" % info.values,
+		"Faith %d · %s" % [int(info.faith), info.creed],
+		("Customs: %s" % info.customs) if String(info.customs) != "" else "",
+		("At war with %s" % info.wars) if String(info.wars) != "" else "",
+		("Allied with %s" % info.allies) if String(info.allies) != "" else "",
+		("Of the others: %s" % info.opinions) if String(info.opinions) != "" else "",
+		"They make: %s" % info.designs,
+		{"worshipped": "They worship you as %s.", "feared": "They fear you as %s.", "hated": "They curse you as %s."}.get(info.stance, "%s") % info.god_name
+				if info.stance != "unnoticed" else "",
+		String(info.feats),
+	]
+	show_card(info.name, UI.icon("crown"), lines)
+
+
+## A species: `info` is the simulation's SpeciesInfo.
+func show_species(info: Dictionary) -> void:
+	if info.is_empty():
+		close()
+		return
+	var lines := [
+		"%d alive%s" % [info.alive, (" · the land feeds %d" % info.capacity) if info.capacity > 0 else ""],
+		"A people" if info.people else ("A legend" if info.legend else "%s · size %d" % [String(info.diet).capitalize(), info.size]),
+		"Lives %d years · speed %.1f" % [int(info.lifespan), info.speed] if not info.legend else "",
+		("Born in %s" % String(info.habitat).to_lower()) if String(info.habitat) != "" else "",
+		("Changed: %s" % info.strain) if String(info.strain) != "" else "",
+	]
+	var tex: Texture2D = UI.creature(String(info.id), 44)
+	show_card(info.name, tex if tex != null else UI.icon("paw"), lines)
+
+
+## A spirit of nature: its row of the simulation's SpiritTable.
+func show_spirit(info: Dictionary) -> void:
+	if info.is_empty():
+		close()
+		return
+	var lines := [
+		"Spirit of %s · %d tiles" % [info.place, info.tiles],
+		"%s (%+.2f)%s" % [String(info.mood_word).capitalize(), info.mood, (" · worshipped by %d" % info.worshippers) if info.worshippers > 0 else ""],
+		"In anger: %s · its gift: %s" % [info.wrath, info.gift],
+		("This year: %s" % info.wounds) if String(info.wounds) != "" else "",
+		("\"%s\"" % info.words) if String(info.words) != "" else "",
+		String(info.deeds),
+		String(info.lore),
+	]
+	show_card(info.name, UI.icon("sprout"), lines)
+
+
+## An invention: the simulation's InventionInfo, with its record (script) and lineage.
+func show_invention(info: Dictionary) -> void:
+	if info.is_empty():
+		close()
+		return
+	var lines := [
+		"%s of the %s of %s, year %d" % [String(info.kind).capitalize(), info.people, info.kingdom, info.year],
+		info.effects,
+		"%s · known in %d villages%s" % ["Written by the model" if info.mind == "model" else "Procedural", info.villages, " · lost" if info.lost else ""],
+		"Lineage: %s" % info.lineage,
+		("Improved %d times since" % info.children) if info.children > 0 else "",
+		String(info.description),
+	]
+	show_card(info.name, UI.icon("bulb"), lines, info.script)
+
+
 func close() -> void:
 	if visible:
 		visible = false

@@ -354,7 +354,7 @@ public partial class Simulation
 			}
 			HandOutWork(v, people);
 			TowersShoot(v);
-			if (Scheduler.Time >= village.NextSettlers)
+			if (Law("settlers") && Scheduler.Time >= village.NextSettlers)
 				SendSettlers(v, people);
 		}
 	}
@@ -1081,6 +1081,8 @@ public partial class Simulation
 			return 6;
 		if (_ground[t] == GroundRoad)
 			return 1;
+		if (Frost.Length > t && Frost[t] > 0f && _ground[t] != GroundRoad)
+			return 9;
 		if (_ground[t] != GroundField)
 			return Parched.Length > t && Parched[t] > 0 ? 7 : Blight.Length > t && Blight[t] > 0 ? 8 : 0;
 		float w = _wheat[t];

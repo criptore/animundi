@@ -346,6 +346,7 @@ public partial class Simulation
 	// whirlwinds, and the mark over the sick (`unit` is whose head it floats over, or -1).
 	private readonly List<(string id, float x, float y, float w, float h, int unit)> _fx = new();
 	private static readonly string[] TornadoFrames = { "effects/Tornado_0", "effects/Tornado_1", "effects/Tornado_2" };
+	private static readonly string[] fireNames = { "effects/Fire_0", "effects/Fire_1", "effects/Fire_2" };
 	private long[] _items = Array.Empty<long>();
 
 	/// <summary>Animation clock in real seconds: flames, walking, the bonfire and windmills move at
@@ -453,6 +454,13 @@ public partial class Simulation
 		foreach (var d in Disasters)
 			if (d.Kind == "tornado" && (!cull || InView(d.X, d.Y, margin)))
 				_fx.Add((TornadoFrames[(int)(AnimTime * 10f) % 3], d.X, d.Y + 0.4f, 16f, 27f, -1));
+		// Sparks of the fire power (MorePowers.cs), lifted by their height.
+		for (int k = 0; k < _sparks.Count; k++)
+		{
+			var s = _sparks[k];
+			if (!cull || InView(s.X, s.Y, margin))
+				_fx.Add((fireNames[(int)(AnimTime * 12f + k) % 3], s.X, s.Y - s.Z * 0.5f, 3f, 4f, -1));
+		}
 		// Mushroom clouds and rockets (Ages.cs): they rise and fade.
 		foreach (var (kind, sx, sy, at) in _skyFx)
 		{

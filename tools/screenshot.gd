@@ -108,6 +108,30 @@ func _process(_delta: float) -> bool:
 			# Time stands still for the picture: the rocket in the air, the cloud still burning.
 			sim.SetTimeScale(0.0)
 			_main._hud._show_book("ages", false)
+		elif _where == "terrain" and _main._sim.VillageCount() > 0:
+			# The terrain tools near the first village (0.9): a volcano, an island, a lake, a
+			# mountain raised by hand, the Stamps tab open.
+			var sim = _main._sim
+			var home: Dictionary = sim.VillageTable()[0]
+			point = Vector2(home.x + 0.5, home.y + 0.5) * WorldMap.TILE
+			sim.PowerStamp("volcano_big", home.x + 16.5, home.y - 6.5)
+			sim.PowerStamp("crater", home.x - 14.5, home.y - 8.5)
+			sim.PowerWater(home.x - 6.5, home.y + 10.5, 3.0)
+			for n in 3:
+				sim.PowerRaise(home.x + 12.5, home.y + 10.5, 2.5)
+			sim.RunSteps(30)
+			_main._hud.powers.select("raise")
+		elif _where == "views" and _main._sim.VillageCount() > 0:
+			# What the interface shows (0.9): the kingdoms' layer, a kingdom's card, the statistics.
+			var sim = _main._sim
+			for n in 3:
+				sim.RecordHistoryNow()
+			_main.show_layer("Kingdoms")
+			_main._hud._layer_buttons["Kingdoms"].set_pressed_no_signal(true)
+			_main.show_card("kingdom", sim.KingdomTable()[0].index)
+			if _zoom == 0.0:
+				_main._hud._open(_main._hud.stats)
+				_main._hud.stats.set_history(sim.History())
 		elif _where == "inspect" and _main._sim.VillageCount() > 0:
 			var first: Dictionary = _main._sim.VillageTable()[0]
 			point = Vector2(first.x + 0.5, first.y + 0.5) * WorldMap.TILE

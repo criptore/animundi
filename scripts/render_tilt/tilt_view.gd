@@ -77,6 +77,8 @@ var _lights_wait := 0.0
 var _heights := PackedFloat32Array()
 ## The sprites, their shadows and their reflections: hidden on the data layers.
 var _life_nodes: Array[MultiMeshInstance3D] = []
+## The terrain's chunk meshes, row by row as TiltTerrain.build makes them (terrain tools rebuild them).
+var _chunks: Array[MeshInstance3D] = []
 ## A data layer is shown: plain colours, no life, no light of the hour.
 var _plain := false
 
@@ -124,8 +126,10 @@ func setup(main: Node) -> void:
 	_sprites.set_shader_parameter("atlas", SpriteAtlas.shared().texture)
 	_shadows.set_shader_parameter("shadow_texture", SpriteBatch.shadow_texture())
 
+	_chunks.clear()
 	for mesh in TiltTerrain.build(world, _heights):
 		var inst := MeshInstance3D.new()
+		_chunks.append(inst)
 		inst.mesh = mesh
 		inst.material_override = _terrain
 		inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -267,6 +271,31 @@ func set_time(t: float) -> String:
 	}
 	_apply_look()
 	return a.name if k < 0.5 else b.name
+
+
+## The land changed level at `tiles` (the terrain tools): their heights, and the chunks they and
+## their neighbours' cliff faces stand in, are made again.
+func update_terrain(world, tiles: PackedInt32Array) -> void:
+	if _chunks.is_empty() or _heights.size() != world.size():
+		return
+	var cols: int = ceili(float(world.width) / TiltTerrain.CHUNK)
+	var dirty := {}
+	for i in tiles:
+		_heights[i] = TiltTerrain.tile_height(world, i)
+		var x: int = i % world.width
+		var y: int = i / world.width
+		for d in [Vector2i.ZERO, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var nx: int = x + d.x
+			var ny: int = y + d.y
+			if nx >= 0 and ny >= 0 and nx < world.width and ny < world.height:
+				dirty[(ny / TiltTerrain.CHUNK) * cols + nx / TiltTerrain.CHUNK] = true
+	for c in dirty:
+		if c >= _chunks.size():
+			continue
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, TiltTerrain.chunk_arrays(_heights, world.width, world.height,
+				(c % cols) * TiltTerrain.CHUNK, (c / cols) * TiltTerrain.CHUNK))
+		_chunks[c].mesh = mesh
 
 
 ## The light of the mood of the world (a bright era warms it, a nuclear winter greys it).

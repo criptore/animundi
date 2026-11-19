@@ -84,6 +84,10 @@ public sealed class UnitManager
 	/// <summary>Diseases it has survived, one bit each (disease index modulo 64).</summary>
 	public ulong[] Immune = Array.Empty<ulong>();
 
+	// God powers (0.9, MorePowers.cs): seconds of a curse and of madness left.
+	public float[] Cursed = Array.Empty<float>();
+	public float[] Mad = Array.Empty<float>();
+
 	private int[] _free = Array.Empty<int>();
 	private int _freeCount;
 
@@ -134,6 +138,8 @@ public sealed class UnitManager
 		Sick[i] = 0;
 		SickFor[i] = 0f;
 		Immune[i] = 0UL;
+		Cursed[i] = 0f;
+		Mad[i] = 0f;
 		Count++;
 		return i;
 	}
@@ -195,6 +201,8 @@ public sealed class UnitManager
 		Array.Resize(ref Sick, size);
 		Array.Resize(ref SickFor, size);
 		Array.Resize(ref Immune, size);
+		Array.Resize(ref Cursed, size);
+		Array.Resize(ref Mad, size);
 		Array.Resize(ref _free, size);
 	}
 }

@@ -15,6 +15,8 @@ const SimulationScript = preload("res://sim/Simulation.cs")
 const Hud = preload("res://scripts/ui/hud.gd")
 const BrushCursor = preload("res://scripts/ui/brush_cursor.gd")
 const TiltView = preload("res://scripts/render_tilt/tilt_view.gd")
+const StampStore = preload("res://scripts/world/stamp_store.gd")
+const MapRenderer = preload("res://scripts/render/map_renderer.gd")
 
 ## Animals placed on a new world: one per this many tiles.
 const TILES_PER_ANIMAL := 300
@@ -55,6 +57,11 @@ var _following := false
 const SETTLERS := 10
 ## The light of the mood of the world over the flat map (sim/Eras.cs).
 var _world_tint := CanvasModulate.new()
+## Another card pinned in the inspector (0.9): kind (kingdom, species, spirit, invention) and id.
+var _pinned_card := ["", null]
+## Lines between the capitals of kingdoms at war, over the flat map's Wars layer.
+var _war_lines := Node2D.new()
+var _stats_rounds := 0
 
 
 func _ready() -> void:
@@ -88,10 +95,15 @@ func _ready() -> void:
 	_hud.inspector.closed.connect(func():
 		_pinned_unit = -1
 		_pinned_village = -1
+		_pinned_card = ["", null]
 		_following = false)
 	_hud.inspector.follow_toggled.connect(func(on): _following = on)
 	_hud.focus_requested.connect(func(tile):
 		_look_at(tile + Vector2(0.5, 0.5), 2.0))
+	_hud.card_requested.connect(show_card)
+	_hud._setup.code_copied.connect(func(code): _hud.notice("Copied this world's code: %s" % code, 5.0))
+	add_child(_war_lines)
+	_war_lines.draw.connect(_draw_war_lines)
 	generate()
 
 
@@ -112,7 +124,9 @@ func generate() -> void:
 	# A new world: nothing of the old one is followed, the powers know its creatures and laws.
 	_hud.inspector.close()
 	_whisper_from = -1
-	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes(), _sim.EraIds())
+	for saved in StampStore.load_all():
+		_sim.AddStamp(saved[0], saved[1], saved[2])
+	_hud.powers.setup(_sim.SpawnableSpecies(), _sim.RaceIds(), _sim.PaintableBiomes(), _sim.EraIds(), stamp_names())
 	_hud.laws.set_laws(_sim.LawTable())
 	# The world waits while the player chooses its peoples.
 	_sim.SetTimeScale(0.0)
@@ -133,7 +147,29 @@ func start_peoples(races: PackedStringArray, per_village: int, ai := false) -> v
 func show_layer(layer: String) -> void:
 	current_layer = layer
 	_map.show_layer(layer)
+	_refresh_political()
 	_apply_view()
+
+
+## A political layer (0.9) is drawn from the simulation's kingdoms: again now and then.
+func _refresh_political() -> void:
+	var political: bool = Hud.POLITICAL_LAYERS.any(func(p): return p[0] == current_layer)
+	if political and world != null:
+		_map.set_political(_sim.LayerColors(current_layer))
+	_war_lines.visible = current_layer == "Wars" and not tilt_on
+	_war_lines.queue_redraw()
+
+
+func _draw_war_lines() -> void:
+	var lines: PackedFloat32Array = _sim.WarLines()
+	for k in range(0, lines.size(), 4):
+		var a := Vector2(lines[k], lines[k + 1]) * WorldMap.TILE
+		var b := Vector2(lines[k + 2], lines[k + 3]) * WorldMap.TILE
+		var width := 3.0 / maxf(_camera.zoom.x, 0.1)
+		_war_lines.draw_line(a, b, Color(0.1, 0.02, 0.03, 0.8), width * 2.0)
+		_war_lines.draw_line(a, b, Color(0.95, 0.25, 0.25), width)
+		_war_lines.draw_circle(a, width * 2.5, Color(0.95, 0.25, 0.25))
+		_war_lines.draw_circle(b, width * 2.5, Color(0.95, 0.25, 0.25))
 
 
 ## Shows the tilt view or the flat map, looking at the same place from as far.
@@ -168,6 +204,7 @@ func _apply_view() -> void:
 	_tilt.set_enabled(tilt_on)
 	_tilt.set_plain(not life)
 	_hud.show_tilt(tilt_on)
+	_war_lines.visible = current_layer == "Wars" and not tilt_on
 
 
 ## Screen pixels per world pixel in the current view (in the tilt view, at the place looked at).
@@ -286,6 +323,49 @@ func _use_power(screen_pos: Vector2) -> void:
 				_hud.notice("A village needs free land: not the sea, not another village's ground.")
 		"war", "peace", "alliance", "convert":
 			_whisper(powers.power, _sim.KingdomAt(at.x, at.y))
+		"raise":
+			_sim.PowerRaise(at.x, at.y, r)
+		"lower":
+			_sim.PowerLower(at.x, at.y, r)
+		"water":
+			_sim.PowerWater(at.x, at.y, r)
+		"stamp":
+			if _sim.PowerStamp(powers.arg, at.x, at.y) <= 0:
+				_hud.notice("Nothing changes there: the stamp needs the map under it.")
+		"copy":
+			var json: String = _sim.CopyStamp(at.x, at.y, copy_size())
+			var saved: Array = StampStore.save(json)
+			if saved.is_empty() or _sim.AddStamp(saved[0], saved[1], json) != "":
+				_hud.notice("The land could not be kept.")
+			else:
+				_hud.powers.set_stamps(stamp_names())
+				_hud.notice("Kept as \"%s\": paste it from the Stamps tab, in this world or another." % saved[1], 5.0)
+		"seeds":
+			_sim.PowerSeeds(at.x, at.y, r)
+		"blizzard":
+			_sim.PowerBlizzard(at.x, at.y, r + 1.5)
+		"curse":
+			_sim.PowerCurse(at.x, at.y, r)
+		"madness":
+			if _sim.PowerMadness(at.x, at.y, r) == 0:
+				_hud.notice("No creatures there to turn on each other.")
+		"resurrect":
+			if _sim.PowerResurrect(at.x, at.y, r + 1.0) == 0:
+				_hud.notice("No dead lie there (the dead lie only a few seconds where they fell).")
+		"rebellion":
+			if not _sim.PowerRebellion(at.x, at.y):
+				_hud.notice("Click a village that is not a kingdom's capital.")
+		"inspire":
+			if not _sim.PowerInspire(at.x, at.y):
+				_hud.notice("No kingdom owns this land.")
+		"forget_culture":
+			if not _sim.PowerForgetCulture(at.x, at.y):
+				_hud.notice("No kingdom owns this land.")
+		"forget_faith":
+			if not _sim.PowerForgetFaith(at.x, at.y):
+				_hud.notice("No kingdom owns this land.")
+		"trait":
+			_sim.PowerTrait(powers.arg, at.x, at.y, r)
 		"enlighten":
 			if not _sim.PowerEnlighten(at.x, at.y):
 				_hud.notice("No kingdom owns this land.")
@@ -298,6 +378,46 @@ func _use_power(screen_pos: Vector2) -> void:
 		"era":
 			if _sim.PowerEra(powers.arg):
 				_hud.notice("The world turns: a %s era begins." % powers.arg)
+
+
+## The side of the square "Copy the land" keeps, from the brush.
+func copy_size() -> int:
+	return clampi(_hud.powers.brush * 4, 6, 32)
+
+
+## The stamps the simulation knows, id → name.
+func stamp_names() -> Dictionary:
+	var names := {}
+	for id in _sim.StampIds():
+		names[id] = _sim.StampName(id)
+	return names
+
+
+## Copies the simulation's terrain changes (tile, level, water, biome quads) into the world,
+## and redraws the tiles and their neighbours, flat and tilted.
+func apply_terrain(quads: PackedInt32Array) -> void:
+	var tiles := PackedInt32Array()
+	var redraw := {}
+	var land_heights := [0.0, 0.0, 0.3, 0.7, 0.9]
+	for k in range(0, quads.size(), 4):
+		var i := quads[k]
+		var level := quads[k + 1]
+		world.level[i] = level
+		world.water[i] = quads[k + 2]
+		world.biome[i] = quads[k + 3]
+		# An elevation that agrees with the level (the data layers and the sea's shades read it).
+		if level >= WorldData.Level.PLAIN:
+			world.elevation[i] = world.sea_level + land_heights[level] * (1.0 - world.sea_level)
+		else:
+			world.elevation[i] = world.sea_level * (0.97 if level == WorldData.Level.SHALLOW else 0.7)
+		tiles.append(i)
+		var x := i % world.width
+		var y := i / world.width
+		for d in [Vector2i.ZERO, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if world.in_bounds(x + d.x, y + d.y):
+				redraw[world.index(x + d.x, y + d.y)] = true
+	_map.update_tiles(PackedInt32Array(redraw.keys()))
+	_tilt.update_terrain(world, tiles)
 
 
 ## Whispers take two clicks: the kingdom that acts, then the other one.
@@ -324,10 +444,24 @@ func _whisper(kind: String, kingdom: int) -> void:
 func _inspect(screen_pos: Vector2) -> void:
 	var at := _ground_at(screen_pos)
 	_following = false
+	_pinned_card = ["", null]
 	_pinned_unit = _sim.UnitAt(at.x, at.y, 0.9)
 	_pinned_village = _sim.VillageAt(at.x, at.y) if _pinned_unit < 0 else -1
 	if _pinned_unit < 0 and _pinned_village < 0:
-		_hud.inspector.close()
+		# Land of no village: its spirit, if it has one.
+		if not _sim.SpiritInfoAt(at.x, at.y).is_empty():
+			_pinned_card = ["spirit", at]
+		else:
+			_hud.inspector.close()
+	_refresh_inspector()
+
+
+## Pins a card in the inspector: "kingdom" (index), "species" (name), "invention" (id).
+func show_card(kind: String, id: Variant) -> void:
+	_pinned_unit = -1
+	_pinned_village = -1
+	_following = false
+	_pinned_card = [kind, id]
 	_refresh_inspector()
 
 
@@ -339,6 +473,16 @@ func _refresh_inspector() -> void:
 			_hud.inspector.close()
 	elif _pinned_village >= 0:
 		_hud.inspector.show_village(_sim.VillageInfo(_pinned_village))
+	else:
+		match _pinned_card[0]:
+			"kingdom":
+				_hud.inspector.show_kingdom(_sim.KingdomInfo(_pinned_card[1]))
+			"species":
+				_hud.inspector.show_species(_sim.SpeciesInfo(_pinned_card[1]))
+			"spirit":
+				_hud.inspector.show_spirit(_sim.SpiritInfoAt(_pinned_card[1].x, _pinned_card[1].y))
+			"invention":
+				_hud.inspector.show_invention(_sim.InventionInfo(_pinned_card[1]))
 
 
 func _process(_delta: float) -> void:
@@ -354,6 +498,10 @@ func _process(_delta: float) -> void:
 	var tint: Color = _sim.EraTint()
 	_world_tint.color = Color.WHITE if tilt_on else tint
 	_tilt.set_world_tint(tint)
+	# Land raised, lowered, flooded or stamped (the terrain tools).
+	var reshaped: PackedInt32Array = _sim.TakeTerrainChanges()
+	if not reshaped.is_empty():
+		apply_terrain(reshaped)
 	# Land repainted by the biome brush.
 	var repainted: PackedInt32Array = _sim.TakeBiomeChanges()
 	if not repainted.is_empty():
@@ -365,7 +513,18 @@ func _process(_delta: float) -> void:
 	# The brush follows the mouse while a power is chosen.
 	var pointer := get_viewport().get_mouse_position()
 	var brushing: bool = _hud.powers.power != "inspect" and not _hud.blocking()
-	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle", "wildfire", "drought", "earthquake", "flood", "eruption", "plague", "heal"] else (6.0 if _hud.powers.power == "nuke" else 0.6)
+	var reach: float = _hud.powers.radius() if _hud.powers.power in ["fire", "rain", "smite", "bless", "biome", "meteor", "miracle", "wildfire",
+			"drought", "earthquake", "flood", "eruption", "plague", "heal", "raise", "lower", "water", "seeds", "curse", "madness",
+			"resurrect", "trait"] else 0.6
+	match _hud.powers.power:
+		"nuke":
+			reach = 6.0
+		"copy":
+			reach = copy_size() / 2.0
+		"stamp":
+			reach = 5.0
+		"blizzard":
+			reach = _hud.powers.radius() + 1.5
 	var at := _ground_at(pointer)
 	_brush.visible = brushing and not tilt_on
 	_tilt_brush.visible = brushing and tilt_on
@@ -408,6 +567,11 @@ func _process(_delta: float) -> void:
 		_hud.set_legends(_sim.LegendTable())
 		_hud.set_nature(_sim.NatureTable())
 		_hud.set_ages(_sim.WorldAges(), _sim.ProgressTable())
+		if _hud.stats.visible:
+			_hud.stats.set_history(_sim.History())
+		_stats_rounds += 1
+		if _stats_rounds % 3 == 0 and current_layer != "Biomes" and not current_layer in MapRenderer.LAYERS:
+			_refresh_political()
 		_hud.set_chronicle(_sim.AgeName(), _sim.ChronicleTable())
 		_refresh_inspector()
 	# The camera stays on the creature or the village the player follows.

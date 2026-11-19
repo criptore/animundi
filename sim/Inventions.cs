@@ -379,7 +379,8 @@ public partial class Simulation
 		for (int v = 0; v < Villages.Count; v++)
 			if (Villages[v].Alive)
 				RefreshMods(v);
-		MindsStep();
+		if (Law("inventions"))
+			MindsStep();
 		if (Scheduler.Time >= _nextSpread)
 		{
 			_nextSpread = Scheduler.Time + YearSeconds;

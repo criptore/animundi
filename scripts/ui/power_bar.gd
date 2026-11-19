@@ -45,6 +45,21 @@ const POWERS := {
 	"peace": ["Peace", "Click the lands of two kingdoms at war to make peace.", false],
 	"alliance": ["Alliance", "Click the lands of two kingdoms to ally them.", false],
 	"convert": ["Convert", "Click a kingdom's land, then the kingdom whose faith it will take up.", false],
+	"raise": ["Raise the land", "Click or drag to lift the ground: water into plains, plains into hills, hills into mountains.", true],
+	"lower": ["Lower the land", "Click or drag to dig the ground down, until the water comes in.", true],
+	"water": ["Water", "Click or drag on land to pour a lake; on water, to dry it into land.", true],
+	"stamp": ["Stamp", "Click to paste %s on the map.", false],
+	"copy": ["Copy the land", "Click to keep the land under the brush as a stamp of your own, for any world.", false],
+	"seeds": ["Seeds", "Click or drag to sow the plants of the land under the brush.", true],
+	"blizzard": ["Blizzard", "Click to freeze the land: frost for half a year, fires out, the cold kills.", false],
+	"curse": ["Curse", "Click or drag: those under the brush hunger faster and strike weaker for a year and a half.", true],
+	"madness": ["Madness", "Click: the creatures under the brush turn on each other.", false],
+	"resurrect": ["Resurrect", "Click where the dead lie: beasts rise as they were, people as the undead.", false],
+	"rebellion": ["Rebellion", "Click a village (not a capital): it breaks away from its kingdom.", false],
+	"inspire": ["Inspire", "Click a kingdom's land: its mind has an idea and invents at once.", false],
+	"forget_culture": ["Forget customs", "Click a kingdom's land: it forgets its customs, its tales and its memories.", false],
+	"forget_faith": ["Forget faith", "Click a kingdom's land: its gods are forgotten and a new faith is born.", false],
+	"trait": ["Trait", "Click or drag to make the people under the brush %s.", true],
 	"enlighten": ["Enlighten", "Click a kingdom's land: its scholars understand at once (half an age of knowledge).", false],
 	"dark_age": ["Dark age", "Click a kingdom's land: it forgets what it knew and falls back an age.", false],
 	"nuke": ["Atomic bomb", "Click to drop the bomb: all around it dies, the land blights, ash fills the sky.", false],
@@ -54,6 +69,7 @@ const POWERS := {
 ## The tabs: id, name, icon.
 const TABS := [
 	["terrain", "Terrain", "height"],
+	["stamps", "Stamps", "stamp"],
 	["life", "Creatures", "paw"],
 	["peoples", "Peoples", "people"],
 	["nature", "Nature", "sprout"],
@@ -73,9 +89,17 @@ const PLACE := {
 	"wildfire": ["nature", "summer"], "drought": ["nature", "drought"], "tornado": ["nature", "tornado"],
 	"earthquake": ["nature", "quake"], "flood": ["nature", "flood"], "eruption": ["nature", "volcano"],
 	"plague": ["nature", "plague"], "heal": ["divine", "heal"],
+	"raise": ["terrain", "raise"], "lower": ["terrain", "lower"], "water": ["terrain", "water"],
+	"stamp": ["stamps", "stamp"], "copy": ["stamps", "save"],
+	"seeds": ["nature", "sprout"], "blizzard": ["nature", "blizzard"], "curse": ["divine", "curse"], "madness": ["divine", "spiral"],
+	"resurrect": ["divine", "grave"], "rebellion": ["whispers", "flag"], "inspire": ["whispers", "bulb"],
+	"forget_culture": ["whispers", "book"], "forget_faith": ["whispers", "forget"], "trait": ["whispers", "people"],
 	"enlighten": ["ages", "bulb"], "dark_age": ["ages", "forget"], "nuke": ["ages", "atom"], "era": ["ages", "hourglass"],
 }
 
+## The picture of each built-in stamp (sim/Terrain.cs); the player's own show a stamp.
+const STAMP_ICONS := {"volcano_small": "volcano", "volcano_big": "volcano", "island": "globe", "crater": "meteor",
+		"oasis": "sprout", "mountain": "height", "lake": "water"}
 ## The picture of each mood of the world (data/eras.json).
 const ERA_ICONS := {"calm": "sprout", "bright": "summer", "dark": "moon", "rainy": "rain", "cold": "winter",
 		"scorching": "drought", "magical": "sparkle"}
@@ -83,21 +107,18 @@ const ERA_ICONS := {"calm": "sprout", "bright": "summer", "dark": "moon", "rainy
 ## Disasters: powers that call the simulation's PowerDisaster with their own name.
 const DISASTERS := ["wildfire", "drought", "tornado", "earthquake", "flood", "eruption"]
 
-## Powers to come (docs/ROADMAP.md, 0.9): tab, name, icon, what they will do.
+## Powers to come (docs/ROADMAP.md, 1.0): tab, name, icon, what they will do.
 const SOON := [
-	["terrain", "Raise the land", "raise", "Lift the ground: plains into hills, hills into mountains."],
-	["terrain", "Lower the land", "lower", "Dig the ground down, until the sea comes in."],
-	["terrain", "Water", "water", "Pour lakes and rivers, or dry them up."],
-	["terrain", "Stamps", "stamp", "Paste ready-made volcanoes, islands, craters and oases."],
-	["nature", "Seeds", "sprout", "Sow plants and trees where the brush goes."],
-	["nature", "Blizzard", "blizzard", "Freeze the land under the brush."],
-	["divine", "Curse", "curse", "Bad luck, weakness and fear on those under the brush."],
-	["divine", "Madness", "spiral", "Creatures under the brush turn on each other."],
-	["divine", "Resurrect", "grave", "Bring the dead back, as they were or as undead."],
-	["whispers", "Rebellion", "flag", "Push a village to break away from its kingdom."],
-	["whispers", "Inspire", "bulb", "Give a people's mind an idea: it invents at once."],
-	["whispers", "Forget", "forget", "Make a people forget its language, culture or faith."],
+	["nature", "Hail and wind", "tornado", "Weather of your own: hail on the fields, winds that carry fire."],
+	["divine", "Avatar", "people", "Walk the world in a body of your own."],
+	["divine", "Faith mode", "ankh", "Let the peoples' faith in you feed your powers."],
+	["whispers", "Forget a language", "forget", "Make a people forget its tongue and speak anew."],
+	["whispers", "Storyteller", "book", "Choose the stories the world tells: a war, a hero, a plague."],
 ]
+
+## The picture of each trait the Trait power gives (sim/MorePowers.cs TraitNames).
+const TRAIT_ICONS := {"brave": "swords", "lazy": "pause", "kind": "heart", "greedy": "coin", "wise": "book", "strong": "hammer"}
+const TRAITS := ["brave", "lazy", "kind", "greedy", "wise", "strong"]
 
 ## Tools in a row of the tray, and the rows it shows.
 const COLUMNS := 12
@@ -110,8 +131,10 @@ var brush := 2
 ## A button per power (for the powers that bring or paint, the button of their tab).
 var _buttons := {}
 ## Buttons of what a power brings or paints: power → {value: button}.
-var _arg_buttons := {"spawn": {}, "settle": {}, "biome": {}, "era": {}}
-var _args := {"spawn": "", "settle": "", "biome": "", "era": ""}
+var _arg_buttons := {"spawn": {}, "settle": {}, "biome": {}, "era": {}, "stamp": {}, "trait": {}}
+var _args := {"spawn": "", "settle": "", "biome": "", "era": "", "stamp": "", "trait": ""}
+## The stamps' names by id (the player's own are "My stamp 3").
+var _stamp_names := {}
 var _tab := "life"
 var _open := true
 var _tab_buttons := {}
@@ -249,8 +272,11 @@ func _add_soon(soon: Array) -> void:
 
 ## Fills the tabs of creatures, peoples and biomes: creatures and peoples by id, biomes by name;
 ## and the moods of the world (data/eras.json ids) in the tab of the ages.
-func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedStringArray, eras := PackedStringArray()) -> void:
-	for pair in [["spawn", species], ["settle", races], ["biome", biomes], ["era", eras]]:
+func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedStringArray, eras := PackedStringArray(),
+		stamps := {}) -> void:
+	_stamp_names = stamps
+	for pair in [["spawn", species], ["settle", races], ["biome", biomes], ["era", eras], ["stamp", PackedStringArray(stamps.keys())],
+			["trait", PackedStringArray(TRAITS)]]:
 		var id: String = pair[0]
 		var grid: HFlowContainer = _grids[PLACE[id][0]]
 		for b in _arg_buttons[id].values():
@@ -259,9 +285,7 @@ func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedS
 		_arg_buttons[id].clear()
 		var at := 0
 		for value in pair[1]:
-			var text := String(value).capitalize()
-			if id == "era":
-				text = text + " era"
+			var text := _arg_name(id, String(value))
 			var tex := _picture_of(id, value)
 			var b := UI.tool_button(tex, POWERS[id][1] % text.to_lower(), TOOL)
 			if tex == null:
@@ -278,6 +302,35 @@ func setup(species: PackedStringArray, races: PackedStringArray, biomes: PackedS
 	_refresh()
 
 
+## The name of what a power brings or paints: a stamp by its name, an era as "Dark era".
+func _arg_name(id: String, value: String) -> String:
+	if id == "stamp":
+		return String(_stamp_names.get(value, value.capitalize()))
+	return value.capitalize() + (" era" if id == "era" else "")
+
+
+## The stamps after the player saved one: the stamp tab again, the same powers.
+func set_stamps(stamps: Dictionary) -> void:
+	_stamp_names = stamps
+	var grid: HFlowContainer = _grids["stamps"]
+	for b in _arg_buttons["stamp"].values():
+		grid.remove_child(b)
+		b.queue_free()
+	_arg_buttons["stamp"].clear()
+	var at := 0
+	for value in stamps:
+		var b := UI.tool_button(_picture_of("stamp", value), POWERS["stamp"][1] % String(stamps[value]).to_lower(), TOOL)
+		b.toggle_mode = true
+		b.pressed.connect(_pick.bind("stamp", String(value)))
+		grid.add_child(b)
+		grid.move_child(b, at)
+		at += 1
+		_arg_buttons["stamp"][String(value)] = b
+	if not _arg_buttons["stamp"].has(_args["stamp"]):
+		_args["stamp"] = stamps.keys()[0] if not stamps.is_empty() else ""
+	_refresh()
+
+
 ## The picture of what a power brings or paints.
 func _picture_of(id: String, value: String) -> Texture2D:
 	if id == "biome":
@@ -285,6 +338,10 @@ func _picture_of(id: String, value: String) -> Texture2D:
 		return UI.biome_swatch(Biomes.TILES[b] if b >= 0 else value, 36)
 	if id == "era":
 		return UI.icon(ERA_ICONS.get(value, "hourglass"))
+	if id == "stamp":
+		return UI.icon(STAMP_ICONS.get(value, "stamp"))
+	if id == "trait":
+		return UI.icon(TRAIT_ICONS.get(value, "people"))
 	return UI.creature(value, 38)
 
 
@@ -313,7 +370,7 @@ func drags() -> bool:
 ## What the game says about the current power.
 func hint() -> String:
 	var text: String = POWERS[power][1]
-	var what := arg.capitalize().to_lower() + (" era" if power == "era" else "")
+	var what := _arg_name(power, arg).to_lower()
 	return text % what if "%s" in text else text
 
 
@@ -356,7 +413,7 @@ func _refresh() -> void:
 	for t in _tab_buttons:
 		_tab_buttons[t].set_pressed_no_signal(_open and t == _tab)
 	if _name_label != null:
-		var named := (arg.capitalize() + (" era" if power == "era" else "")) if arg != "" else String(POWERS[power][0])
+		var named := _arg_name(power, arg) if arg != "" else String(POWERS[power][0])
 		_name_label.text = named
 		_name_label.tooltip_text = named
 		_hint_label.text = hint()
