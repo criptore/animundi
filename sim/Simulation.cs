@@ -66,6 +66,10 @@ public partial class Simulation : Node2D
 		SetupPlagues(worldData.Get("seed_value").AsInt32());
 		SetupSpirits(worldData.Get("seed_value").AsInt32());
 		SetupMonsters(worldData.Get("seed_value").AsInt32());
+		SetupAges(worldData.Get("seed_value").AsInt32());
+		SetupEras(worldData.Get("seed_value").AsInt32());
+		SetupMorePowers();
+		SetupHistory();
 		ClearDrawing();
 
 		// Walking and chasing: every step, every unit.
@@ -91,6 +95,17 @@ public partial class Simulation : Node2D
 		// Nature spirits think once a year each; monsters' lairs and mutations every two seconds.
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "spirits", Global = true, Interval = 1f, Batches = 1, Run = (_, _, dt) => SpiritStep(dt) });
 		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "monsters", Global = true, Interval = 2f, Batches = 1, Run = (_, _, dt) => MonsterStep(dt) });
+		// The mood of the world changes every few decades (Eras.cs); the ages turn with the kingdoms.
+		// The god powers that last (MorePowers.cs): sparks fly every step, frost melts, curses and
+		// madness wear off.
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "sparks", Global = true, Interval = Scheduler.Step, Batches = 1, Run = (_, _, dt) => SparkStep(dt) });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "frost", Global = true, Interval = 0.5f, Batches = 1, Run = (_, _, dt) => FrostStep(dt) });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "curses", Interval = 1f, CoarseInterval = 2f, Batches = 10, Run = CurseStep });
+		Scheduler.UnitSystems.Add(new Scheduler.UnitSystem { Name = "eras", Global = true, Interval = 1f, Batches = 1, Run = (_, _, _) =>
+		{
+			EraStep();
+			HistoryStep();
+		} });
 		// Nature (grass, ash, plants): one slice of the map at a time.
 		Scheduler.WorldProcesses.Add(new Scheduler.WorldProcess { Name = "nature", Interval = NatureInterval, Slices = NatureSlices, Run = NatureSlice });
 	}

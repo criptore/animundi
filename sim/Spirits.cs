@@ -267,7 +267,8 @@ public partial class Simulation
 			parts.Add(what switch
 			{
 				"felled" => $"{n} trees felled", "burned" => $"{n} tiles burned", "hunted" => $"{n} beasts hunted", "built" => $"{n} buildings raised",
-				"mined" => $"{n} mines dug", "fished" => $"{n} docks on its shores", "struck" => $"struck {n} times from the sky", _ => $"{n} {what}",
+				"mined" => $"{n} mines dug", "fished" => $"{n} docks on its shores", "struck" => $"struck {n} times from the sky",
+				"polluted" => $"choked by smoke {n} times", _ => $"{n} {what}",
 			});
 		return string.Join(", ", parts);
 	}
@@ -355,7 +356,8 @@ public partial class Simulation
 				s.Worshippers++;
 		// A wide land bears more than a small one.
 		float bears = 6f + s.Tiles.Length / 150f;
-		s.Mood = Math.Clamp(s.Mood - 0.5f * s.Grief / bears + 0.12f + 0.1f * s.Worshippers, -1f, 1f);
+		// The mood of the world (Eras.cs): spirits heal faster in bright and magical eras.
+		s.Mood = Math.Clamp(s.Mood - 0.5f * s.Grief / bears + 0.12f * EraSpirits() + 0.1f * s.Worshippers, -1f, 1f);
 		s.LastWounds = WoundsText(s);
 		s.Grief = 0f;
 		s.Wounds.Clear();

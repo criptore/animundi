@@ -87,4 +87,9 @@ const NAMES := [
 	"inspect",
 	"brush",
 	"legend",
+	"atom",
+	"rocket",
+	"factory",
+	"moon",
+	"sparkle",
 ]

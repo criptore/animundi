@@ -45,6 +45,19 @@ public partial class Simulation
 		["trees_growth"] = true,  // plants grow and spread
 		["legends"] = true,       // legendary monsters wake in their lairs (data/legends.json)
 		["faiths"] = true,        // kingdoms convert to their neighbours' faiths, and faiths split in heresies
+		["ages"] = true,          // peoples gain knowledge and climb the ages, or fall back (Ages.cs)
+		["pollution"] = true,     // industry fills the air with smog and warms the world (Ages.cs)
+		["nuclear_war"] = true,   // atomic kingdoms may drop the bomb in their wars (Ages.cs)
+		["eras"] = true,          // the mood of the world changes every few decades (Eras.cs)
+		// One switch per rule of the civilisations and of nature (0.9).
+		["diplomacy"] = true,     // rulers plot wars, alliances and peace on their own (Kingdoms.cs)
+		["rebellions"] = true,    // disloyal villages plot to break away (Kingdoms.cs)
+		["settlers"] = true,      // crowded villages send settlers (Villages.cs)
+		["inventions"] = true,    // each people's mind invents (Minds.cs)
+		["trade"] = true,         // routes open between friendly villages (Trade.cs)
+		["customs"] = true,       // cultures write customs and myths (Culture.cs)
+		["seasons"] = true,       // winter stops growth and frost creeps from the poles (Nature.cs)
+		["fire_spread"] = true,   // fire spreads from tile to tile (Nature.cs)
 	};
 
 	/// <summary>Living units per species.</summary>
@@ -244,8 +257,10 @@ public partial class Simulation
 			if (hunger && sp.Eats)
 			{
 				// People live off their village's stores: they get hungry more slowly than animals.
-				Units.Hunger[i] = Math.Min(1f, Units.Hunger[i] + dt / (sp.IsPeople ? HungerSeconds * 1.6f : HungerSeconds));
-				Units.Thirst[i] = Math.Min(1f, Units.Thirst[i] + dt / ThirstSeconds);
+				// A curse (MorePowers.cs) makes them hunger and thirst faster.
+				float cursed = Units.Cursed[i] > 0f ? 1.8f : 1f;
+				Units.Hunger[i] = Math.Min(1f, Units.Hunger[i] + cursed * dt / (sp.IsPeople ? HungerSeconds * 1.6f : HungerSeconds));
+				Units.Thirst[i] = Math.Min(1f, Units.Thirst[i] + cursed * dt / ThirstSeconds);
 				if (Units.Hunger[i] >= 1f || Units.Thirst[i] >= 1f)
 				{
 					Units.Suffering[i] += dt;

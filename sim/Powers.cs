@@ -47,6 +47,9 @@ public partial class Simulation
 	public int PowerFire(float x, float y, float radius)
 	{
 		int lit = World == null ? 0 : Ignite(x, y, radius);
+		// Sparks fly from it and light the land they fall on (MorePowers.cs).
+		if (World != null && OnLand(x, y))
+			ThrowSparks(x, y, radius, 2 + (int)radius);
 		GodActs("fire", x, y, radius, lit);
 		return lit;
 	}

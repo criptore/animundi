@@ -75,7 +75,7 @@ Direction: **built like WorldBox** (flat 2D map, batched sprites, data-driven co
 
 ## 0.4 Civilisation
 - [x] Settlements grow: camp → village → town → city (by people; a city needs a town hall)
-- [ ] **Buildings by age**: every home and building redrawn for each era of a people (wood → stone → metal → industrial → modern → future), the way homes now change by tier; a village's look follows the age its culture has reached (0.8 Ages drives the eras)
+- [x] **Buildings by age** (done with 0.8, [AGES.md](AGES.md)): great homes redrawn for the later ages (brick rows, blocks of flats, towers of glass, arcologies), buildings of later ages (university, factory, power plant, missile silo, launch pad); a village's look follows its kingdom's age. Later: huts and houses of each people redrawn for every age
 - [ ] **Notable buildings unlocked by culture and age** (later, with cultures and ages): colosseum, museum, triumphal arch, aqueduct, lighthouse, pyramid, great library, observatory, cathedral, bathhouse, amphitheatre, harbour fortress, university, monuments of each people; each with its unlock (age, culture traits, wealth, population) and an effect on the village (happiness, faith, knowledge, trade, defence)
 - [ ] Buildings generated from function × culture × age, with generated sprites (moved to 0.5 AI minds and 0.8 Ages)
 - [x] Trade (`sim/Trade.cs`): routes between friendly villages with a market or stockpile; every month the surplus (food, wood, stone) goes where it is lacking, markets earn gold; carts follow land paths, boats sail between docks along water paths (paths found once per route)
@@ -95,7 +95,7 @@ See [INVENTIONS.md](INVENTIONS.md).
 - [x] Inventions spread (kingdom, trade partners, neighbours, by usefulness), are forgotten when useless or replaced, and evolve by descent (parent, generation), traced in the chronicle (event filter "inventions")
 - [x] Procedural fallback when no model is available (and when it is slow or wrong)
 - [x] The culture mind writes laws, rituals and myths (done with 0.6): the model takes the grammar of the record it is asked for
-- [ ] Inventions with new effect blocks unlocked by ages (0.8)
+- [x] Inventions with new effect blocks unlocked by ages (done with 0.8): vehicles (`speed`) and `knowledge` from the Bronze Age, energy (`power`) from the Industrial Age, `clean` from the Modern Age
 - [x] Monster and nature minds (done with 0.7): legends, monster species and nature spirits ask the same model, each with its grammar
 
 ## 0.6 Culture
@@ -116,31 +116,37 @@ See [CULTURE.md](CULTURE.md).
 - [ ] Later: blizzards and acid rain; lairs people can see being raided; spirits one can bargain with (offerings); a card for spirits, lairs and diseases in the inspector (0.9)
 
 ## 0.8 Ages
-- [ ] Stone to Space and beyond, with no final age
-- [ ] AI-driven evolution of objects, buildings and vehicles through the ages
-- [ ] Consequences: pollution, climate change, nuclear war
-- [ ] Moods of the world: eras of a few decades (bright, dark, rainy, cold, magical…) that change weather, growth and monsters, steerable by the player
+See [AGES.md](AGES.md).
+- [x] Stone to Space and beyond, with no final age (`sim/Ages.cs`, `data/ages.json`): ten ages, then ages beyond named by the first people to reach them; knowledge a year from people, temples, libraries, universities, trade, neighbours further ahead, culture and the mood of the world; soldiers, work, inventions, carts and boats stronger with each age; falling back (capital taken, libraries burned, the bomb, nuclear winter) and finding the way again faster
+- [x] AI-driven evolution of objects, buildings and vehicles through the ages: the people's mind (local model or procedural) names the vehicle, ship, home and weapon of each age, each grown from the one before, with their lineage; carts, boats, great homes and new buildings drawn by age on the map; invention blocks unlocked by age
+- [x] Consequences: smog that withers and blights the land and grieves the spirits, a warming world (milder winters, droughts and wildfires, melting snow), the bomb (atomic kingdoms with a silo, at war), nuclear winter; rockets, satellites, the moon
+- [x] Moods of the world (`sim/Eras.cs`, `data/eras.json`): eras of twenty to forty years (calm, bright, dark, rainy, cold, scorching, magical) that change weather, growth, harvests, fire, disasters, monsters, spirits, learning and the light over the map, steerable by the player (Ages & Eras powers)
+- [x] The Ages book, the Ages & Eras powers (enlighten, dark age, the bomb, eras), four laws; `tools/ages_check.gd`
+- [ ] Later: huts and houses of each people redrawn for every age; armies of later ages (tanks, planes, warships); the moon and other worlds as maps of their own; magic on its own track (magitech)
 
 ## 0.9 God powers and interface
 Nothing here before the world lives on its own (see the order of work above). Special biomes and volcanoes are never generated at random: the player places them with these tools.
 - [x] Biome brush: paint mushroom land, cursed land, volcanic rock, lava (and the natural biomes), with a brush size (land only; the old plants go and the new biome's grow; lava kills what stands on it)
-- [ ] Stamps: ready-made presets (volcanoes of several sizes, later islands, craters, oases) pasted on the map where the player clicks; levels around them are fixed so the terrain stays valid
-- [ ] The player's own presets: select an area of the map and save it as a stamp, reuse it in any world
+- [x] Stamps (`sim/Terrain.cs`, [POWERS.md](POWERS.md)): small and great volcanoes, islands, craters, oases, mountains, lakes pasted where the player clicks; levels around them are fixed so the terrain stays valid
+- [x] The player's own presets: "Copy the land" keeps the square under the brush as a stamp in `user://stamps/`, listed in every world
 - [x] Plants and the map texture update only where the terrain changed
-- [ ] Fire power drops sparks (particles) that set alight the tiles they land on, as in WorldBox (the fire power lights the tiles under the brush for now; the F test key is gone)
+- [x] Fire power throws sparks that arc out and set alight the tiles they land on, as in WorldBox
 - [x] The powers bar (`scripts/ui/power_bar.gd`, `sim/Powers.cs`): a power and a brush size, then click or drag on the map; first powers: bring creatures, settle a people (a new village and kingdom), fire, lightning, rain, meteor, smite, bless
 - [x] Miracle (Wrath & Mercy) and Convert (Whispers) powers
 - [x] Disasters and sickness as powers (done with 0.7): wildfire, drought, tornado, earthquake, flood, eruption, plague, heal
-- [ ] More powers: terrain (raise, lower, water), weather, curses, faith mode, avatar, gestures, storyteller
+- [x] More powers: terrain (raise, lower, water), seeds, blizzard, curse, madness, resurrect
+- [ ] Later (1.0): hail and wind, faith mode, avatar, gestures, storyteller
 - [x] Inspector cards for a creature and a village: click to pin, refreshed while it lives
-- [ ] Inspector cards: kingdom, species, spirit, invention (with its script and lineage)
-- [ ] Map layers (kingdoms, cultures, languages, religions, clans, families, species, alliances, armies), war lines, plot and task icons, unit arrows, and statistics
+- [x] Inspector cards: kingdom, species, spirit, invention (with its script and lineage), from the dock's books and the land
+- [x] Political map layers (kingdoms, cultures, religions, peoples, alliances, wars and their fronts), war lines between capitals, statistics through the years (`sim/Cards.cs`, `scripts/ui/stats_window.gd`)
+- [ ] Later: clans and families, armies on the march, plot and task icons, unit arrows
 - [x] World laws menu: a switch for each of the five laws the simulation has
-- [ ] World laws: one switch per simulation rule, grouped (diplomacy, civilisations, units, nature, biomes, weather, disasters), each with a one-line description
+- [x] World laws: one switch per simulation rule, grouped, each with a one-line description (plotting, rebellions, settlers, inventions, trade, customs and myths, seasons, fire spreading join the others)
 - [x] Whispers: war, peace or alliance between two kingdoms, by clicking their lands
-- [ ] Powers that act on minds: rain traits, make people forget their language, culture, faith or kingdom
+- [x] Powers that act on minds: rain traits, stir a rebellion, inspire an invention, make a kingdom forget its customs or its faith (forgetting a language: later)
 - [x] The whole interface in one look (`scripts/ui/ui.gd`, icons by `art/ui_icons.py`): title screen, world setup, top bar, dock of books (kingdoms, villages, life, inventions, chronicle), tabbed powers bar, inspector, map layers, laws, settings and pause windows; every feature to come already has its locked button
-- [ ] Save, load, share a seed
+- [x] Share a world: a code of its settings, copied and pasted in the world setup
+- [ ] Save and load a whole world (1.0)
 
 ## 1.0 Polish
 - [ ] Balancing and performance

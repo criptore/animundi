@@ -410,7 +410,7 @@ public partial class Simulation
 				}
 				continue;
 			}
-			if (Scheduler.Time >= c.NextThought && Villages[kingdom.Capital].Population >= 10)
+			if (Law("customs") && Scheduler.Time >= c.NextThought && Villages[kingdom.Capital].Population >= 10)
 				ThinkCulture(k, force: false);
 		}
 		if (Scheduler.Time >= _nextCultureSeason)

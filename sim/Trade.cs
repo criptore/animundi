@@ -51,7 +51,7 @@ public partial class Simulation
 			if (r.Alive && (!Villages[r.A].Alive || !Villages[r.B].Alive || !Friendly(Villages[r.A].Kingdom, Villages[r.B].Kingdom)))
 				r.Alive = false;
 		_trade.RemoveAll(r => !r.Alive);
-		if (_rng.NextDouble() < 0.15)
+		if (Law("trade") && _rng.NextDouble() < 0.15)
 			OpenRoute();
 		foreach (var r in _trade)
 			if (Scheduler.Time >= r.Next)
@@ -218,7 +218,7 @@ public partial class Simulation
 	{
 		foreach (var v in _vehicles)
 		{
-			v.At += dt * (v.Boat ? BoatSpeed : CartSpeed);
+			v.At += dt * (v.Boat ? BoatSpeed : CartSpeed) * VehicleSpeed(v.Village);
 			if (v.Crew != null)
 			{
 				// The crew sails with the boat (hidden aboard), and goes ashore at the end.

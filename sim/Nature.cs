@@ -81,20 +81,29 @@ public partial class Simulation
 	public string SeasonName() => SeasonNames[Season()];
 
 	/// <summary>How cold the season is: 0 in summer, 1 in midwinter.</summary>
-	public float Coldness() => Math.Max(0f, MathF.Cos(MathF.Tau * (YearProgress() - 0.875f)));
+	/// The mood of the world (Eras.cs), the ash of a nuclear winter and the warming (Ages.cs) move it.
+	public float Coldness()
+	{
+		// Without seasons (a law of the world), the year stays a mild spring.
+		float season = Law("seasons") ? Math.Max(0f, MathF.Cos(MathF.Tau * (YearProgress() - 0.875f))) : 0f;
+		if (World == null)
+			return season;
+		return Math.Clamp(season + EraCold() + WinterCold() - WarmingMildness(), 0f, 1f);
+	}
 
 	/// <summary>How fast things grow this season: fast in spring, none in midwinter.</summary>
 	private float GrowthFactor()
 	{
 		float p = YearProgress();
-		return p < 0.25f ? 1.4f : p < 0.5f ? 1f : p < 0.75f ? 0.6f : 0.15f * (1f - Coldness());
+		float season = !Law("seasons") ? 1f : p < 0.25f ? 1.4f : p < 0.5f ? 1f : p < 0.75f ? 0.6f : 0.15f * (1f - Coldness());
+		return season * EraGrowth();
 	}
 
 	// ------------------------------------------------------------------ events
 
 	/// <summary>Event categories for the log's filters: kings, wars, cities, disasters, life...
 	/// "nature" is what spirits and monsters do; "disasters" includes plagues.</summary>
-	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "culture", "heroes", "legends", "nature", "disasters", "life" };
+	public static readonly string[] EventCategories = { "kings", "wars", "cities", "inventions", "ages", "culture", "heroes", "legends", "nature", "disasters", "life" };
 
 	private void LogEvent(string text, string cat = "life")
 	{
@@ -462,7 +471,7 @@ public partial class Simulation
 			_lightningIn -= dt;
 			if (_lightningIn <= 0f)
 			{
-				_lightningIn = 40f + (float)_rng.NextDouble() * 80f;
+				_lightningIn = (40f + (float)_rng.NextDouble() * 80f) / EraFire();
 				Lightning();
 			}
 		}
@@ -470,7 +479,7 @@ public partial class Simulation
 		if (_burningTiles.Count == 0 && _burning.Count == 0)
 			return;
 		// Fire spreads less in the cold.
-		float damp = 1f - 0.6f * Coldness();
+		float damp = Law("fire_spread") ? Math.Min(1.6f, (1f - 0.6f * Coldness()) * EraFire()) : 0f;
 
 		int plantCount = _burning.Count;
 		for (int k = 0; k < plantCount; k++)

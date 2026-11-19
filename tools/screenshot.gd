@@ -6,6 +6,8 @@
 ## - "setup": shows the world setup panel, as a new world opens;
 ## - "laws", "settings", "pause": the map centre with that window open;
 ## - "nature": the first village with a whirlwind, a flood, an eruption, a sickness and a lair (0.7);
+## - "ages": the first village in the Modern Age (blocks of flats, a factory, a power plant, cars and
+##   liners), a launch pad sending a rocket up, a mushroom cloud beyond, and the Ages book open (0.8);
 ## - "inspect": as "village", with the first village's card pinned and a power chosen;
 ## - "village": starts the world with Humans, Elves and Orcs and centres on the first village;
 ## - "volcano": centres on the world's first volcano (once the terrain tools can place one);
@@ -86,6 +88,50 @@ func _process(_delta: float) -> bool:
 			sim.RunSteps(30 * 6)
 			sim.PowerDisaster("tornado", home.x + 4.5, home.y + 2.5, 2.0)
 			_main._hud._show_book("nature", false)
+		elif _where == "ages" and _main._sim.VillageCount() > 0:
+			# The ages at work around the first village (0.8).
+			var sim = _main._sim
+			var home: Dictionary = sim.VillageTable()[0]
+			var k: int = -1
+			for row in sim.KingdomTable():
+				if row.name == home.kingdom:
+					k = row.index
+			point = Vector2(home.x + 0.5, home.y + 0.5) * WorldMap.TILE
+			sim.SetKingdomAge(k, 8)
+			for id in ["big_house", "big_house", "stone_house", "stone_house", "stone_house", "factory", "power_plant", "launch_pad"]:
+				sim.BuildNow(home.index, id)
+			sim.RunSteps(30 * 4)
+			sim.Nuke(home.x + 22.5, home.y - 10.5, -1)
+			sim.RunSteps(30 * 4)
+			sim.LaunchNow(k)
+			sim.RunSteps(50)
+			# Time stands still for the picture: the rocket in the air, the cloud still burning.
+			sim.SetTimeScale(0.0)
+			_main._hud._show_book("ages", false)
+		elif _where == "terrain" and _main._sim.VillageCount() > 0:
+			# The terrain tools near the first village (0.9): a volcano, an island, a lake, a
+			# mountain raised by hand, the Stamps tab open.
+			var sim = _main._sim
+			var home: Dictionary = sim.VillageTable()[0]
+			point = Vector2(home.x + 0.5, home.y + 0.5) * WorldMap.TILE
+			sim.PowerStamp("volcano_big", home.x + 16.5, home.y - 6.5)
+			sim.PowerStamp("crater", home.x - 14.5, home.y - 8.5)
+			sim.PowerWater(home.x - 6.5, home.y + 10.5, 3.0)
+			for n in 3:
+				sim.PowerRaise(home.x + 12.5, home.y + 10.5, 2.5)
+			sim.RunSteps(30)
+			_main._hud.powers.select("raise")
+		elif _where == "views" and _main._sim.VillageCount() > 0:
+			# What the interface shows (0.9): the kingdoms' layer, a kingdom's card, the statistics.
+			var sim = _main._sim
+			for n in 3:
+				sim.RecordHistoryNow()
+			_main.show_layer("Kingdoms")
+			_main._hud._layer_buttons["Kingdoms"].set_pressed_no_signal(true)
+			_main.show_card("kingdom", sim.KingdomTable()[0].index)
+			if _zoom == 0.0:
+				_main._hud._open(_main._hud.stats)
+				_main._hud.stats.set_history(sim.History())
 		elif _where == "inspect" and _main._sim.VillageCount() > 0:
 			var first: Dictionary = _main._sim.VillageTable()[0]
 			point = Vector2(first.x + 0.5, first.y + 0.5) * WorldMap.TILE

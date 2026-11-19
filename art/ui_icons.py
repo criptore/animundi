@@ -669,6 +669,46 @@ def inspect(k):
     eye(k, "cream", "blue", "ink")
 
 
+def atom(k):
+    """The atom: three orbits round a red heart (the bomb, the ages)."""
+    k.e("lblue", 1, 5, 14, 10)
+    k.e(None, 3, 6, 12, 9)
+    k.l("lblue", 3, 2, 12, 13)
+    k.l("lblue", 12, 2, 3, 13)
+    k.e("red", 6, 6, 9, 9)
+    k.p("yellow", (7, 7))
+
+
+def rocket(k):
+    k.g("lgrey", [(7, 1), (8, 1), (10, 5), (10, 11), (5, 11), (5, 5)])
+    k.e("lblue", 6, 5, 9, 7)
+    k.g("red", [(5, 8), (3, 12), (5, 12)])
+    k.g("red", [(10, 8), (12, 12), (10, 12)])
+    k.r("orange", 6, 12, 9, 13)
+    k.p("yellow", (7, 14), (8, 14), (7, 13))
+
+
+def factory(k):
+    k.r("brown", 1, 8, 14, 14)
+    for x in (1, 6, 11):
+        k.g("red", [(x, 8), (x + 4, 5), (x + 4, 8)])
+    k.r("dbrown", 11, 1, 12, 7)
+    k.p("grey", (12, 0), (13, 0), (13, 1))
+    k.p("yellow", (3, 11), (7, 11), (11, 11))
+
+
+def moon(k):
+    k.e("lgrey", 2, 2, 13, 13)
+    k.e(None, 5, 0, 15, 10)
+    k.p("grey", (4, 9), (6, 11))
+    k.p("white", (11, 12), (13, 4))
+
+
+def sparkle(k):
+    four_star(k, "purple", "pink")
+    k.p("lblue", (2, 2), (13, 3), (3, 13), (12, 12))
+
+
 def brush(k):
     k.e("cream", 2, 2, 13, 13)
     k.e(None, 4, 4, 11, 11)
@@ -682,6 +722,7 @@ ICONS = [
     quake, flood, volcano, plague, raise_, lower, stamp, spiral, grave, halo, forget, biome,
     height, thermo, river, bread, log, stone, ingot, coin, hammer, sword, wheat, spring,
     summer, autumn, winter, drought, blizzard, water, humidity, inspect, brush, legend,
+    atom, rocket, factory, moon, sparkle,
 ]
 
 

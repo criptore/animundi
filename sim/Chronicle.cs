@@ -52,7 +52,7 @@ public partial class Simulation
 	/// <summary>How much each kind of event weighs when an age is named.</summary>
 	private static readonly Dictionary<string, float> ThemeWeights = new()
 	{
-		["wars"] = 4f, ["disasters"] = 3f, ["heroes"] = 3f, ["legends"] = 3.5f, ["nature"] = 2.5f, ["kings"] = 2f, ["cities"] = 2f, ["inventions"] = 1f, ["culture"] = 0.75f, ["life"] = 1f,
+		["wars"] = 4f, ["disasters"] = 3f, ["heroes"] = 3f, ["legends"] = 3.5f, ["nature"] = 2.5f, ["kings"] = 2f, ["cities"] = 2f, ["inventions"] = 1f, ["culture"] = 0.75f, ["life"] = 1f, ["ages"] = 2.5f,
 	};
 
 	/// <summary>What an event weighs: its kind's weight; a wildfire far from anyone and the
@@ -75,6 +75,7 @@ public partial class Simulation
 		["kings"] = (new[] { "Crowns", "Thrones", "Heirs" }, "Crowns Passing"),
 		["cities"] = (new[] { "Stone", "Hearths", "Walls" }, "Walls Rising"),
 		["inventions"] = (new[] { "Makers", "Wonders", "Craft" }, "The Makers' Years"),
+		["ages"] = (new[] { "Progress", "Engines", "Smoke", "the Atom", "Stars" }, "The World Moves On"),
 		["life"] = (new[] { "Silence", "Beasts", "Seasons" }, "The Turning Seasons"),
 		["quiet"] = (new[] { "Plenty", "Calm", "Sleep" }, "Quiet Years"),
 	};

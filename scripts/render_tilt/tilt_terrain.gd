@@ -23,12 +23,16 @@ static func heights(world: WorldData) -> PackedFloat32Array:
 	var h := PackedFloat32Array()
 	h.resize(world.size())
 	for i in world.size():
-		var level := world.level[i]
-		if level < WorldData.Level.PLAIN:
-			h[i] = SEA
-		else:
-			h[i] = (level - WorldData.Level.PLAIN) * STEP - (WATER_DIP if world.water[i] != WorldData.Water.LAND else 0.0)
+		h[i] = tile_height(world, i)
 	return h
+
+
+## Height of tile `i`: the sea bed under the plain for water levels, a step per level above.
+static func tile_height(world: WorldData, i: int) -> float:
+	var level := world.level[i]
+	if level < WorldData.Level.PLAIN:
+		return SEA
+	return (level - WorldData.Level.PLAIN) * STEP - (WATER_DIP if world.water[i] != WorldData.Water.LAND else 0.0)
 
 
 ## Where a ray meets the stepped ground: the (x, z) of the first point, going down from `from`

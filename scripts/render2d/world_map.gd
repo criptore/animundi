@@ -86,11 +86,24 @@ func set_world(w: WorldData) -> void:
 	_build_colors()
 
 
-## Shows the biome map or one of the data layers of MapRenderer.LAYERS.
+## The colours of a political layer, a tile each (0xRRGGBBAA, 0 for land no kingdom owns):
+## the simulation's LayerColors.
+var _political := PackedInt32Array()
+
+
+## Shows the biome map or one of the data layers of MapRenderer.LAYERS (a political layer's
+## colours come with set_political).
 func show_layer(layer_name: String) -> void:
 	layer = layer_name
 	_material.set_shader_parameter("show_patterns", layer_name == "Biomes")
 	if world != null:
+		_build_colors()
+
+
+## The colours of the political layer shown (sim/Cards.cs LayerColors), redrawn at once.
+func set_political(colors: PackedInt32Array) -> void:
+	_political = colors
+	if world != null and _political.size() == world.size():
 		_build_colors()
 
 
@@ -149,6 +162,17 @@ func update_tiles(indices: PackedInt32Array) -> void:
 
 ## Colour of tile `i` on the current layer, before the shader's patterns and edges.
 func tile_color(i: int) -> Color:
+	if layer != "Biomes" and not MapRenderer.LAYERS.has(layer):
+		# A political layer: the owner's colour, shaded by the level; the rest greyed.
+		var c := Biomes.COLORS[world.biome[i]] as Color
+		if world.is_water(i):
+			return Color(0.09, 0.1, 0.12) if world.water[i] == WorldData.Water.OCEAN else Color(0.16, 0.17, 0.2)
+		if _political.size() == world.size() and _political[i] != 0:
+			var p := _political[i]
+			var owner := Color8((p >> 24) & 255, (p >> 16) & 255, (p >> 8) & 255)
+			return owner * LEVEL_TINT[world.level[i]]
+		var grey := c.get_luminance() * 0.5 + 0.25
+		return Color(grey, grey, grey * 1.02)
 	if layer != "Biomes":
 		return _renderer.layer_color(world, i, layer)
 	var b := world.biome[i]

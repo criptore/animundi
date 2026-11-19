@@ -10,6 +10,8 @@ const WorldSettings = preload("res://scripts/world/world_settings.gd")
 
 ## The player started the world with these peoples (ids from data/races.json).
 ## `ai`: the built-in language model invents for the peoples (0.5); it is downloaded once.
+## A world's code was copied to the clipboard (to share it).
+signal code_copied(code: String)
 signal start_requested(races: PackedStringArray, per_village: int, ai: bool)
 ## The land's settings changed (they are written to `settings`): the world must be made again.
 signal generate_requested
@@ -69,6 +71,15 @@ func _ready() -> void:
 	var random_button := UI.tool_button(UI.icon("dice", 1), "A random world (R)", 34)
 	random_button.pressed.connect(randomize_seed)
 	seed_row.add_child(random_button)
+	# A world's code: copy it to share the world, or paste one (also typed in the seed box).
+	var share := UI.tool_button(UI.icon("scroll", 1), "Copy this world's code, to share it", 34)
+	share.pressed.connect(func():
+		DisplayServer.clipboard_set(settings.to_code())
+		code_copied.emit(settings.to_code()))
+	seed_row.add_child(share)
+	var paste := UI.tool_button(UI.icon("load", 1), "Make the world of a code you copied", 34)
+	paste.pressed.connect(func(): apply_code(DisplayServer.clipboard_get()))
+	seed_row.add_child(paste)
 
 	_size_option = OptionButton.new()
 	_size_option.focus_mode = Control.FOCUS_NONE
@@ -153,8 +164,24 @@ func randomize_seed() -> void:
 	request()
 
 
+## Makes the world of a code (WorldSettings.to_code): the settings and the controls take its
+## values. False when it is not a world's code.
+func apply_code(code: String) -> bool:
+	if not settings.from_code(code):
+		return false
+	_seed_edit.text = settings.seed_text
+	_size_option.select(maxi(WorldSettings.SIZES.values().find(settings.width), 0))
+	_continents.value = settings.continents
+	_water.value = roundi(settings.water_ratio * 100)
+	_climate.value = roundi(settings.temperature_offset * 100)
+	generate_requested.emit()
+	return true
+
+
 ## Writes the land's settings and asks for the world to be made again.
 func request() -> void:
+	if apply_code(_seed_edit.text):
+		return
 	settings.seed_text = _seed_edit.text if _seed_edit.text.strip_edges() != "" else "animundi"
 	settings.set_size(WorldSettings.SIZES.values()[_size_option.selected])
 	settings.continents = int(_continents.value)

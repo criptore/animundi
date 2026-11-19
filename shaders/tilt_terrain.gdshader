@@ -10,7 +10,7 @@ render_mode unshaded, cull_disabled;
 // The map's colour texture, one texel per tile.
 uniform sampler2D colors : filter_nearest;
 // Ground made by people (R * 255: 0 nothing, 1 road, 2 bare field, 3-5 wheat growing to ripe,
-// 6 flood water, 7 parched earth).
+// 6 flood water, 7 parched earth, 8 blighted by smog or fallout, 9 frost of a blizzard).
 uniform sampler2D ground : filter_nearest;
 uniform float frost = 0.0;
 // Off for the data layers (height, temperature...): the tops show the layer's colours alone.
@@ -124,6 +124,16 @@ void fragment() {
 				float hd = hash(vec2(cell) * 8.0 + vec2(sub) + 31.0);
 				vec3 dust = vec3(0.76, 0.64, 0.42) * (hd > 0.9 ? 0.8 : 1.0);
 				col = mix(col, dust, mix(0.42, 0.5, detail));
+			} else if (g == 9) {
+				// Frost left by a blizzard (sim/MorePowers.cs): white, sparkling up close.
+				float hs = hash(vec2(cell) * 8.0 + vec2(sub) + 53.0);
+				vec3 snow = vec3(0.90, 0.94, 1.0) * (hs > 0.9 ? 1.08 : (hs < 0.1 ? 0.9 : 1.0));
+				col = mix(col, snow, mix(0.75, 0.85, detail));
+			} else if (g == 8) {
+				// Blighted ground under smog or fallout (sim/Ages.cs): grey-brown, dead, with dark specks.
+				float hb = hash(vec2(cell) * 8.0 + vec2(sub) + 47.0);
+				vec3 ash = vec3(0.42, 0.40, 0.36) * (hb > 0.88 ? 0.7 : (hb < 0.1 ? 1.15 : 1.0));
+				col = mix(col, ash, mix(0.55, 0.65, detail));
 			} else if (g >= 2) {
 				bool furrow = sub.y % 2 == 1;
 				vec3 soil = vec3(0.45, 0.33, 0.21) * (furrow ? 0.82 : 1.0);

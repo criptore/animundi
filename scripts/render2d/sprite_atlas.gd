@@ -15,6 +15,18 @@ const FIRE_FRAMES := 3
 const TORNADO_FRAMES := 3
 const LAIRS := ["nest", "crypt", "pit", "cave", "pool", "cairn"]
 const PAD := 4
+## Vehicles of the ages beyond the cart and the boat (sim/Draw.cs VehicleSprite): wagon, steam
+## train, motor car, hovercar; sailing ship, galleon, steamship, liner, hovership.
+const LAND_VEHICLES := 4
+const SEA_VEHICLES := 5
+## Buildings of later ages (data/buildings.json "age") and the eras of great homes (Draw.cs HomeEra).
+const ERA_BUILDINGS := ["university", "factory", "power_plant", "silo", "launch_pad"]
+const HOME_ERAS := 4
+const MUSHROOM_FRAMES := 3
+## The colour mask: magenta shades painted in the owner's colour by the sprite shader.
+const MASK := Color(0.816, 0.0, 0.816)
+const MASK_DARK := Color(0.58, 0.0, 0.58)
+const INK := Color("#1b1418")
 
 var texture: ImageTexture
 ## Sprite id -> Rect2 of the sprite in the atlas, in UV (0..1).
@@ -50,6 +62,21 @@ func _init() -> void:
 	for kind in LAIRS:
 		images["effects/Lair_%s" % kind] = lair_image(kind)
 	images["effects/Sick"] = sick_image()
+	# The ages (sim/Ages.cs): vehicles, buildings and homes of later ages, the bomb and rockets.
+	for k in range(1, LAND_VEHICLES + 1):
+		images["effects/Vehicle_land_%d" % k] = land_vehicle(k)
+	for k in range(1, SEA_VEHICLES + 1):
+		images["effects/Vehicle_sea_%d" % k] = sea_vehicle(k)
+	for id in ERA_BUILDINGS:
+		images["effects/Era_%s" % id] = era_building(id)
+	for era in HOME_ERAS:
+		for tier in 2:
+			for variant in 2:
+				images["effects/Home_%d_%d_%d" % [era, tier, variant]] = era_home(era, tier, variant)
+	for k in MUSHROOM_FRAMES:
+		images["effects/Mushroom_%d" % k] = mushroom_frame(k)
+	for k in 2:
+		images["effects/Rocket_%d" % k] = rocket_frame(k)
 	var ids := images.keys()
 	ids.sort_custom(func(a, b): return images[a].get_height() > images[b].get_height())
 
@@ -282,3 +309,355 @@ static func sick_image() -> Image:
 			elif ch == "O":
 				img.set_pixel(x, y, Color("#e2ff9a"))
 	return img
+
+
+# ---------------------------------------------------------------- the ages (sim/Ages.cs)
+
+## Fills a rectangle (inclusive corners) clipped to the image.
+static func _fill(img: Image, x0: int, y0: int, x1: int, y1: int, c: Color) -> void:
+	for y in range(maxi(0, y0), mini(img.get_height(), y1 + 1)):
+		for x in range(maxi(0, x0), mini(img.get_width(), x1 + 1)):
+			img.set_pixel(x, y, c)
+
+
+static func _dot(img: Image, x: int, y: int, c: Color) -> void:
+	if x >= 0 and y >= 0 and x < img.get_width() and y < img.get_height():
+		img.set_pixel(x, y, c)
+
+
+## A filled ellipse inside the box (inclusive).
+static func _oval(img: Image, x0: int, y0: int, x1: int, y1: int, c: Color) -> void:
+	var cx := (x0 + x1) / 2.0
+	var cy := (y0 + y1) / 2.0
+	var rx := (x1 - x0) / 2.0 + 0.5
+	var ry := (y1 - y0) / 2.0 + 0.5
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var dx := (x + 0.5 - cx - 0.5) / rx
+			var dy := (y + 0.5 - cy - 0.5) / ry
+			if dx * dx + dy * dy <= 1.0:
+				_dot(img, x, y, c)
+
+
+## Rings the shapes in ink, the way every sprite of the game is outlined, and shades their
+## lowest row.
+static func _outline(img: Image) -> Image:
+	var src := img.duplicate()
+	var w := img.get_width()
+	var h := img.get_height()
+	for y in h:
+		for x in w:
+			if src.get_pixel(x, y).a > 0.5:
+				continue
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var n: Vector2i = Vector2i(x, y) + d
+				if n.x >= 0 and n.y >= 0 and n.x < w and n.y < h and src.get_pixel(n.x, n.y).a > 0.5 and src.get_pixel(n.x, n.y) != INK:
+					img.set_pixel(x, y, INK)
+					break
+	return img
+
+
+## A vehicle of trade on land, by step of the ages: 1 a covered wagon, 2 a steam train, 3 a motor
+## car, 4 a hovercar. The owner's colour paints the canvas, the coach and the body.
+static func land_vehicle(k: int) -> Image:
+	var wood := Color("#8a5a32")
+	var dark := Color("#4a3426")
+	var wheel := Color("#2e2a30")
+	var steel := Color("#7c8494")
+	var glass := Color("#9fd6f0")
+	var img: Image
+	match k:
+		1:
+			img = Image.create(13, 10, false, Image.FORMAT_RGBA8)
+			_oval(img, 2, 1, 10, 7, Color("#efe2c2"))
+			_fill(img, 1, 5, 11, 6, MASK)
+			_fill(img, 1, 7, 11, 7, wood)
+			_fill(img, 3, 3, 9, 4, Color("#d9c9a4"))
+			_dot(img, 3, 8, wheel); _dot(img, 9, 8, wheel); _dot(img, 2, 8, dark); _dot(img, 10, 8, dark)
+		2:
+			img = Image.create(21, 12, false, Image.FORMAT_RGBA8)
+			# The engine: a black boiler, a chimney with a puff of steam, the cab in front.
+			_fill(img, 1, 5, 9, 8, Color("#34323a"))
+			_fill(img, 2, 2, 3, 4, Color("#34323a"))
+			_oval(img, 0, 0, 3, 2, Color("#d8d8de"))
+			_fill(img, 7, 3, 9, 4, MASK)
+			_dot(img, 8, 4, Color("#ffe27a"))
+			_dot(img, 1, 7, Color("#e8483c"))
+			# The coach, in the owner's colour, with windows.
+			_fill(img, 11, 4, 19, 8, MASK)
+			_fill(img, 11, 4, 19, 4, MASK_DARK)
+			for x in [12, 15, 18]:
+				_dot(img, x, 6, Color("#ffe9a8"))
+			for x in [2, 6, 12, 17]:
+				_dot(img, x, 9, wheel)
+				_dot(img, x + 1, 9, wheel)
+			_fill(img, 0, 10, 20, 10, steel)
+		3:
+			img = Image.create(13, 9, false, Image.FORMAT_RGBA8)
+			_fill(img, 1, 4, 11, 6, MASK)
+			_fill(img, 3, 2, 8, 3, MASK_DARK)
+			_fill(img, 4, 2, 5, 3, glass)
+			_fill(img, 7, 2, 8, 3, glass)
+			_dot(img, 11, 5, Color("#ffe27a"))
+			_dot(img, 1, 5, Color("#e8483c"))
+			for x in [3, 9]:
+				_fill(img, x, 7, x + 1, 7, wheel)
+		_:
+			img = Image.create(13, 10, false, Image.FORMAT_RGBA8)
+			_oval(img, 1, 2, 11, 6, MASK)
+			_oval(img, 3, 1, 8, 4, glass)
+			_fill(img, 2, 5, 10, 5, MASK_DARK)
+			# It floats on a cyan glow.
+			_fill(img, 3, 8, 9, 8, Color("#7ef0e8"))
+			_dot(img, 6, 9, Color("#c9fff9"))
+	return _outline(img)
+
+
+## A trade boat by step of the ages: 1 a sailing ship, 2 a galleon, 3 a steamship, 4 a liner,
+## 5 a hovership. Sails and hulls carry the owner's colour.
+static func sea_vehicle(k: int) -> Image:
+	var hull := Color("#7a4a2a")
+	var mast := Color("#5a3a24")
+	var sail := Color("#f0e6cc")
+	var steel := Color("#5f6878")
+	var white := Color("#e8ecf2")
+	var img: Image
+	match k:
+		1:
+			img = Image.create(14, 14, false, Image.FORMAT_RGBA8)
+			_fill(img, 6, 1, 6, 10, mast)
+			_fill(img, 3, 2, 9, 7, MASK)
+			_fill(img, 3, 2, 9, 2, MASK_DARK)
+			_fill(img, 1, 9, 12, 11, hull)
+			_fill(img, 2, 12, 11, 12, hull.darkened(0.3))
+		2:
+			img = Image.create(17, 17, false, Image.FORMAT_RGBA8)
+			for mx in [5, 11]:
+				_fill(img, mx, 1, mx, 12, mast)
+			_fill(img, 2, 2, 8, 6, sail)
+			_fill(img, 8, 3, 14, 8, sail)
+			_fill(img, 3, 7, 7, 9, sail)
+			_fill(img, 4, 0, 6, 1, MASK)
+			_fill(img, 10, 0, 12, 1, MASK)
+			_fill(img, 1, 11, 15, 14, hull)
+			_fill(img, 12, 9, 15, 11, hull)
+			_fill(img, 1, 12, 15, 12, MASK_DARK)
+		3:
+			img = Image.create(18, 12, false, Image.FORMAT_RGBA8)
+			_fill(img, 1, 7, 16, 10, Color("#2c2a32"))
+			_fill(img, 2, 10, 15, 10, Color("#a43a2e"))
+			_fill(img, 4, 4, 12, 6, white)
+			_fill(img, 7, 1, 8, 4, MASK)
+			_fill(img, 7, 1, 8, 1, Color("#2c2a32"))
+			_oval(img, 3, 0, 6, 2, Color("#c8c8d0"))
+			for x in [5, 8, 11]:
+				_dot(img, x, 5, Color("#4a6a8a"))
+		4:
+			img = Image.create(19, 12, false, Image.FORMAT_RGBA8)
+			_fill(img, 0, 7, 18, 10, white)
+			_fill(img, 1, 10, 17, 10, steel)
+			_fill(img, 3, 4, 14, 6, white)
+			_fill(img, 5, 2, 11, 3, white)
+			_fill(img, 12, 1, 13, 3, MASK)
+			_fill(img, 0, 8, 18, 8, MASK)
+			for x in range(4, 15, 2):
+				_dot(img, x, 5, Color("#4a6a8a"))
+		_:
+			img = Image.create(16, 11, false, Image.FORMAT_RGBA8)
+			_oval(img, 1, 3, 14, 7, MASK)
+			_oval(img, 4, 1, 10, 4, Color("#9fd6f0"))
+			_fill(img, 2, 6, 13, 6, MASK_DARK)
+			_fill(img, 3, 9, 12, 9, Color("#7ef0e8"))
+	return _outline(img)
+
+
+## Buildings of later ages: the university (a dome over columns), the factory (sawtooth roofs, a
+## smoking chimney), the power plant (a cooling tower), the missile silo (a hatch in a fenced
+## yard), the launch pad (a gantry and a rocket). Roofs and flags carry the owner's colour.
+static func era_building(id: String) -> Image:
+	var stone := Color("#c9c1b1")
+	var stone_dark := Color("#8e8676")
+	var brick := Color("#a4523a")
+	var brick_dark := Color("#6e3426")
+	var concrete := Color("#a7a9ae")
+	var concrete_dark := Color("#74777e")
+	var window := Color("#ffe9a8")
+	var smoke := Color("#8c8a90")
+	var img: Image
+	match id:
+		"university":
+			img = Image.create(26, 26, false, Image.FORMAT_RGBA8)
+			_fill(img, 2, 12, 23, 23, stone)
+			_fill(img, 1, 10, 24, 11, MASK)
+			_oval(img, 7, 2, 18, 12, MASK)
+			_fill(img, 12, 0, 13, 2, Color("#e8c24a"))
+			for x in range(4, 23, 4):
+				_fill(img, x, 13, x + 1, 22, Color("#ece6d8"))
+			_fill(img, 11, 17, 14, 23, stone_dark)
+			_fill(img, 1, 24, 24, 24, stone_dark)
+		"factory":
+			img = Image.create(26, 24, false, Image.FORMAT_RGBA8)
+			_fill(img, 1, 11, 24, 22, brick)
+			for x in range(1, 24, 6):
+				for t in 5:
+					_fill(img, x + t, 11 - t, x + t, 11, MASK if t < 4 else MASK_DARK)
+			_fill(img, 19, 1, 21, 10, brick_dark)
+			_oval(img, 16, 0, 21, 3, smoke)
+			for x in range(3, 22, 4):
+				_fill(img, x, 15, x + 1, 17, window)
+			_fill(img, 10, 18, 13, 22, brick_dark)
+		"power_plant":
+			img = Image.create(26, 26, false, Image.FORMAT_RGBA8)
+			# The cooling tower: waisted, steaming.
+			for y in range(5, 24):
+				var t := (y - 5) / 18.0
+				var half := int(round(6.0 - 2.4 * sin(t * PI) + 1.2 * t))
+				_fill(img, 9 - half, y, 9 + half, y, concrete if y % 5 else concrete_dark)
+			_oval(img, 3, 0, 14, 5, Color("#e4e6ea"))
+			_fill(img, 15, 13, 24, 23, concrete)
+			_fill(img, 15, 11, 24, 12, MASK)
+			_fill(img, 21, 6, 22, 10, concrete_dark)
+			for x in [17, 20, 23]:
+				_dot(img, x, 16, window)
+		"silo":
+			img = Image.create(16, 14, false, Image.FORMAT_RGBA8)
+			_fill(img, 1, 6, 14, 12, Color("#7c8a5a"))
+			_oval(img, 4, 7, 11, 11, concrete)
+			_oval(img, 6, 8, 9, 10, Color("#2e2a30"))
+			_fill(img, 7, 9, 8, 9, Color("#e8c24a"))
+			for x in range(1, 15, 3):
+				_fill(img, x, 3, x, 6, concrete_dark)
+			_fill(img, 1, 4, 14, 4, concrete_dark)
+			_fill(img, 13, 0, 13, 4, concrete_dark)
+			_fill(img, 11, 0, 12, 1, MASK)
+		_:
+			img = Image.create(18, 32, false, Image.FORMAT_RGBA8)
+			_fill(img, 1, 28, 16, 30, concrete)
+			# The gantry.
+			for y in range(4, 28):
+				_dot(img, 3, y, Color("#c8463a"))
+				if y % 3 == 0:
+					_fill(img, 3, y, 6, y, Color("#c8463a"))
+			# The rocket waiting on it.
+			_fill(img, 9, 6, 12, 27, Color("#ecedf0"))
+			_fill(img, 10, 2, 11, 5, Color("#ecedf0"))
+			_fill(img, 9, 12, 12, 13, MASK)
+			_fill(img, 8, 24, 8, 27, MASK_DARK)
+			_fill(img, 13, 24, 13, 27, MASK_DARK)
+			_dot(img, 10, 1, Color("#c8463a"))
+	return _outline(img)
+
+
+## The great homes of later ages, by era: 0 a row of brick houses, 1 an apartment block, 2 a glass
+## tower, 3 an arcology of domes and gardens. tier 0 for a stone house, 1 for a big house;
+## variant changes the windows. Roofs and bands carry the owner's colour.
+static func era_home(era: int, tier: int, variant: int) -> Image:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = era * 1009 + tier * 101 + variant * 7 + 3
+	var lit := Color("#ffe9a8")
+	var dim := Color("#4a5468")
+	var w: int
+	var h: int
+	var img: Image
+	match era:
+		0:
+			w = 18 if tier == 0 else 24
+			h = 15 if tier == 0 else 19
+			img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+			var wall := Color("#a4523a") if variant == 0 else Color("#8c4a3a")
+			_fill(img, 1, 5, w - 2, h - 2, wall)
+			var houses := 2 if tier == 0 else 3
+			var each := (w - 2) / houses
+			for k in houses:
+				var x0 := 1 + k * each
+				for t in 4:
+					_fill(img, x0 + t, 4 - t, x0 + each - 1 - t, 4 - t, MASK if t else MASK_DARK)
+				_fill(img, x0 + each - 3, 0, x0 + each - 2, 2, Color("#5a3428"))
+				_fill(img, x0 + 2, h - 6, x0 + 3, h - 2, Color("#4a2a20"))
+				_dot(img, x0 + each - 3, h - 6, lit if rng.randf() < 0.7 else dim)
+				_dot(img, x0 + 2, 7, lit if rng.randf() < 0.6 else dim)
+				_dot(img, x0 + each - 3, 7, lit if rng.randf() < 0.6 else dim)
+		1:
+			w = 16 if tier == 0 else 22
+			h = 19 if tier == 0 else 26
+			img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+			var wall := Color("#b8b4aa") if variant == 0 else Color("#c4a98a")
+			_fill(img, 1, 2, w - 2, h - 2, wall)
+			_fill(img, 1, 1, w - 2, 2, MASK)
+			for y in range(4, h - 4, 3):
+				for x in range(3, w - 3, 3):
+					_fill(img, x, y, x + 1, y, lit if rng.randf() < 0.55 else dim)
+			_fill(img, w / 2 - 1, h - 4, w / 2, h - 2, Color("#3a3640"))
+		2:
+			w = 14 if tier == 0 else 18
+			h = 26 if tier == 0 else 34
+			img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+			var glass := Color("#6fa8cc") if variant == 0 else Color("#7fb8b8")
+			_fill(img, 2, 3, w - 3, h - 2, glass)
+			_fill(img, 2, 3, 3, h - 2, glass.lightened(0.35))
+			for y in range(5, h - 2, 4):
+				_fill(img, 2, y, w - 3, y, MASK if y % 8 == 1 else glass.darkened(0.25))
+			for n in 10:
+				_dot(img, rng.randi_range(4, w - 4), rng.randi_range(5, h - 3), lit)
+			_fill(img, w / 2, 0, w / 2, 2, Color("#c8ccd4"))
+		_:
+			w = 20 if tier == 0 else 26
+			h = 24 if tier == 0 else 32
+			img = Image.create(w, h, false, Image.FORMAT_RGBA8)
+			var shell := Color("#e8ecf2")
+			_fill(img, 2, h / 2, w - 3, h - 2, shell)
+			_oval(img, 1, h / 3, w - 2, h - 2, shell)
+			_oval(img, w / 4, 1, w - w / 4 - 1, h / 2 + 2, Color("#a8e0f0") if variant == 0 else Color("#c0e8d8"))
+			_fill(img, 2, h - 5, w - 3, h - 5, MASK)
+			for n in 8:
+				_dot(img, rng.randi_range(w / 4 + 2, w - w / 4 - 3), rng.randi_range(4, h / 2), Color("#5fb85a"))
+			for x in range(4, w - 4, 3):
+				_dot(img, x, h - 8, lit if rng.randf() < 0.7 else dim)
+	return _outline(img)
+
+
+## A mushroom cloud, 46x58: frame 0 the fireball rising, 1 the full cloud, 2 the cloud fading
+## into grey ash.
+static func mushroom_frame(k: int) -> Image:
+	var w := 46
+	var h := 58
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 911 + k * 31
+	var core: Color = [Color("#fff4b0"), Color("#ffd04a"), Color("#c8c4bc")][k]
+	var body: Color = [Color("#ff9a3a"), Color("#d8643a"), Color("#8e8a88")][k]
+	var rim: Color = [Color("#c8402a"), Color("#7a3a2e"), Color("#5c5a5e")][k]
+	# The stem.
+	for y in range(20, h):
+		var half := 3 + int((y - 20) / 9.0) + (2 if y > h - 6 else 0)
+		_fill(img, w / 2 - half, y, w / 2 + half, y, body if y % 4 else rim)
+		_fill(img, w / 2 - 1, y, w / 2 + 1, y, core)
+	# The cap, a ring of puffs around a bright heart.
+	_oval(img, 4, 2, w - 5, 24, rim)
+	_oval(img, 6, 3, w - 7, 22, body)
+	for n in 14:
+		var px := rng.randi_range(8, w - 9)
+		var py := rng.randi_range(5, 18)
+		_oval(img, px - 3, py - 2, px + 3, py + 2, body.lightened(0.15) if n % 3 else rim)
+	_oval(img, 15, 8, w - 16, 18, core)
+	# A skirt of dust at the foot.
+	_oval(img, 6, h - 7, w - 7, h - 1, rim)
+	_oval(img, 9, h - 6, w - 10, h - 2, body)
+	return img
+
+
+## A rocket rising on its flame, 7x22; the two frames flicker the flame.
+static func rocket_frame(k: int) -> Image:
+	var img := Image.create(7, 22, false, Image.FORMAT_RGBA8)
+	_fill(img, 2, 2, 4, 13, Color("#ecedf0"))
+	_dot(img, 3, 1, Color("#ecedf0"))
+	_dot(img, 3, 0, Color("#c8463a"))
+	_fill(img, 2, 6, 4, 7, MASK)
+	_fill(img, 1, 11, 1, 14, MASK_DARK)
+	_fill(img, 5, 11, 5, 14, MASK_DARK)
+	var flame := 6 if k == 0 else 8
+	for y in range(14, 14 + flame):
+		var half := 1 if y < 14 + flame - 2 else 0
+		_fill(img, 3 - half, y, 3 + half, y, Color("#ffd04a") if y < 17 else Color("#f0621e"))
+	_dot(img, 3, 15, Color("#fff4b0"))
+	return _outline(img)

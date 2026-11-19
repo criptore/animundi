@@ -201,6 +201,8 @@ public partial class Simulation
 		["armour"] = new[] { "Shield", "Mail", "Helm", "Hide Armour" },
 		["technique"] = new[] { "Rotation", "Lore", "Craft", "Way", "Rite" },
 		["building"] = new[] { "Hall", "Lodge", "Granary", "Shrine", "Bastion", "Longhouse", "Tower" },
+		["vehicle"] = new[] { "Cart", "Wheel", "Carriage", "Engine", "Runner" },
+		["energy"] = new[] { "Furnace", "Turbine", "Dynamo", "Reactor", "Cell" },
 	};
 
 	/// <summary>What the kingdom needs most, and an invention for it: weapons and armour at war,
@@ -230,8 +232,13 @@ public partial class Simulation
 		else if (crowded && r < 0.5 || restless && r < 0.3)
 			kind = "building";
 		else
-			kind = _rng.NextDouble() < 0.6 ? "tool" : InventionKinds[_rng.Next(InventionKinds.Length)];
-		var parents = known.FindAll(x => x.Kind == kind);
+		{
+			// What their age allows (Ages.cs): vehicles and energy come later.
+			var kinds = OpenKinds(k);
+			kind = _rng.NextDouble() < 0.6 ? "tool" : kinds[_rng.Next(kinds.Count)];
+		}
+		var openBlocks = OpenBlocks(k);
+		var parents = known.FindAll(x => x.Kind == kind && x.Effects.TrueForAll(e => openBlocks.Contains(e.Do)));
 		Invention parent = parents.Count > 0 && _rng.NextDouble() < 0.6 ? parents[_rng.Next(parents.Count)] : null;
 
 		var effects = new List<EffectDraft>();
@@ -254,6 +261,17 @@ public partial class Simulation
 					break;
 				case "armour":
 					effects.Add(new EffectDraft { Do = "defense", Amount = 10f + 15f * (float)_rng.NextDouble() });
+					break;
+				case "vehicle":
+					effects.Add(new EffectDraft { Do = "speed", Amount = 12f + 18f * (float)_rng.NextDouble() });
+					break;
+				case "energy":
+					effects.Add(new EffectDraft { Do = "power", Amount = 8f + 12f * (float)_rng.NextDouble() });
+					if (BlockOpen("clean", kingdom.Age) && _rng.NextDouble() < 0.5)
+						effects.Add(new EffectDraft { Do = "clean", Amount = 10f + 20f * (float)_rng.NextDouble() });
+					break;
+				case "technique" when BlockOpen("knowledge", kingdom.Age) && !hungry && _rng.NextDouble() < 0.3:
+					effects.Add(new EffectDraft { Do = "knowledge", Amount = 3f + 5f * (float)_rng.NextDouble() });
 					break;
 				case "technique":
 					effects.Add(hungry || _rng.NextDouble() < 0.4
@@ -284,6 +302,7 @@ public partial class Simulation
 		float need = power * 12f + 2f;
 		var cost = kind switch
 		{
+			"vehicle" or "energy" => new Dictionary<string, float> { ["metal"] = MathF.Ceiling(need / 2f * 0.5f), ["wood"] = MathF.Ceiling(need * 0.5f) },
 			"weapon" or "armour" => new Dictionary<string, float> { ["metal"] = MathF.Ceiling(need / 2f * 0.6f), ["wood"] = MathF.Ceiling(need * 0.4f) },
 			"building" => new Dictionary<string, float> { ["wood"] = MathF.Ceiling(need * 0.5f), ["stone"] = MathF.Ceiling(need * 0.5f) },
 			_ => new Dictionary<string, float> { ["wood"] = MathF.Ceiling(need) },
@@ -349,9 +368,11 @@ public partial class Simulation
 				sb.Append($"- {Inventions[id].Name} ({Inventions[id].Kind}: {Describe(Inventions[id])})\n");
 		}
 		sb.Append("Invent ONE new thing they need, or improve one they know (set \"improves\" to its exact name). ");
-		sb.Append($"Kinds: {string.Join(", ", InventionKinds)}. Effects (\"do\"): ");
+		var open = OpenBlocks(k);
+		sb.Append($"They live in {The(AgeTitle(kingdom.Age))}. Kinds: {string.Join(", ", OpenKinds(k))}. Effects (\"do\"): ");
 		foreach (var (name, block) in EffectBlocks)
-			sb.Append($"{name} (kinds {string.Join("/", block.kinds)}, amount up to {block.max}{(block.job ? ", with a job" : "")}); ");
+			if (open.Contains(name))
+				sb.Append($"{name} (kinds {string.Join("/", block.kinds)}, amount up to {block.max}{(block.job ? ", with a job" : "")}); ");
 		sb.Append($"jobs: {string.Join(", ", WorkJobs)}. 1 to 3 effects; the sum of amount/max must stay under {Budget(k):0.0}. ");
 		sb.Append("Cost in wood, stone, metal, gold: wood counts 1, metal 2, gold 4, and the total must be at least 12 times that sum. ");
 		sb.Append($"sprite: 0-{InventionSprites - 1} (buildings only; their builders like {Walls[kingdom.Culture.Wall]} walls and {Roofs[kingdom.Culture.Roof]} roofs: sprite {kingdom.Culture.Roof * Walls.Length + kingdom.Culture.Wall}). Name in their language's spirit, 2-28 letters. Answer with the JSON record only.\n");
